@@ -114,7 +114,10 @@ export function startLabeler(opt: Options) {
   }
 
   // autoplay can be blocked (iOS low power mode): then one tap starts it
-  const play = () => video.play().catch(() => showStatus("Zum Abspielen auf das Video tippen", "tap"));
+  // (an AbortError only means a new src interrupted the old play() call)
+  const play = () => video.play().catch((e: DOMException) => {
+    if (e.name === "NotAllowedError") showStatus("Zum Abspielen auf das Video tippen", "tap");
+  });
   viewport.addEventListener("click", () => {
     if ($("status").dataset.kind === "tap") { hideStatus(); video.play(); }
   });

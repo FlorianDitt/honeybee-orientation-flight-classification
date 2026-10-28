@@ -44,7 +44,7 @@ ul.m li { margin-bottom: 7px; }
     <div class="fact"><b>96 × 30 s</b>75 Seq. Stock A, 21 Stock B</div>
     <div class="fact"><b>59,94 fps</b>1080 × 1920, GoPro</div>
     <div class="fact"><b>Keine Labels</b>Start/Ziel der Bahn liefern Selbst-Labels</div>
-    <div class="fact"><b>A ≫ B</b>~70 vs. ~9 Flugbahnen pro 30 s</div>
+    <div class="fact"><b>A ≫ B</b>~75 vs. ~9 Flugbahnen pro 30 s</div>
   </div>
 </div>
 <div class="hero">
@@ -55,61 +55,67 @@ ul.m li { margin-bottom: 7px; }
 
 ---
 
-<!-- Folie 2 · Methode -->
+<!-- Folie 2 · System -->
 
-## Methode: Flugbahnen selbst erzeugen, dann klassifizieren
+## System: vom Rohvideo zum Indikator
 
 <style scoped>
-h2 { margin-bottom: 20px; }
-.grid { display: grid; grid-template-columns: 1fr 520px; gap: 44px; }
-ol { font-size: 17px; line-height: 1.36; padding-left: 1.3em; margin: 0; }
-ol li { margin-bottom: 8px; }
-ol li::marker { color: var(--accent); font-weight: 700; }
-.plot img { width: 520px; display: block; }
-.plot .cap { font-size: 14px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
-.plot .cap b { color: var(--ink); }
-.split { margin-top: 14px; }
-.bar { display: flex; height: 26px; }
-.seg { height: 100%; border-right: 2px solid var(--bg); color: #fff; font-size: 13px; font-weight: 600;
-       display: flex; align-items: center; padding-left: 10px; box-sizing: border-box; white-space: nowrap; overflow: hidden; }
-.seg:first-child { border-radius: 5px 0 0 5px; }
-.seg:last-child { border-radius: 0 5px 5px 0; border-right: none; }
-.gap { width: 18px; }
-.legend { display: flex; gap: 18px; font-size: 13px; color: var(--muted); margin-top: 6px; }
+h2 { margin-bottom: 18px; }
+.flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 20px; }
+.step { position: relative; background: #f1efe9; border-radius: 8px; padding: 10px 12px 9px; }
+.step:not(:last-child)::after { content: "→"; position: absolute; right: -13px; top: 50%; transform: translateY(-50%);
+  color: var(--accent); font-weight: 700; font-size: 18px; }
+.step .n { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 0.08em; }
+.step b { display: block; font-size: 16px; margin: 1px 0 3px; }
+.step span { display: block; font-size: 13px; line-height: 1.3; color: var(--muted); }
+.step code { display: inline-block; margin-top: 5px; font-size: 11px; }
+.grid { display: grid; grid-template-columns: 1fr 430px; gap: 36px; }
+ul.d { font-size: 16px; line-height: 1.36; margin: 0; }
+ul.d li { margin-bottom: 7px; }
+.shot img { width: 430px; border-radius: 6px; display: block; border: 1px solid var(--line); }
+.shot .cap { font-size: 12.5px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+.split { margin-top: 12px; }
+.bars { display: flex; gap: 14px; }
+.bar { display: flex; height: 22px; border-radius: 5px; overflow: hidden; }
+.bar div { height: 100%; color: #fff; font-size: 11.5px; font-weight: 600; display: flex; align-items: center;
+  padding-left: 8px; box-sizing: border-box; white-space: nowrap; overflow: hidden; border-right: 2px solid var(--bg); }
+.bar div:last-child { border-right: none; }
+.a { flex: 75; } .b { flex: 21; }
+.tr { width: 73.3%; background: #2f4858; } .bu { width: 1.4%; background: #d1d5db; }
+.va { width: 18.7%; background: #6b8fa3; } .ta { width: 5.2%; background: #d99a1e; } .tb { width: 100%; background: #b5541c; }
+.legend { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); margin-top: 5px; flex-wrap: wrap; }
 .legend b { color: var(--ink); font-weight: 600; }
 </style>
 
+<div class="flow">
+  <div class="step"><div class="n">1</div><b>Tracking</b><span>Hintergrundmodell, Hungarian-Zuordnung, Fragmente verbinden</span><code>beeflight-tracks</code></div>
+  <div class="step"><div class="n">2</div><b>Selbst-Labels</b><span>Start/Ziel am Brett, Geradheit, Windung → stratifizierte Stichprobe</span><code>beeflight-sample</code></div>
+  <div class="step"><div class="n">3</div><b>Handlabels</b><span>Web-App, 4 Klassen, 3 Stimmen pro Bahn, Mehrheit entscheidet</span><code>labeler/ · beeflight-vote</code></div>
+  <div class="step"><div class="n">4</div><b>Modell</b><span>GRU auf der Bahn vs. Krümmungs-Baseline, Macro-F1</span><code>PyTorch</code></div>
+  <div class="step"><div class="n">5</div><b>Indikator</b><span>Anteil Orientierungsflüge pro Sequenz über die Zeit</span><code>beeflight-run</code></div>
+</div>
+
 <div class="grid">
 <div>
-  <ol>
-    <li><strong>Vordergrund:</strong> Median-Hintergrund abziehen; Gras-Maske aus Pixeln, die &gt; 8 % der Zeit „bewegt“ sind</li>
-    <li><strong>Tracking:</strong> Hungarian-Zuordnung mit Geschwindigkeitsvorhersage, Lücken bis 3 Frames</li>
-    <li><strong>Selbst-Labels:</strong> Start auf dem Brett → Abflug, Ende auf dem Brett → Anflug; dazu Geradheit, Windung, Dauer</li>
-    <li><strong>Handlabels:</strong> ~300 Bahnen in 4 Klassen: Orientierung · Sammelabflug · suchender Anflug · Artefakt</li>
-    <li><strong>Lernen:</strong> Trajektorien-Encoder (GRU) gegen Baseline Krümmungsschwelle; Macro-F1, daraus Anteil Orientierungsflüge pro Sequenz</li>
-  </ol>
+  <h3>Designentscheidungen</h3>
+  <ul class="d">
+    <li><strong>Labels überleben Tracker-Updates:</strong> jedes Label speichert die Bahn und die Tracker-Version; nach v2 und v3 wurden die Labels automatisch auf dieselben Flüge übertragen</li>
+    <li><strong>Mehrere Labelnde:</strong> Freunde labeln online kurze Clips (GitHub Pages), nach einer Übungsrunde mit Rückmeldung; Übereinstimmung als Krippendorffs α</li>
+    <li><strong>Kein Leck:</strong> Split nach Zeitblöcken mit Puffer, Schwellen nur auf Validierung, Testsets erst nach dem Einfrieren gelabelt</li>
+  </ul>
 </div>
-<div class="plot">
-  <img src="assets/flight_counts.png">
-  <div class="cap"><b>Vorstudie</b> auf Trainings- und Validierungsdaten (Stock A, 7 × 30 s): kurvige Abflüge in 5 von 7 Sequenzen; die meisten Bahnen reißen im Gras ab.</div>
+<div class="shot">
+  <img src="assets/labeler.png">
+  <div class="cap"><b>Label-App:</b> Zeitlupe in Schleife, Bahn synchron eingezeichnet, Tasten 1–4</div>
 </div>
 </div>
 
 <div class="split">
-  <div style="display:flex; gap:0">
-    <div class="bar" style="flex:75">
-      <div class="seg" style="width:73.33%; background:var(--train)">Training · Seq. 015–069</div>
-      <div class="seg" style="width:1.33%; background:var(--buffer)"></div>
-      <div class="seg" style="width:18.67%; background:var(--val)">Validierung</div>
-      <div class="seg" style="width:1.33%; background:var(--buffer)"></div>
-      <div class="seg" style="width:5.34%; background:var(--test-a)"></div>
-    </div>
-    <div class="gap"></div>
-    <div class="bar" style="flex:21">
-      <div class="seg" style="width:100%; background:var(--test-b)">Test B · Stock B</div>
-    </div>
+  <div class="bars">
+    <div class="bar a"><div class="tr">Training · Seq. 015–069</div><div class="bu"></div><div class="va">Validierung</div><div class="bu"></div><div class="ta"></div></div>
+    <div class="bar b"><div class="tb">Test B · Stock B</div></div>
   </div>
-  <div class="legend"><span><b>Split nach Zeitblöcken</b>, nie nach Frames</span><span>grau: Puffer, verworfen</span><span><b style="color:var(--test-a)">Test A</b> gleicher Stock, 2 min</span><span><b style="color:var(--test-b)">Test B</b> neuer Stock, 10,5 min</span><span>Tuning nur auf Validierung</span></div>
+  <div class="legend"><span><b>Split nach Zeitblöcken</b>, nie nach Frames</span><span>grau: Puffer, verworfen</span><span><b style="color:#d99a1e">Test A</b> gleicher Stock, 2 min</span><span><b style="color:#b5541c">Test B</b> neuer Stock, 10,5 min</span></div>
 </div>
 
 ---
@@ -119,45 +125,53 @@ ol li::marker { color: var(--accent); font-weight: 700; }
 ## Ergebnisse und Diskussion
 
 <style scoped>
-h2 { margin-bottom: 22px; }
-.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 26px; }
-.card { border-radius: 8px; padding: 14px 16px; background: #f1efe9; }
-.card .k { font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
-.card .v { font-size: 30px; font-weight: 700; margin: 4px 0 2px; }
-.card .s { font-size: 14px; color: var(--muted); line-height: 1.35; }
+h2 { margin-bottom: 16px; }
+.top { display: grid; grid-template-columns: 480px 1fr; gap: 36px; margin-bottom: 14px; }
+.chart img { width: 480px; display: block; }
+.chart .cap { font-size: 13px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+.chart .cap b { color: var(--ink); }
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content: start; }
+.card { border-radius: 8px; padding: 10px 14px; background: #f1efe9; }
+.card .k { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
+.card .v { font-size: 27px; font-weight: 700; margin: 2px 0 0; line-height: 1.2; }
+.card .s { font-size: 13px; color: var(--muted); line-height: 1.3; }
 .card.todo { background: none; border: 2px dashed var(--line); }
 .card.todo .v { color: #c4c7cc; }
-.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; }
-h3 { margin-bottom: 8px; }
-ul { font-size: 17px; line-height: 1.4; margin: 0; }
-ul li { margin-bottom: 7px; }
-.ask { margin-top: 14px; font-size: 17px; border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+ul { font-size: 16px; line-height: 1.36; margin: 0; }
+ul li { margin-bottom: 6px; }
+.ask { margin-top: 10px; font-size: 16px; border-left: 3px solid var(--accent); padding: 3px 0 3px 12px; }
 </style>
 
+<div class="top">
+<div class="chart">
+  <img src="assets/tracker_versions.png">
+  <div class="cap"><b>Fehleranalyse statt Bauchgefühl:</b> Anteil vollständiger Bahnen (Start und Ende am Brett oder Bildrand). v2: Zonen zu eng, Schwelle zu hoch. v3: geteilte Blobs, enge Kurven, Neustarts.</div>
+</div>
 <div class="cards">
-  <div class="card"><div class="k">Flugbahnen</div><div class="v">509</div><div class="s">in 7 × 30 s Stock A, davon 70 Abflüge und 76 Anflüge</div></div>
-  <div class="card"><div class="k">Kurvige Abflüge</div><div class="v">21</div><div class="s">≈ 3 pro 30 s → ~165 Kandidaten im Training (Vorstudie)</div></div>
-  <div class="card"><div class="k">Fragmente</div><div class="v">71 %</div><div class="s">Bahn beginnt oder endet im Gras: Biene geht verloren</div></div>
-  <div class="card todo" style="border-color:var(--test-b)"><div class="k">Test A / B · Macro-F1</div><div class="v">– / –</div><div class="s">GRU vs. Krümmungs-Baseline</div></div>
+  <div class="card"><div class="k">Flugbahnen</div><div class="v">4923</div><div class="s">Training + Validierung, Stock A, 34,5 min</div></div>
+  <div class="card"><div class="k">Kurvige Abflüge</div><div class="v">168</div><div class="s">plus 677 Brett → Brett (Schleifen oder kurze Hüpfer)</div></div>
+  <div class="card"><div class="k">Handlabels</div><div class="v">165 <span style="font-size:16px;color:var(--muted);font-weight:400">/ 380</span></div><div class="s">Ziel: 3 Stimmen pro Bahn, Krippendorffs α</div></div>
+  <div class="card todo"><div class="k">Test A / B · Macro-F1</div><div class="v">– / –</div><div class="s">GRU vs. Krümmungs-Baseline</div></div>
+</div>
 </div>
 
 <div class="cols">
 <div>
   <h3>Erkenntnisse und Grenzen</h3>
   <ul>
-    <li><strong>Kurvig ≠ Orientierung:</strong> auch suchende Anflüge und Ausweichmanöver kurven, genau das muss das Modell trennen</li>
-    <li><strong>Tarnung:</strong> Bienen über Gras kaum sichtbar, daher 71 % Fragmente</li>
-    <li><strong>Blickrichtung</strong> zum Stock bei ~30 px Körperlänge nicht sicher messbar</li>
-    <li><strong>Stock B bedeckt:</strong> ~9 Flugbahnen pro 30 s, Test B klein; Wetter als Störgröße</li>
+    <li><strong>Kurvig ≠ Orientierung:</strong> auch suchende Anflüge kurven, genau das muss das Modell trennen</li>
+    <li><strong>Tarnung:</strong> über dem Gras reißen noch 33 % der Bahnen an einem Ende ab</li>
+    <li><strong>Stock B bedeckt:</strong> ~9 Bahnen pro 30 s, Test B klein</li>
   </ul>
 </div>
 <div>
   <h3>Nächste Schritte</h3>
   <ul>
-    <li>Detektor für die Flugzone trainieren, Fragmente zu ganzen Bahnen verbinden</li>
-    <li>~300 Bahnen von Hand labeln, Inter-Rater-Check an 50 Bahnen</li>
-    <li>GRU gegen Baseline auf Test A und B, Anteil Orientierungsflüge über die Zeit</li>
+    <li>380 Bahnen mit je 3 Stimmen labeln, α berichten</li>
+    <li>GRU gegen Baseline auf Test A und B, Indikator über die Zeit</li>
+    <li>Gelernter Detektor gegen die restlichen Abrisse, wenn Zeit bleibt</li>
   </ul>
-  <div class="ask"><strong>Offene Frage:</strong> Trennt die Bahnform allein Orientierung von suchender Landung, oder braucht es den Startpunkt?</div>
+  <div class="ask"><strong>Offene Frage:</strong> Reicht die Bahnform, oder braucht es den Startpunkt?</div>
 </div>
 </div>

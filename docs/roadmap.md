@@ -43,11 +43,12 @@ Am Ende stehen drei Dinge:
 
 ## Phase 2: Detektor gegen die Fragmente (Woche 1–2)
 
-Tracker v2 hat den Anteil abgerissener Bahnen schon von 69 % auf 41 % (Training) gesenkt
-([Nachtrag](vorstudie.md#nachtrag-tracker-v2)). Ein gelernter Detektor soll den Rest angehen.
+Tracker v2 und v3 haben den Anteil vollständiger Bahnen von 32 % auf 67 % gehoben
+([Nachtrag](vorstudie.md#nachtrag-tracker-v2-und-v3)). Ein gelernter Detektor soll den Rest angehen.
 
 - [x] Tracker v2: Schwelle 18, Zonen 30 px, Verbinden von Fragmenten; Labels auf v2 übertragen
   (`beeflight-sample --carry`), alte Stände in `labels/archive/background-v1/`
+- [x] Tracker v3: Blobs zusammenfassen, keine Neugeburt neben einer Bahn, Kurven, Überlappungen verbinden
 
 - [ ] **Bootstrap-Labels**: Bounding Boxes aus vollständigen Bahnen der Vorstudie (sichere Detektionen) als
       Trainingsdaten, ein paar hundert Frames von Hand korrigiert
@@ -56,7 +57,7 @@ Tracker v2 hat den Anteil abgerissener Bahnen schon von 69 % auf 41 % (Training)
 - [ ] Detektor als Backend in `tracks.py` einhängen (`--detector yolo|background`)
 - [ ] Messen auf Validierung: Anteil vollständiger Bahnen vorher und nachher
 
-> **Gate 1 (Ende Woche 2):** Steigt der Anteil vollständiger Bahnen nicht deutlich (Ziel: von 59 % auf > 75 %),
+> **Gate 1 (Ende Woche 2):** Steigt der Anteil vollständiger Bahnen nicht deutlich (Ziel: von 67 % auf > 80 %),
 > bleibt das Hintergrundmodell. Fragmente werden dann als eigene Auswertung berichtet, und die Präsentation
 > erzählt den Detektor als ehrlichen Negativbefund. Nicht länger als eine Woche investieren.
 

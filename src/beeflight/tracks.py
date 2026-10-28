@@ -18,7 +18,7 @@ from scipy.optimize import linear_sum_assignment
 from .splits import ROOT, SPLITS, video_path
 
 SCALE = 0.5
-TRACKER = "background-v2"
+TRACKER = "background-v3"
 # half-res px: a track ending this close to the board or the frame edge has landed or left the frame
 BOARD_MARGIN, EDGE_MARGIN = 30, 30
 # full-res rows: top of the board (bees sit there) and its lower edge (flight zone starts below)
@@ -35,7 +35,25 @@ def frames(seq_id, step=1):
                 yield i, cv2.resize(g, None, fx=SCALE, fy=SCALE, interpolation=cv2.INTER_AREA)
 
 
+def merge_close(d, radius=10.0):
+    """One bee can fall apart into body and wing/shadow blobs: merge blobs closer than `radius` (area-weighted)."""
+    if len(d) < 2:
+        return d
+    d = d[np.argsort(-d[:, 2])]
+    out, used = [], np.zeros(len(d), bool)
+    for i in range(len(d)):
+        if used[i]:
+            continue
+        near = (~used) & (np.linalg.norm(d[:, :2] - d[i, :2], axis=1) < radius)
+        used |= near
+        g = d[near]
+        w = g[:, 2] / g[:, 2].sum()
+        out.append([*(w @ g[:, :2]), g[:, 2].sum()])
+    return np.array(out)
+
+
 def detect(seq_id, y_top, thr=18):
+    """Foreground blobs per frame as rows (x, y, area), half resolution, y relative to y_top."""
     bg = np.median(np.stack([g[y_top:] for _, g in frames(seq_id, step=15)]), axis=0).astype(np.int16)
     dets, fg_count = [], np.zeros(bg.shape, np.int32)
     for _, g in frames(seq_id):
@@ -46,35 +64,50 @@ def detect(seq_id, y_top, thr=18):
         k, _, st, cen = cv2.connectedComponentsWithStats(m)
         dets.append(np.array([[*cen[j], st[j, 4]] for j in range(1, k) if 25 < st[j, 4] < 3000]).reshape(-1, 3))
     # wind-blown grass and the crowded board are foreground far more often than a passing bee
+    # (letting tracks continue through this mask was tried: they wander into the board and swap bees)
     clutter = fg_count > 0.08 * len(dets)
     clutter = cv2.dilate(clutter.astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool)
     keep = []
     for d in dets:
         xi = np.clip(d[:, 0].astype(int), 0, bg.shape[1] - 1)
         yi = np.clip(d[:, 1].astype(int), 0, bg.shape[0] - 1)
-        keep.append(d[~clutter[yi, xi]] if len(d) else d)
+        keep.append(merge_close(d[~clutter[yi, xi]]) if len(d) else d)
     return keep, clutter, bg
 
 
-def track(dets, gate=45.0, max_gap=3):
-    """Hungarian matching on constant-velocity predictions; tracks survive short gaps."""
+def track(dets, gate=45.0, max_gap=5, birth_gap=20.0):
+    """Hungarian matching; tracks survive gaps of up to `max_gap` frames.
+
+    A detection is compared with the constant-velocity prediction and with the last position (a turning bee
+    overshoots the prediction); the smaller distance counts. No new track starts within `birth_gap` of a
+    detection just assigned to a track: that is a second blob of the same bee, and the new track would steal
+    the bee from the old one in the next frame.
+    """
     active, done = [], []
     for t, d in enumerate(dets):
-        preds = np.array([tr["pts"][-1][1:3] + tr["v"] * (t - tr["pts"][-1][0]) for tr in active]).reshape(-1, 2)
         used = set()
         if len(active) and len(d):
-            cost = np.linalg.norm(preds[:, None] - d[None, :, :2], axis=2)
+            last = np.array([tr["pts"][-1][1:3] for tr in active])
+            dt = np.array([t - tr["pts"][-1][0] for tr in active])
+            preds = last + np.array([tr["v"] for tr in active]) * dt[:, None]
+            cost = np.minimum(np.linalg.norm(preds[:, None] - d[None, :, :2], axis=2),
+                              np.linalg.norm(last[:, None] - d[None, :, :2], axis=2) + 5)
             for i, j in zip(*linear_sum_assignment(cost)):
                 if cost[i, j] < gate:
                     tr = active[i]
-                    dt = t - tr["pts"][-1][0]
-                    tr["v"] = 0.5 * tr["v"] + 0.5 * (d[j, :2] - tr["pts"][-1][1:3]) / dt
+                    step = t - tr["pts"][-1][0]
+                    tr["v"] = 0.5 * tr["v"] + 0.5 * (d[j, :2] - tr["pts"][-1][1:3]) / step
                     tr["pts"].append((t, *d[j, :2]))
                     used.add(j)
         still = []
         for tr in active:
             (done if t - tr["pts"][-1][0] > max_gap else still).append(tr)
-        active = still + [{"pts": [(t, *d[j, :2])], "v": np.zeros(2)} for j in range(len(d)) if j not in used]
+        taken = d[sorted(used), :2] if used else np.zeros((0, 2))
+        for j in range(len(d)):
+            if j in used or (len(taken) and np.linalg.norm(taken - d[j, :2], axis=1).min() < birth_gap):
+                continue
+            still.append({"pts": [(t, *d[j, :2])], "v": np.zeros(2)})
+        active = still
     return [np.array(tr["pts"]) for tr in done + active]
 
 
@@ -87,11 +120,11 @@ def zone_of(pt, shape, board_bottom):
     return "lost"
 
 
-def stitch(tracks, shape, board_bottom, max_gap=40, radius=12.0, spread=2.0, vmax=30.0):
+def stitch(tracks, shape, board_bottom, max_gap=40, max_overlap=3, radius=12.0, spread=2.0, vmax=30.0):
     """Join fragments of one flight: the bee vanishes over the grass and reappears as a new track.
 
     A track that ends in the open ("lost") is linked to a track that starts in the open up to `max_gap`
-    frames later, if the start lies near the constant-velocity extrapolation of the end and vice versa
+    frames later (or up to `max_overlap` frames earlier: the tracker sometimes restarts on the same bee), if the start lies near the constant-velocity extrapolation of the end and vice versa
     (tolerance grows with the gap, the bee may turn). Links are taken greedily, best first, one per end.
     Tracks leaving at the frame edge or landing on the board are never continued.
     """
@@ -110,11 +143,12 @@ def stitch(tracks, shape, board_bottom, max_gap=40, radius=12.0, spread=2.0, vma
             continue
         for j, (ts, ps, vs, zs) in enumerate(starts):
             gap = ts - te
-            if i == j or zs != "lost" or not 1 <= gap <= max_gap:
+            if i == j or zs != "lost" or not -max_overlap <= gap <= max_gap:
                 continue
-            if np.linalg.norm(ps - pe) > vmax * gap:
+            g = max(gap, 1)
+            if np.linalg.norm(ps - pe) > vmax * g:
                 continue
-            tol = radius + spread * gap
+            tol = radius + spread * g
             err = 0.5 * (np.linalg.norm(pe + ve * gap - ps) + np.linalg.norm(ps - vs * gap - pe))
             if err < tol:
                 cand.append((err / tol, i, j))
@@ -137,8 +171,10 @@ def stitch(tracks, shape, board_bottom, max_gap=40, radius=12.0, spread=2.0, vma
         parts, k = [tracks[i]], i
         while k in nxt:
             k = nxt[k]
+            # touching or overlapping fragments: the earlier one gives way
+            parts[-1] = parts[-1][parts[-1][:, 0] < tracks[k][0, 0]]
             parts.append(tracks[k])
-        out.append(np.concatenate(parts))
+        out.append(np.concatenate([p for p in parts if len(p)]))
     return out
 
 

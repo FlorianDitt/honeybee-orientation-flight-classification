@@ -30,14 +30,18 @@ um von Hand korrigierte Frames.
 
 - Zuordnung per **Hungarian-Algorithmus** (`scipy.optimize.linear_sum_assignment`) zwischen vorhergesagten
   Positionen und Detektionen.
-- **Konstantgeschwindigkeits-Modell**, geglättet: `v ← 0,5·v + 0,5·Δx/Δt`.
-- Gate 45 px (halbe Auflösung), Lücken bis **3 Frames** werden überbrückt.
+- Blobs näher als 10 px werden vorher zusammengefasst (Körper und Flügel/Schatten einer Biene).
+- **Konstantgeschwindigkeits-Modell**, geglättet: `v ← 0,5·v + 0,5·Δx/Δt`. Kosten = kleinerer Abstand zur
+  Vorhersage oder zur letzten Position (+5 px), damit enge Kurven nicht abreißen.
+- Gate 45 px (halbe Auflösung), Lücken bis **5 Frames** werden überbrückt. Keine neue Bahn innerhalb von 20 px
+  einer gerade zugeordneten Detektion (sonst stiehlt ein zweiter Blob derselben Biene die Bahn).
 - **Verbinden von Fragmenten** (`beeflight.tracks.stitch`): Eine Bahn, die im Gras endet, wird mit einer Bahn
-  verbunden, die bis zu 40 Frames später im Gras beginnt, wenn Anfang und Ende zur Vorhersage mit konstanter
+  verbunden, die bis zu 40 Frames später (oder bis zu 3 Frames früher) im Gras beginnt, wenn Anfang und Ende zur Vorhersage mit konstanter
   Geschwindigkeit passen (Toleranz 12 px + 2 px pro Frame Lücke, in beide Richtungen geprüft). Gierig nach
   Abweichung, jede Bahn höchstens einmal fortgesetzt; Bahnen am Brett oder Bildrand nie.
 - Bahnen mit < 15 Detektionen werden danach verworfen (vorher, damit auch kurze Stücke verbunden werden).
-- Version `background-v2` (steht in jeder Ausgabe und jedem Label); `background-v1` war der Stand der Vorstudie.
+- Version `background-v3` (steht in jeder Ausgabe und jedem Label); `background-v1` war der Stand der Vorstudie,
+  Verlauf in [vorstudie.md](vorstudie.md#nachtrag-tracker-v2-und-v3).
 
 ## 3. Flugbahnen, Merkmale und Selbst-Labels (`beeflight.tracks.features`)
 

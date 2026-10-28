@@ -1,6 +1,6 @@
 import numpy as np
 
-from beeflight.tracks import BOARD_MARGIN, EDGE_MARGIN, features, stitch, track, zone_of
+from beeflight.tracks import BOARD_MARGIN, EDGE_MARGIN, features, merge_close, stitch, track, zone_of
 
 SHAPE = (500, 500)
 
@@ -57,3 +57,23 @@ def test_zone_margins():
     assert zone_of((250, 50 + BOARD_MARGIN - 1), SHAPE, 50) == "board"
     assert zone_of((EDGE_MARGIN - 1, 250), SHAPE, 50) == "edge"
     assert zone_of((250, 250), SHAPE, 50) == "lost"
+
+
+def test_split_blob_of_one_bee_does_not_steal_the_track():
+    t = np.arange(40)
+    bee = np.c_[10 + 8 * t, 200 + 0 * t]
+    dets = []
+    for i in t:
+        d = [[*bee[i], 120]]
+        if 18 <= i <= 20:  # wing or shadow shows up as a second blob next to the bee
+            d.append([bee[i][0] - 6, bee[i][1] + 9, 40])
+        dets.append(merge_close(np.array(d, float)))
+    tracks = [p for p in track(dets) if len(p) > 5]
+    assert len(tracks) == 1 and len(tracks[0]) == 40
+
+
+def test_tracker_follows_a_sharp_turn():
+    # 25 px/frame to the right, then a hairpin back: the prediction lands 50 px off, the last position 25 px
+    xy = [(50 + 25 * i, 200) for i in range(12)] + [(325 - 25 * i, 215) for i in range(1, 12)]
+    dets = [np.array([[x, y, 100]], float) for x, y in xy]
+    assert len([p for p in track(dets) if len(p) > 5]) == 1

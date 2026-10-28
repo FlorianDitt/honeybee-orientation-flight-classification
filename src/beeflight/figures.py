@@ -1,4 +1,4 @@
-"""Slide figures from flight_tracks.py output (training/validation sequences of Stock A only).
+"""Slide figures from beeflight-tracks output (training/validation sequences of Stock A only).
 
 Usage: beeflight-figures   (needs beeflight-tracks output for the sequences in SEQS)
 """
@@ -54,6 +54,36 @@ def counts_chart():
     return {k: sum(p[k] for p in per) for k in col}
 
 
+def tracker_chart():
+    """Share of complete tracks (both ends at the board or the frame edge) per tracker version, train + val."""
+    from .splits import SPLITS
+    versions = [("flights_v1", "v1 · Vorstudie"), ("flights_v2", "v2 · Zonen, Schwelle"), ("flights", "v3 · Tracker-Fixes")]
+    shares, counts = [], []
+    for folder, _ in versions:
+        rows = [r for s in SPLITS["train"] + SPLITS["val"]
+                for r in json.loads((ROOT / "outputs" / folder / f"{s}.json").read_text())["rows"]]
+        done = sum("lost" not in (r["start"], r["end"]) for r in rows)
+        shares.append(100 * done / len(rows))
+        counts.append(done)
+    fig, ax = plt.subplots(figsize=(5.4, 2.3), dpi=200)
+    fig.patch.set_facecolor("#fbfaf7")
+    ax.set_facecolor("#fbfaf7")
+    colors = ["#c9ccd1", "#c9ccd1", "#d99a1e"]
+    x = np.arange(len(versions))
+    ax.bar(x, shares, 0.56, color=colors)
+    for xi, sh, n in zip(x, shares, counts):
+        ax.text(xi, sh + 3, f"{sh:.0f} %", ha="center", va="bottom", fontsize=13, fontweight="bold", color="#16181d")
+        ax.text(xi, sh / 2, f"{n}\nBahnen", ha="center", va="center", fontsize=8.5, color="#16181d", linespacing=1.1)
+    ax.set_xticks(x, [v[1] for v in versions], fontsize=9.5)
+    ax.set_ylim(0, max(shares) * 1.18)
+    ax.set_yticks([])
+    for sp in ("top", "right", "left"):
+        ax.spines[sp].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(ASSETS / "tracker_versions.png", facecolor=fig.get_facecolor())
+    return dict(zip([v[1] for v in versions], [round(s, 1) for s in shares]))
+
+
 def hero(seq="rec2123_seq050", frame=300):
     d = json.loads((IN / f"{seq}.json").read_text())
     with av.open(str(video_path(seq))) as c:
@@ -81,6 +111,8 @@ def hero(seq="rec2123_seq050", frame=300):
 def main():
     print(counts_chart())
     hero()
+    if (ROOT / "outputs" / "flights_v1").exists() and (ROOT / "outputs" / "flights_v2").exists():
+        print(tracker_chart())
 
 
 if __name__ == "__main__":

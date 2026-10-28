@@ -64,7 +64,7 @@ feste Kamera sie zuverlässig sieht, und genau den zeigt der Datensatz.
 ## Warum das ein ML-Thema ist
 
 - **Detektion über Gras:** Die Bienen sind 25–35 px groß und auf dem Gras-Hintergrund getarnt; das
-  Hintergrundmodell verliert auch nach Nachbesserung 41 % der Bahnen (Vorstudie: 71 %). Ein gelernter Detektor ist nötig, um ganze Bahnen
+  Hintergrundmodell verliert auch nach zwei Runden Nachbesserung noch ein Drittel der Bahnen an einem Ende. Ein gelernter Detektor ist nötig, um ganze Bahnen
   zu bekommen.
 - **Klassifikation von Sequenzen:** variable Länge, Rauschen, Lücken, Klassen, die sich nur im Verlauf
   unterscheiden.

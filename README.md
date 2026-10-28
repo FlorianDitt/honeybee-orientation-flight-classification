@@ -29,6 +29,7 @@ Größte offene Baustelle: 71 % der Bahnen reißen über dem Gras ab.
 | [docs/methode.md](docs/methode.md) | Pipeline, Selbst-Labels, Modelle, Metriken, Split und Evaluationsprotokoll |
 | [docs/vorstudie.md](docs/vorstudie.md) | Ergebnisse der Machbarkeitsprüfung, Beobachtungen, verworfene Themen |
 | [docs/labeling.md](docs/labeling.md) | Label-Leitfaden für die vier Klassen |
+| [docs/roadmap.md](docs/roadmap.md) | Weg zum Endprodukt: Phasen, Wochenplan, Entscheidungspunkte |
 | [presentation/](presentation/) | Marp-Präsentation (3 Folien, deutsch) |
 
 ## Setup

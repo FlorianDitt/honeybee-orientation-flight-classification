@@ -46,8 +46,12 @@ erkennbar ist.
 
 ## Ablauf
 
-1. Bahnen aus `outputs/flights/*.json` stratifiziert ziehen: über Sequenzen verteilt, alle Selbst-Labels vertreten,
-   kurvige Abflüge überrepräsentiert.
-2. Reihenfolge mischen, ohne Selbst-Label anzeigen (sonst Anker-Effekt).
-3. 50 Bahnen nach ≥ 1 Woche ein zweites Mal labeln, Cohen's κ berichten.
-4. Labels als CSV `seq,t0,label,flags` neben den Bahnen ablegen; Test-Bahnen erst nach dem Einfrieren des Modells.
+1. **Stichprobe ziehen** mit `uv run beeflight-sample --split train --n 300` (und `--split val --n 80`):
+   stratifiziert nach Selbst-Label, kurvige Abflüge überrepräsentiert (30 %), Reihenfolge gemischt.
+   Das Selbst-Label wird beim Labeln nicht angezeigt (sonst Anker-Effekt).
+2. **Labeln** in der Web-App ([labeler/README.md](../labeler/README.md)): `cd labeler && npm run dev`,
+   dann http://127.0.0.1:4321. Etwa 10–15 s pro Bahn, also ~1 h für 300 Bahnen; besser in Blöcken von 50.
+3. **Zweitlabeln** nach ≥ 1 Woche: `uv run beeflight-sample --recheck 50`, in der App „Zweitlabeln (blind)“.
+   Daraus Cohen's κ berichten.
+4. Labels liegen in `labels/<split>.jsonl`, je Zeile Klasse, Flags, Notiz und die komplette Bahn.
+   Test-Bahnen erst nach dem Einfrieren des Modells labeln.

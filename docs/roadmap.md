@@ -32,10 +32,10 @@ Am Ende stehen drei Dinge:
 
 ## Phase 1: Daten und Label-Tool (Woche 1)
 
-- [ ] `beeflight-tracks` auf **alle 69 Trainings- und Validierungssequenzen** (≈ 70 min Rechenzeit, im Hintergrund)
-- [ ] **Label-Tool** `beeflight-label`: spielt eine Bahn als Clip (Original und 0,25×) mit eingezeichneter Bahn ab;
-      Tasten 1–4 für die Klassen, `f` Fragment, `u` unsicher; schreibt `labels/train.csv`
-- [ ] Stichprobe ziehen nach [labeling.md](labeling.md): stratifiziert, gemischt, ohne Selbst-Label
+- [x] `beeflight-tracks` auf **alle 69 Trainings- und Validierungssequenzen**
+- [x] **Label-App** (`labeler/`, Astro): Bahn als vergrößerter Clip mit synchron eingezeichneter Bahn,
+      Tasten 1–4, Flags, schreibt `labels/<split>.jsonl` inklusive Geometrie
+- [x] Stichprobe ziehen nach [labeling.md](labeling.md): stratifiziert, gemischt, ohne Selbst-Label
 - [ ] **Erste 100 Bahnen labeln** (≈ 1 h): zeigt früh, ob die Klassen trennbar sind und wie oft
       `artefakt` vorkommt
 

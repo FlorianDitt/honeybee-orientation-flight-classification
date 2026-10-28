@@ -52,8 +52,12 @@ Die Testsets erst ganz am Ende herunterladen und genau einmal auswerten.
 uv run beeflight-splits                                  # Split-Übersicht, schreibt splits.json
 uv run beeflight-tracks rec2123_seq050 rec2123_seq060    # Flugbahnen -> outputs/flights/<seq>.json + .jpg
 uv run beeflight-figures                                 # Abbildungen für die Präsentation
+uv run beeflight-sample --split train --n 300            # Label-Warteschlange -> labels/queue_train.json
 uv run pytest                                            # Tests
 ```
+
+**Handlabels** in der Web-App: `cd labeler && npm install && npm run dev`, dann http://127.0.0.1:4321
+(Details in [labeler/README.md](labeler/README.md)).
 
 Eine Sequenz braucht etwa eine Minute (8 Kerne) und rund 1 GB RAM.
 
@@ -64,6 +68,9 @@ src/beeflight/
   splits.py      Train/Val/Test-Split (einzige Quelle der Wahrheit), Download
   tracks.py      Vordergrund, Gras-Maske, Tracking, Bahnmerkmale, Start-/Zielzonen
   figures.py     Abbildungen für die Folien
+  sample.py      stratifizierte Label-Warteschlangen
+labeler/         Astro-Web-App zum Handlabeln
+labels/          Warteschlangen und Handlabels (versioniert)
 tests/           Split-Invarianten, Bahnmerkmale, Tracker
 docs/            Dokumentation der Idee und Methode
 presentation/    Marp-Folien (slides.md, theme/hive.css, assets/)

@@ -1,0 +1,52 @@
+---
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6' fill='%23d99a1e'/></svg>" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --ink: #16181d;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #fbfaf7;
+    --panel: #f1efe9;
+    --accent: #d99a1e;
+    --c-orientierung: #e0662a;
+    --c-sammelabflug: #3d93c9;
+    --c-anflug: #3f9d6b;
+    --c-artefakt: #8a8f98;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 Inter, system-ui, sans-serif;
+  }
+  a { color: inherit; }
+  kbd {
+    font: 600 11px/1 ui-monospace, "JetBrains Mono", monospace;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 2px 5px;
+    background: #fff;
+    color: var(--ink);
+  }
+</style>

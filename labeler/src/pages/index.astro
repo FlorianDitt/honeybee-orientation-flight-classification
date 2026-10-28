@@ -1,0 +1,86 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { CLASSES, SPLITS, readLabels, readQueue } from "../lib/store";
+
+const NAMES: Record<string, string> = {
+  train: "Training",
+  val: "Validierung",
+  recheck: "Zweitlabeln (blind)",
+  test_same_hive: "Test A · gleicher Stock",
+  test_other_hive: "Test B · Stock B",
+};
+const rows = SPLITS.map((split) => {
+  const queue = readQueue(split);
+  const labels = readLabels(split);
+  const counts = Object.fromEntries(CLASSES.map((c) => [c, 0]));
+  for (const l of labels.values()) counts[l.label] += 1;
+  return { split, name: NAMES[split], total: queue?.length ?? 0, done: labels.size, counts, ready: !!queue };
+});
+const ready = rows.filter((r) => r.ready);
+const missing = rows.filter((r) => !r.ready);
+---
+
+<Layout title="Bienenflug-Labeler">
+  <main>
+    <header>
+      <div class="kicker">beeflight · Handlabels</div>
+      <h1>Flugbahnen labeln</h1>
+      <p>Eine ganze Flugbahn bekommt eine Klasse. Leitfaden: <code>docs/labeling.md</code>.</p>
+    </header>
+
+    {ready.length === 0 && (
+      <section class="empty">
+        <h2>Noch keine Warteschlange</h2>
+        <p>Erst Flugbahnen erzeugen, dann eine Stichprobe ziehen:</p>
+        <pre>uv run beeflight-tracks --split train --split val --skip-existing
+uv run beeflight-sample --split train --n 300
+uv run beeflight-sample --split val --n 80</pre>
+      </section>
+    )}
+
+    <div class="cards">
+      {ready.map((r) => (
+        <a class="card" href={`/label/${r.split}`}>
+          <div class="name">{r.name}</div>
+          <div class="big">{r.done} <span>/ {r.total}</span></div>
+          <div class="bar"><div style={`width:${r.total ? (100 * r.done) / r.total : 0}%`} /></div>
+          <ul>
+            {CLASSES.map((c) => (
+              <li><i style={`background:var(--c-${c})`} />{c} <b>{r.split === "recheck" ? "–" : r.counts[c]}</b></li>
+            ))}
+          </ul>
+        </a>
+      ))}
+    </div>
+
+    {missing.length > 0 && ready.length > 0 && (
+      <p class="hint">Ohne Warteschlange: {missing.map((r) => r.name).join(", ")}. Anlegen mit <code>uv run beeflight-sample …</code></p>
+    )}
+  </main>
+</Layout>
+
+<style>
+  main { max-width: 980px; margin: 0 auto; padding: 48px 16px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: 34px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  header p { color: var(--muted); margin: 0 0 28px; }
+  code, pre { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 13px; }
+  code { background: var(--panel); padding: 1px 6px; border-radius: 4px; }
+  pre { background: var(--panel); padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+  .empty { border: 2px dashed var(--line); border-radius: 10px; padding: 8px 20px 12px; margin-bottom: 24px; }
+  .empty h2 { font-size: 18px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .card { display: block; text-decoration: none; background: var(--panel); border-radius: 10px; padding: 18px 20px;
+          border: 2px solid transparent; transition: border-color .15s; }
+  .card:hover { border-color: var(--accent); }
+  .name { font-weight: 600; }
+  .big { font-size: 30px; font-weight: 700; margin: 6px 0; }
+  .big span { font-size: 16px; color: var(--muted); font-weight: 400; }
+  .bar { height: 6px; background: #fff; border-radius: 3px; overflow: hidden; }
+  .bar div { height: 100%; background: var(--accent); }
+  ul { list-style: none; padding: 0; margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+  li { display: flex; align-items: center; gap: 8px; }
+  li b { margin-left: auto; color: var(--ink); }
+  li i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 20px; }
+</style>

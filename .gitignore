@@ -17,3 +17,9 @@ __pycache__/
 presentation/*.pdf
 presentation/*.pptx
 presentation/*.html
+
+# labeler (Astro)
+labeler/node_modules/
+labeler/dist/
+labeler/.astro/
+labels/*.tmp

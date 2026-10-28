@@ -22,6 +22,7 @@ ml = ["torch>=2.5"]
 beeflight-splits = "beeflight.splits:main"
 beeflight-tracks = "beeflight.tracks:main"
 beeflight-figures = "beeflight.figures:main"
+beeflight-sample = "beeflight.sample:main"
 
 [dependency-groups]
 dev = ["pytest>=8"]

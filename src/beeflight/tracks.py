@@ -4,17 +4,18 @@ Orientation flights of young bees are loops and arcs facing the hive; foragers l
 fairly straight. Per track we record where it starts and ends (board, frame edge, lost in the
 grass) and its total turning angle: |turn| > 360 deg means the bee flew at least one full loop.
 
-Usage: beeflight-tracks SEQ_ID [SEQ_ID ...]   (writes outputs/flights/<seq>.json and .jpg)
+Usage: beeflight-tracks SEQ_ID [SEQ_ID ...]       (writes outputs/flights/<seq>.json and .jpg)
+       beeflight-tracks --split train --skip-existing
 """
+import argparse
 import json
-import sys
 
 import av
 import cv2
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from .splits import ROOT, video_path
+from .splits import ROOT, SPLITS, video_path
 
 SCALE = 0.5
 # full-res rows: top of the board (bees sit there) and its lower edge (flight zone starts below)
@@ -105,14 +106,25 @@ def features(p, shape, board_bottom):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("seqs", nargs="*")
+    ap.add_argument("--split", action="append", choices=list(SPLITS), default=[])
+    ap.add_argument("--skip-existing", action="store_true")
+    args = ap.parse_args()
+    seqs = args.seqs + [s for name in args.split for s in SPLITS[name]]
     OUT.mkdir(parents=True, exist_ok=True)
-    for seq_id in sys.argv[1:]:
+    for seq_id in seqs:
+        if args.skip_existing and (OUT / f"{seq_id}.json").exists():
+            continue
+        if not video_path(seq_id).exists():
+            print(f"{seq_id}: video missing, skipped", flush=True)
+            continue
         rec = seq_id[3:7]
         top, bottom = (int(v * SCALE) for v in BOARD[rec])
         dets, clutter, bg = detect(seq_id, top)
         tracks = track(dets)
         shape = bg.shape
-        rows, keep = [], []
+        rows = []
         for p in tracks:
             p = p.copy()
             if len(p) < 15:
@@ -121,9 +133,10 @@ def main():
             # flight: mostly below the board and actually moving
             if f["frac_below_board"] < 0.6 or f["path"] < 60 or f["speed"] < 1.0:
                 continue
+            f["t"] = p[:, 0].astype(int).tolist()  # frame index of each point (gaps possible)
             f["xy"] = p[:, 1:].round(1).tolist()
             rows.append(f)
-        (OUT / f"{seq_id}.json").write_text(json.dumps({"seq": seq_id, "top": top, "rows": rows}))
+        (OUT / f"{seq_id}.json").write_text(json.dumps({"seq": seq_id, "top": top, "scale": SCALE, "rows": rows}))
         # overview: loops red, straight green, rest yellow
         img = cv2.cvtColor((bg.clip(0, 255) // 2).astype(np.uint8), cv2.COLOR_GRAY2BGR)
         img[clutter] = (img[clutter] * 0.5).astype(np.uint8)

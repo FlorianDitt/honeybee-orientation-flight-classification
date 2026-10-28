@@ -1,0 +1,114 @@
+---
+// Short version of docs/labeling.md for people without background; keep both in sync.
+import Layout from "../../src/layouts/Layout.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const classes = [
+  {
+    key: "1", id: "orientierung", name: "Orientierungsflug",
+    text: "Startet auf dem Flugbrett (dem Holzbrett vor dem Eingang) oder schwebt direkt davor. Die Biene fliegt Bögen, Schleifen oder Zickzack vor dem Flugloch, meist langsam und mit Blick zum Stock.",
+  },
+  {
+    key: "2", id: "sammelabflug", name: "Sammelabflug",
+    text: "Startet auf dem Flugbrett und verlässt das Bild zügig und ohne Schleife. Eine kurze Kurve direkt nach dem Start ist erlaubt.",
+  },
+  {
+    key: "3", id: "anflug", name: "Anflug",
+    text: "Kommt von außerhalb und landet auf dem Flugbrett oder ist erkennbar auf dem Weg dorthin. Darf kurven, abbremsen und suchen: Entscheidend ist das Ziel Flugloch.",
+  },
+  {
+    key: "4", id: "artefakt", name: "Artefakt",
+    text: "Keine echte Flugbahn: Gras, Blätter, Schatten, eine krabbelnde Biene, oder die Linie springt zwischen zwei Bienen hin und her.",
+  },
+];
+const cases = [
+  ["Startet, fliegt eine Schleife, landet wieder", "Orientierungsflug"],
+  ["Kommt von außen, kreist vor dem Flugloch, landet", "Anflug"],
+  ["Kommt von außen, kreist, fliegt wieder weg", "Orientierungsflug + unsicher"],
+  ["Gerader Abflug mit einem Bogen am Bildrand", "Sammelabflug"],
+  ["Wespe oder Fliege", "Artefakt"],
+];
+---
+
+<Layout title="Leitfaden · Bienenflug">
+  <main>
+    <a href={base} class="back">← Übersicht</a>
+    <h1>Leitfaden</h1>
+    <p class="lead">Du bekommst immer eine ganze Flugbahn zu sehen und gibst ihr eine von vier Klassen. Im Zweifel lieber
+      <b>unsicher</b> ankreuzen als lange grübeln. Es gibt kein Falsch: Gerade die schwierigen Fälle sind interessant.</p>
+
+    <h2>Was du siehst</h2>
+    <ul class="legend">
+      <li><i class="dash"></i> gestrichelt: die ganze Bahn, die der Computer gefunden hat</li>
+      <li><i class="solid"></i> farbig: der Teil, den die Biene schon geflogen ist</li>
+      <li><i class="ring"></i> Kreis: wo die Biene gerade ist</li>
+      <li><i class="square"></i> Quadrat: Startpunkt der Bahn</li>
+    </ul>
+    <p>Das Video läuft in Zeitlupe (¼) in Schleife, mit etwas Vor- und Nachlauf. Rechts oben siehst du das ganze Bild;
+      das Flugbrett vor dem Eingang liegt ungefähr in der Bildmitte. Mit <kbd>Z</kbd> zoomst du heraus, wenn die Umgebung hilft.</p>
+
+    <h2>Die vier Klassen</h2>
+    <div class="classes">
+      {classes.map((c) => (
+        <section style={`--c: var(--c-${c.id})`}>
+          <h3><kbd>{c.key}</kbd> {c.name}</h3>
+          <p>{c.text}</p>
+        </section>
+      ))}
+    </div>
+
+    <h2>Zusätzlich ankreuzen</h2>
+    <dl>
+      <dt><kbd>F</kbd> Fragment</dt>
+      <dd>Die Bahn ist echt, aber Anfang oder Ende fehlen (die Linie reißt im Gras ab). Die Klasse trotzdem vergeben,
+        wenn man sie erkennt.</dd>
+      <dt><kbd>U</kbd> unsicher</dt>
+      <dd>Du hast dich entschieden, bist dir aber nicht sicher.</dd>
+    </dl>
+    <p class="muted">Erst ankreuzen, dann die Klasse wählen: Die Klasse speichert und springt zur nächsten Bahn.</p>
+
+    <h2>Grenzfälle</h2>
+    <table>
+      <thead><tr><th>Situation</th><th>Klasse</th></tr></thead>
+      <tbody>{cases.map(([s, c]) => <tr><td>{s}</td><td>{c}</td></tr>)}</tbody>
+    </table>
+
+    <h2>Tasten</h2>
+    <table class="keys">
+      <tbody>
+        <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>Klasse speichern, weiter</td></tr>
+        <tr><td><kbd>F</kbd> / <kbd>U</kbd></td><td>Fragment / unsicher umschalten</td></tr>
+        <tr><td><kbd>Leertaste</kbd></td><td>Pause</td></tr>
+        <tr><td><kbd>R</kbd> / <kbd>S</kbd> / <kbd>Z</kbd></td><td>von vorn / Tempo / Zoom</td></tr>
+        <tr><td><kbd>←</kbd> <kbd>→</kbd> / <kbd>N</kbd></td><td>vorherige, nächste / nächste offene Bahn</td></tr>
+      </tbody>
+    </table>
+    <p class="muted">Auf dem Handy geht alles auch über die Knöpfe, am Laptop ist es aber deutlich angenehmer.</p>
+  </main>
+</Layout>
+
+<style>
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  h1 { font-size: 32px; margin: 12px 0 8px; letter-spacing: -.02em; }
+  h2 { font-size: 19px; margin: 32px 0 10px; }
+  .lead { color: var(--muted); }
+  .muted { color: var(--muted); font-size: 14px; }
+  .legend { list-style: none; padding: 12px 16px; background: #1d1f24; color: #eee; border-radius: 8px; display: grid; gap: 6px; font-size: 14px; }
+  .legend li { display: flex; align-items: center; gap: 12px; }
+  .legend i { width: 34px; height: 14px; flex: none; display: inline-block; }
+  .dash { border-top: 2px dashed rgba(255,255,255,.6); height: 0 !important; }
+  .solid { border-top: 3px solid var(--accent); height: 0 !important; }
+  .ring { width: 14px !important; border: 2px solid #fff; border-radius: 50%; margin: 0 10px; }
+  .square { width: 8px !important; height: 8px !important; background: #fff; margin: 0 13px; }
+  .classes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .classes section { background: var(--panel); border-left: 5px solid var(--c); border-radius: 8px; padding: 12px 16px; }
+  .classes h3 { font-size: 16px; margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+  .classes p { margin: 0; font-size: 14px; }
+  dt { font-weight: 600; margin-top: 8px; }
+  dd { margin: 2px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .keys td:first-child { white-space: nowrap; width: 1%; }
+</style>

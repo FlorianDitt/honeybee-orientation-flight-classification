@@ -56,7 +56,9 @@ uv run beeflight-sample --split train --n 300            # Label-Warteschlange -
 uv run pytest                                            # Tests
 ```
 
-**Handlabels** in der Web-App: `cd labeler && npm install && npm run dev`, dann http://127.0.0.1:4321
+**Handlabels** in der Web-App: `cd labeler && npm install && npm run dev`, dann http://127.0.0.1:4321.
+Freunde labeln online unter https://florianditt.github.io/BeeHive/ (Clips mit `uv run beeflight-clips`,
+Deploy mit `npm run deploy:web`), `uv run beeflight-vote` bildet daraus Mehrheitslabels
 (Details in [labeler/README.md](labeler/README.md)).
 
 Eine Sequenz braucht etwa eine Minute (8 Kerne) und rund 1 GB RAM.
@@ -69,9 +71,11 @@ src/beeflight/
   tracks.py      Vordergrund, Gras-Maske, Tracking, Bahnmerkmale, Start-/Zielzonen
   figures.py     Abbildungen für die Folien
   sample.py      stratifizierte Label-Warteschlangen
-labeler/         Astro-Web-App zum Handlabeln
-labels/          Warteschlangen und Handlabels (versioniert)
-tests/           Split-Invarianten, Bahnmerkmale, Tracker
+  clips.py       zugeschnittene Clips und Pakete für die Online-Version
+  vote.py        Mehrheitsentscheid über alle Labelnden, Krippendorffs α
+labeler/         Astro-Web-App zum Handlabeln (lokal und als GitHub-Pages-Seite)
+labels/          Warteschlangen, Handlabels, votes/ (Exporte der Helfenden), final_*.jsonl
+tests/           Split-Invarianten, Bahnmerkmale, Tracker, Stichprobe, Mehrheitsentscheid
 docs/            Dokumentation der Idee und Methode
 presentation/    Marp-Folien (slides.md, theme/hive.css, assets/)
 outputs/         erzeugte Flugbahnen (nicht versioniert)

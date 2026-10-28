@@ -23,6 +23,8 @@ beeflight-splits = "beeflight.splits:main"
 beeflight-tracks = "beeflight.tracks:main"
 beeflight-figures = "beeflight.figures:main"
 beeflight-sample = "beeflight.sample:main"
+beeflight-clips = "beeflight.clips:main"
+beeflight-vote = "beeflight.vote:main"
 
 [dependency-groups]
 dev = ["pytest>=8"]

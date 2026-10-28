@@ -55,3 +55,30 @@ erkennbar ist.
    Daraus Cohen's κ berichten.
 4. Labels liegen in `labels/<split>.jsonl`, je Zeile Klasse, Flags, Notiz und die komplette Bahn.
    Test-Bahnen erst nach dem Einfrieren des Modells labeln.
+
+## Mehrere Labelnde
+
+Damit die Labels nicht nur an einer Person hängen, labeln Freundinnen und Freunde dieselben Bahnen in der
+Online-Version ([labeler/README.md](../labeler/README.md#online-version-für-freunde-github-pages)). Sie sehen den
+Leitfaden in Kurzform und machen zuerst eine **Übungsrunde** mit 10 Bahnen, die ich ohne Flag gelabelt habe
+(`labels/practice.json`); danach erscheint jeweils meine Antwort. Übungsbahnen zählen für die Helfenden nicht.
+
+Die Bahnen sind in Pakete zu etwa 50 aufgeteilt (gleiche gemischte Reihenfolge wie die Warteschlange). Jedes Paket
+bekommt zwei Helfende, zusammen mit meinen Labels sind das **drei Stimmen pro Bahn**.
+
+`uv run beeflight-vote` führt `labels/<split>.jsonl` (meine Labels) und alle Exporte in `labels/votes/` zusammen:
+
+| Fall | Ergebnis |
+|---|---|
+| strikte Mehrheit (2 von 3, 3 von 4, …) | Mehrheitsklasse |
+| keine Mehrheit, ich habe abgestimmt | meine Klasse, Flag `strittig` |
+| keine Mehrheit, ohne mich | offen, wird nicht geschrieben |
+| Flag `fragment` / `unsicher` | gesetzt, wenn mindestens die Hälfte es gesetzt hat |
+
+Ergebnis ist `labels/final_<split>.jsonl` (mit Geometrie und allen Einzelstimmen). Berichtet werden
+**Krippendorffs α** (nominal, verträgt fehlende Stimmen) als Übereinstimmung zwischen den Labelnden, sowie pro Person
+Übungsergebnis und Übereinstimmung mit der Mehrheit. Damit ersetzt α das Zweitlabeln für Cohen's κ; das
+Zweitlabeln bleibt optional als Maß für meine eigene Konsistenz.
+
+Trainiert wird auf den Mehrheitslabels; `strittig` und `unsicher` können als Gewicht oder für eine Auswertung
+„nur eindeutige Bahnen“ dienen.

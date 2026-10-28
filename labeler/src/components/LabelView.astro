@@ -1,0 +1,129 @@
+---
+// Shared markup of the labeling view; the behaviour lives in src/lib/labeler.ts.
+import { CLASSES } from "../lib/labeler";
+
+interface Props {
+  back: string;
+  name: string;
+  total: number | string;
+}
+const { back, name, total } = Astro.props;
+
+const HELP: Record<string, string> = {
+  orientierung: "startet am Brett, Schleifen und Bögen vor dem Flugloch",
+  sammelabflug: "startet am Brett, verlässt die Zone zügig ohne Schleife",
+  anflug: "Ziel ist das Flugbrett, darf kurven und suchen",
+  artefakt: "Gras, Schatten, ID-Wechsel, krabbelnde Biene",
+};
+---
+
+<div class="app">
+  <header>
+    <a href={back} class="back">← Übersicht</a>
+    <div class="pos"><b id="pos">–</b> <span id="split">{name}</span></div>
+    <div class="progress"><div id="progress-bar"></div></div>
+    <div class="done"><b id="done">0</b> / <span id="total">{total}</span> gelabelt</div>
+  </header>
+
+  <main>
+    <section class="stage">
+      <canvas id="zoom" width="720" height="720" aria-label="Vergrößerter Ausschnitt der Flugbahn"></canvas>
+      <div class="hud">
+        <span id="frame">Frame –</span>
+        <span id="phase"></span>
+      </div>
+      <div id="status" class="status" hidden></div>
+    </section>
+
+    <aside>
+      <canvas id="overview" width="216" height="384" aria-label="Gesamtbild mit Position der Bahn"></canvas>
+
+      <div class="playback">
+        <button id="play" title="Abspielen/Pause (Leertaste)">⏯</button>
+        <button id="restart" title="Von vorn (R)">↺</button>
+        <div class="speeds" role="group" aria-label="Geschwindigkeit">
+          <button data-rate="0.25">¼×</button>
+          <button data-rate="0.5">½×</button>
+          <button data-rate="1">1×</button>
+        </div>
+        <button id="zoom-toggle" title="Ausschnitt weiter/enger (Z)">⤢</button>
+      </div>
+
+      <div class="classes">
+        {CLASSES.map((c, i) => (
+          <button class="cls" data-class={c} style={`--c: var(--c-${c})`}>
+            <kbd>{i + 1}</kbd>
+            <span><b>{c}</b><small>{HELP[c]}</small></span>
+          </button>
+        ))}
+      </div>
+
+      <div class="flags">
+        <label><input type="checkbox" id="flag-fragment" /> Fragment <kbd>F</kbd></label>
+        <label><input type="checkbox" id="flag-unsicher" /> unsicher <kbd>U</kbd></label>
+      </div>
+      <input id="note" type="text" placeholder="Notiz (optional), Enter speichert nicht" maxlength="500" />
+
+      <div class="nav">
+        <button id="prev"><kbd>←</kbd> zurück</button>
+        <button id="next">weiter <kbd>→</kbd></button>
+        <button id="next-open">nächste offene <kbd>N</kbd></button>
+        <button id="clear" title="Label dieser Bahn löschen">Label löschen</button>
+      </div>
+      <slot name="aside" />
+      <p class="keys"><kbd>Leertaste</kbd> Pause · <kbd>R</kbd> von vorn · <kbd>S</kbd> Tempo · <kbd>Z</kbd> Zoom</p>
+    </aside>
+  </main>
+</div>
+<video id="video" muted playsinline preload="auto"></video>
+
+<style>
+  .app { display: flex; flex-direction: column; height: 100vh; }
+  header { display: flex; align-items: center; gap: 20px; padding: 10px 20px; border-bottom: 1px solid var(--line); }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .pos span { color: var(--muted); margin-left: 6px; font-size: 13px; }
+  .progress { flex: 1; height: 6px; background: var(--panel); border-radius: 3px; overflow: hidden; }
+  #progress-bar { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .done { font-size: 14px; color: var(--muted); }
+  .done b { color: var(--ink); }
+
+  main { flex: 1; display: grid; grid-template-columns: 1fr 340px; gap: 20px; padding: 16px 20px; min-height: 0; }
+  .stage { position: relative; display: flex; flex-direction: column; align-items: center; min-height: 0; }
+  #zoom { width: min(100%, calc(100vh - 120px)); aspect-ratio: 1; background: #111; border-radius: 8px; }
+  .hud { display: flex; gap: 16px; font: 12px ui-monospace, monospace; color: var(--muted); margin-top: 6px; }
+  .status { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff;
+            padding: 8px 14px; border-radius: 6px; font-size: 14px; max-width: 90%; white-space: pre-line; text-align: center; }
+  .status[data-kind="error"] { background: #b42318; }
+  .status[data-kind="feedback"] { top: auto; bottom: 48px; font-size: 15px; padding: 12px 18px; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+
+  aside { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  #overview { width: 108px; height: 192px; border-radius: 6px; align-self: center; background: #111; }
+  button { font: inherit; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 6px 10px; cursor: pointer; color: var(--ink); }
+  button:hover { border-color: var(--accent); }
+  button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .playback { display: flex; gap: 6px; flex-wrap: wrap; }
+  .speeds { display: flex; }
+  .speeds button { border-radius: 0; margin-left: -1px; }
+  .speeds button:first-child { border-radius: 6px 0 0 6px; }
+  .speeds button:last-child { border-radius: 0 6px 6px 0; }
+
+  .classes { display: flex; flex-direction: column; gap: 8px; }
+  .cls { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 12px; border-left: 5px solid var(--c); }
+  .cls span { display: flex; flex-direction: column; }
+  .cls small { color: var(--muted); font-size: 12px; line-height: 1.3; }
+  .cls.active { background: var(--c); border-color: var(--c); color: #fff; }
+  .cls.active small { color: rgba(255, 255, 255, .85); }
+
+  .flags { display: flex; gap: 16px; font-size: 14px; }
+  .flags label { display: flex; align-items: center; gap: 6px; }
+  #note { font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .nav { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .nav #clear { grid-column: span 2; color: var(--muted); font-size: 13px; }
+  .keys { font-size: 12px; color: var(--muted); margin: 0; line-height: 2; }
+  #video { position: fixed; width: 2px; height: 2px; opacity: 0; pointer-events: none; left: 0; bottom: 0; }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    #zoom { width: 100%; }
+  }
+</style>

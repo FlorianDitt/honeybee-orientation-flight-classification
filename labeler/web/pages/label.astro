@@ -1,0 +1,91 @@
+---
+import Layout from "../../src/layouts/Layout.astro";
+import LabelView from "../../src/components/LabelView.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+---
+
+<Layout title="Labeln · Bienenflug">
+  <LabelView back={base} name="" total="–">
+    <p slot="aside" class="guide">Unsicher, was gemeint ist? <a href={`${base}leitfaden/`} target="_blank">Leitfaden</a></p>
+  </LabelView>
+</Layout>
+
+<script>
+  import { startLabeler, type Label, type Track } from "../../src/lib/labeler";
+  import { BASE, load, site, store, type Rec } from "../../src/lib/webstore";
+
+  const pkgId = new URLSearchParams(location.search).get("p") ?? "";
+  const practiceMode = pkgId === "practice";
+  const state = load();
+  if (!state.name) location.href = BASE;
+
+  if (state.name) main().catch((e) => {
+    const s = document.getElementById("status")!;
+    s.textContent = `Daten ließen sich nicht laden: ${e.message}`;
+    s.dataset.kind = "error";
+    s.hidden = false;
+  });
+
+  async function main() {
+    const data = await site();
+    const pkg = practiceMode
+      ? { name: "Übungsrunde", split: "train", items: data.practice.map((p) => p.id) }
+      : data.packages.find((p) => p.id === pkgId);
+    if (!pkg) { location.href = BASE; return; }
+    const answers = Object.fromEntries(data.practice.map((p) => [p.id, p.answer]));
+    const target = practiceMode ? state.practice : state.labels;
+
+    const items = pkg.items.map((id) => data.items[id]);
+    const tracks: Track[] = items.map((it) => ({ id: it.id, t0: it.t0, t1: it.t1, t: it.t, pts: it.pts }));
+    const labels: Record<string, Label> = {};
+    for (const id of pkg.items) if (target[id]) labels[id] = target[id];
+
+    document.getElementById("split")!.textContent = pkg.name;
+    document.getElementById("total")!.textContent = String(tracks.length);
+    document.title = `${pkg.name} · Bienenflug`;
+
+    const NAMES: Record<string, string> = { orientierung: "Orientierungsflug", sammelabflug: "Sammelabflug", anflug: "Anflug", artefakt: "Artefakt" };
+
+    startLabeler({
+      tracks,
+      labels,
+      media: (t) => {
+        const it = data.items[t.id];
+        const r = it.region;
+        return { src: BASE + it.clip, overview: BASE + it.still, offset: it.offset, last: it.last, k: it.k, region: { x: r.x, y: r.y, w: r.s, h: r.s } };
+      },
+      backend: {
+        async save(t, l) {
+          const rec: Rec = { ...l, split: data.items[t.id].split, labeled_at: new Date().toISOString() };
+          target[t.id] = rec;
+          store(state);
+        },
+        async clear(t) {
+          delete target[t.id];
+          store(state);
+        },
+      },
+      feedback: practiceMode
+        ? (t, l) => {
+            const a = answers[t.id];
+            const verdict = l.label === a ? `✓ Richtig: ${NAMES[a]}` : `✗ Florian hat ${NAMES[a]} vergeben (du: ${NAMES[l.label]})`;
+            return `${verdict}\nNochmal ansehen oder weiter mit N`;
+          }
+        : undefined,
+      onDone: () => {
+        const s = document.getElementById("status")!;
+        s.innerHTML = practiceMode
+          ? `Übungsrunde fertig. <a href="${BASE}">Zur Übersicht</a>, dort geht es mit einem Paket weiter.`
+          : `Paket fertig, danke! <a href="${BASE}">Zur Übersicht</a> und die Labels exportieren.`;
+        s.dataset.kind = "feedback";
+        s.hidden = false;
+      },
+    });
+  }
+</script>
+
+<style>
+  .guide { font-size: 13px; color: var(--muted); margin: 0; }
+  :global(.status a) { color: #fff; font-weight: 600; }
+</style>

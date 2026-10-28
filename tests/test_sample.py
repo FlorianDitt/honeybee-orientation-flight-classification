@@ -1,6 +1,6 @@
 import random
 
-from beeflight.sample import QUOTA, draw, stratum
+from beeflight.sample import QUOTA, draw, stratum, track_id
 
 
 def row(start, end, straight=0.9, dur=1.0):
@@ -30,3 +30,9 @@ def test_draw_is_shuffled_and_reproducible():
     b, _ = draw(items, 100, random.Random(1))
     assert [i["id"] for i in a] == [i["id"] for i in b]
     assert len({i["stratum"] for i in a[:10]}) > 1
+
+
+def test_track_ids_are_unique_when_tracks_start_together():
+    seen = {}
+    assert [track_id("s", 5, seen) for _ in range(3)] == ["s:5", "s:5b", "s:5c"]
+    assert track_id("s", 6, seen) == "s:6"

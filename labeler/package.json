@@ -3,11 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local web app to hand-label bee flight tracks (orientation flight, foraging departure, arrival, artefact)",
+  "description": "Web app to hand-label bee flight tracks: local server with full videos, static GitHub Pages build with clips",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
     "start": "node ./dist/server/entry.mjs",
+    "dev:web": "astro dev --config astro.config.web.mjs",
+    "build:web": "astro build --config astro.config.web.mjs",
+    "preview:web": "astro preview --config astro.config.web.mjs",
+    "deploy:web": "bash scripts/deploy-pages.sh",
     "check": "astro check"
   },
   "dependencies": {

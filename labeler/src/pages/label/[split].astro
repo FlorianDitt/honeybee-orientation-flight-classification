@@ -1,6 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import { CLASSES, isSplit, readLabels, readQueue } from "../../lib/store";
+import LabelView from "../../components/LabelView.astro";
+import { isSplit, readLabels, readQueue } from "../../lib/store";
 
 const { split } = Astro.params;
 if (!isSplit(split)) return Astro.redirect("/");
@@ -9,359 +10,38 @@ if (!items) return Astro.redirect("/");
 // the blind second pass must not see earlier answers, only its own
 const labels = Object.fromEntries(readLabels(split));
 const payload = JSON.stringify({ split, items, labels });
-
-const HELP: Record<string, string> = {
-  orientierung: "startet am Brett, Schleifen und Bögen vor dem Flugloch",
-  sammelabflug: "startet am Brett, verlässt die Zone zügig ohne Schleife",
-  anflug: "Ziel ist das Flugbrett, darf kurven und suchen",
-  artefakt: "Gras, Schatten, ID-Wechsel, krabbelnde Biene",
-};
 ---
 
 <Layout title={`Labeln · ${split}`}>
   <script type="application/json" id="payload" set:html={payload} />
-  <div class="app">
-    <header>
-      <a href="/" class="back">← Übersicht</a>
-      <div class="pos"><b id="pos">–</b> <span id="split">{split}</span></div>
-      <div class="progress"><div id="progress-bar"></div></div>
-      <div class="done"><b id="done">0</b> / {items.length} gelabelt</div>
-    </header>
-
-    <main>
-      <section class="stage">
-        <canvas id="zoom" width="720" height="720" aria-label="Vergrößerter Ausschnitt der Flugbahn"></canvas>
-        <div class="hud">
-          <span id="frame">Frame –</span>
-          <span id="phase"></span>
-        </div>
-        <div id="status" class="status" hidden></div>
-      </section>
-
-      <aside>
-        <canvas id="overview" width="216" height="384" aria-label="Gesamtbild mit Position der Bahn"></canvas>
-
-        <div class="playback">
-          <button id="play" title="Abspielen/Pause (Leertaste)">⏯</button>
-          <button id="restart" title="Von vorn (R)">↺</button>
-          <div class="speeds" role="group" aria-label="Geschwindigkeit">
-            <button data-rate="0.25">¼×</button>
-            <button data-rate="0.5">½×</button>
-            <button data-rate="1">1×</button>
-          </div>
-          <button id="zoom-toggle" title="Ausschnitt weiter/enger (Z)">⤢</button>
-        </div>
-
-        <div class="classes">
-          {CLASSES.map((c, i) => (
-            <button class="cls" data-class={c} style={`--c: var(--c-${c})`}>
-              <kbd>{i + 1}</kbd>
-              <span><b>{c}</b><small>{HELP[c]}</small></span>
-            </button>
-          ))}
-        </div>
-
-        <div class="flags">
-          <label><input type="checkbox" id="flag-fragment" /> Fragment <kbd>F</kbd></label>
-          <label><input type="checkbox" id="flag-unsicher" /> unsicher <kbd>U</kbd></label>
-        </div>
-        <input id="note" type="text" placeholder="Notiz (optional), Enter speichert nicht" maxlength="500" />
-
-        <div class="nav">
-          <button id="prev"><kbd>←</kbd> zurück</button>
-          <button id="next">weiter <kbd>→</kbd></button>
-          <button id="next-open">nächste offene <kbd>N</kbd></button>
-          <button id="clear" title="Label dieser Bahn löschen">Label löschen</button>
-        </div>
-        <p class="keys"><kbd>Leertaste</kbd> Pause · <kbd>R</kbd> von vorn · <kbd>S</kbd> Tempo · <kbd>Z</kbd> Zoom</p>
-      </aside>
-    </main>
-  </div>
-  <video id="video" muted playsinline preload="auto"></video>
+  <LabelView back="/" name={split} total={items.length} />
 </Layout>
 
 <script>
+  import { fullFrame, startLabeler, type Label, type Track } from "../../lib/labeler";
+
   type Item = { id: string; seq: string; t0: number; t1: number; top: number; scale: number; t: number[]; xy: [number, number][] };
-  type Label = { label: string; flags: string[]; note: string };
-
-  const FPS = 60000 / 1001;
-  const W = 1080, H = 1920, LAST_FRAME = 1799, PAD_FRAMES = 20;
-  const CLASSES = ["orientierung", "sammelabflug", "anflug", "artefakt"];
-  const COLORS: Record<string, string> = { orientierung: "#e0662a", sammelabflug: "#3d93c9", anflug: "#3f9d6b", artefakt: "#8a8f98" };
-
   const { split, items, labels } = JSON.parse(document.getElementById("payload")!.textContent!) as {
     split: string; items: Item[]; labels: Record<string, Label>;
   };
-  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-  const video = $<HTMLVideoElement>("video");
-  const zoom = $<HTMLCanvasElement>("zoom").getContext("2d")!;
-  const over = $<HTMLCanvasElement>("overview").getContext("2d")!;
-  const note = $<HTMLInputElement>("note");
-  const flagEls = { fragment: $<HTMLInputElement>("flag-fragment"), unsicher: $<HTMLInputElement>("flag-unsicher") };
+  const tracks = items.map((it) => ({
+    id: it.id, t0: it.t0, t1: it.t1, t: it.t,
+    pts: it.xy.map(([x, y]) => [x / it.scale, (y + it.top) / it.scale] as [number, number]),
+    seq: it.seq,
+  }));
 
-  let idx = Math.max(0, items.findIndex((i) => !labels[i.id]));
-  let rate = 0.25;
-  let wide = false;
-  let pts: [number, number][] = [];  // full-resolution pixel coordinates
-  let box = { x: 0, y: 0, s: 1 };
-  let seg = { start: 0, end: 0 };
-  let frameCb = 0;
-
-  const frameTime = (f: number) => (f + 0.5) / FPS;
-
-  function setup(i: number) {
-    idx = (i + items.length) % items.length;
-    const it = items[idx];
-    pts = it.xy.map(([x, y]) => [x / it.scale, (y + it.top) / it.scale]);
-    fitBox();
-    seg = { start: Math.max(0, it.t0 - PAD_FRAMES), end: Math.min(LAST_FRAME, it.t1 + PAD_FRAMES) };
-    const src = `/video/${it.seq}`;
-    if (!video.src.endsWith(src)) {
-      showStatus("Video lädt …");
-      zoom.fillStyle = "#111";
-      zoom.fillRect(0, 0, zoom.canvas.width, zoom.canvas.height);
-      over.fillStyle = "#111";
-      over.fillRect(0, 0, over.canvas.width, over.canvas.height);
-      video.src = src;
-    }
-    video.currentTime = frameTime(seg.start);
-    video.playbackRate = rate;
-    video.play().catch(() => {});
-    const l = labels[it.id];
-    flagEls.fragment.checked = !!l?.flags.includes("fragment");
-    flagEls.unsicher.checked = !!l?.flags.includes("unsicher");
-    note.value = l?.note ?? "";
-    renderUi();
+  async function call(method: string, body: object) {
+    const res = await fetch(`/api/${split}/labels`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error((await res.json()).error);
   }
 
-  function fitBox() {
-    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-    const margin = wide ? 260 : 90;
-    const x0 = Math.min(...xs) - margin, x1 = Math.max(...xs) + margin;
-    const y0 = Math.min(...ys) - margin, y1 = Math.max(...ys) + margin;
-    const s = Math.min(W, Math.max(240, x1 - x0, y1 - y0));
-    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    box = { s, x: Math.min(Math.max(0, cx - s / 2), W - s), y: Math.min(Math.max(0, cy - s / 2), H - s) };
-  }
-
-  function currentIndex(frame: number) {
-    const t = items[idx].t;
-    let k = -1;
-    while (k + 1 < t.length && t[k + 1] <= frame) k++;
-    return k;
-  }
-
-  function path(ctx: CanvasRenderingContext2D, from: number, to: number, map: (p: [number, number]) => [number, number]) {
-    ctx.beginPath();
-    for (let k = from; k <= to; k++) {
-      const [x, y] = map(pts[k]);
-      k === from ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  }
-
-  function draw(frame: number) {
-    if (video.readyState < 2) return;  // no decoded frame of the current video yet
-    const it = items[idx];
-    const k = currentIndex(frame);
-    const color = COLORS[labels[it.id]?.label] ?? "#d99a1e";
-    const zs = zoom.canvas.width / box.s;
-    const zmap = (p: [number, number]): [number, number] => [(p[0] - box.x) * zs, (p[1] - box.y) * zs];
-
-    zoom.drawImage(video, box.x, box.y, box.s, box.s, 0, 0, zoom.canvas.width, zoom.canvas.height);
-    zoom.lineJoin = zoom.lineCap = "round";
-    zoom.setLineDash([6, 6]);
-    zoom.strokeStyle = "rgba(255,255,255,.55)";
-    zoom.lineWidth = 1.5;
-    path(zoom, 0, pts.length - 1, zmap);
-    zoom.setLineDash([]);
-    if (k >= 1) {
-      zoom.strokeStyle = color;
-      zoom.lineWidth = 3;
-      path(zoom, 0, k, zmap);
-    }
-    if (k >= 0 && frame <= it.t1) {
-      const [x, y] = zmap(pts[k]);
-      zoom.strokeStyle = "#fff";
-      zoom.lineWidth = 2;
-      zoom.beginPath();
-      zoom.arc(x, y, 22, 0, Math.PI * 2);
-      zoom.stroke();
-    }
-    const [sx, sy] = zmap(pts[0]);
-    zoom.fillStyle = "#fff";
-    zoom.fillRect(sx - 4, sy - 4, 8, 8);
-
-    const os = over.canvas.width / W;
-    over.drawImage(video, 0, 0, over.canvas.width, over.canvas.height);
-    over.strokeStyle = "#fff";
-    over.lineWidth = 1;
-    over.strokeRect(box.x * os, box.y * os, box.s * os, box.s * os);
-    over.strokeStyle = color;
-    over.lineWidth = 1.5;
-    path(over, 0, pts.length - 1, (p) => [p[0] * os, p[1] * os]);
-
-    $("frame").textContent = `Frame ${frame} · Bahn ${it.t0}–${it.t1}`;
-    $("phase").textContent = frame < it.t0 ? "vor der Bahn" : frame > it.t1 ? "nach der Bahn" : "";
-  }
-
-  function onFrame(_: number, meta: VideoFrameCallbackMetadata) {
-    const frame = Math.round(meta.mediaTime * FPS);
-    draw(Math.min(frame, LAST_FRAME));
-    if (frame >= seg.end) video.currentTime = frameTime(seg.start);
-    frameCb = video.requestVideoFrameCallback(onFrame);
-  }
-  if (typeof video.requestVideoFrameCallback === "function") {
-    frameCb = video.requestVideoFrameCallback(onFrame);
-    // a new src can drop pending callbacks in some browsers: re-arm exactly one
-    video.addEventListener("loadeddata", () => {
-      video.cancelVideoFrameCallback(frameCb);
-      frameCb = video.requestVideoFrameCallback(onFrame);
-    });
-  } else {
-    // fallback: less exact, but keeps the overlay roughly in sync
-    const tick = () => {
-      if (video.readyState >= 2) {
-        const frame = Math.floor(video.currentTime * FPS);
-        draw(frame);
-        if (frame >= seg.end) video.currentTime = frameTime(seg.start);
-      }
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }
-  video.addEventListener("seeked", () => draw(Math.floor(video.currentTime * FPS)));
-  video.addEventListener("canplay", () => hideStatus());
-  video.addEventListener("error", () => showStatus(`Video ${items[idx].seq}.mp4 fehlt. Herunterladen mit beeflight-splits --download.`));
-
-  function renderUi() {
-    const it = items[idx];
-    const done = items.filter((i) => labels[i.id]).length;
-    $("pos").textContent = `Bahn ${idx + 1} / ${items.length}`;
-    $("done").textContent = String(done);
-    $("progress-bar").style.width = `${(100 * done) / items.length}%`;
-    for (const b of document.querySelectorAll<HTMLButtonElement>(".cls")) {
-      b.classList.toggle("active", labels[it.id]?.label === b.dataset.class);
-    }
-    for (const b of document.querySelectorAll<HTMLButtonElement>("[data-rate]")) {
-      b.classList.toggle("active", Number(b.dataset.rate) === rate);
-    }
-  }
-
-  function showStatus(msg: string) { const s = $("status"); s.textContent = msg; s.hidden = false; }
-  function hideStatus() { $("status").hidden = true; }
-
-  async function save(cls: string) {
-    const it = items[idx];
-    const flags = Object.entries(flagEls).filter(([, el]) => el.checked).map(([f]) => f);
-    const res = await fetch(`/api/${split}/labels`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: it.id, label: cls, flags, note: note.value }),
-    });
-    if (!res.ok) { showStatus(`Speichern fehlgeschlagen: ${(await res.json()).error}`); return; }
-    labels[it.id] = { label: cls, flags, note: note.value };
-    nextOpen();
-  }
-
-  async function clear() {
-    const it = items[idx];
-    await fetch(`/api/${split}/labels`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: it.id }) });
-    delete labels[it.id];
-    setup(idx);
-  }
-
-  function nextOpen() {
-    for (let k = 1; k <= items.length; k++) {
-      const j = (idx + k) % items.length;
-      if (!labels[items[j].id]) return setup(j);
-    }
-    renderUi();
-    showStatus("Alle Bahnen dieser Warteschlange sind gelabelt.");
-  }
-
-  const togglePlay = () => (video.paused ? video.play() : video.pause());
-  const setRate = (r: number) => { rate = r; video.playbackRate = r; renderUi(); };
-
-  for (const b of document.querySelectorAll<HTMLButtonElement>(".cls")) b.onclick = () => save(b.dataset.class!);
-  for (const b of document.querySelectorAll<HTMLButtonElement>("[data-rate]")) b.onclick = () => setRate(Number(b.dataset.rate));
-  $("play").onclick = togglePlay;
-  $("restart").onclick = () => { video.currentTime = frameTime(seg.start); video.play(); };
-  $("zoom-toggle").onclick = () => { wide = !wide; fitBox(); };
-  $("prev").onclick = () => setup(idx - 1);
-  $("next").onclick = () => setup(idx + 1);
-  $("next-open").onclick = nextOpen;
-  $("clear").onclick = clear;
-
-  document.addEventListener("keydown", (e) => {
-    if (e.target === note) {
-      if (e.key === "Escape" || e.key === "Enter") note.blur();
-      return;
-    }
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const n = Number(e.key);
-    if (n >= 1 && n <= CLASSES.length) return void save(CLASSES[n - 1]);
-    switch (e.key.toLowerCase()) {
-      case " ": e.preventDefault(); togglePlay(); break;
-      case "r": video.currentTime = frameTime(seg.start); video.play(); break;
-      case "s": setRate(rate === 0.25 ? 0.5 : rate === 0.5 ? 1 : 0.25); break;
-      case "z": wide = !wide; fitBox(); break;
-      case "f": flagEls.fragment.checked = !flagEls.fragment.checked; break;
-      case "u": flagEls.unsicher.checked = !flagEls.unsicher.checked; break;
-      case "n": nextOpen(); break;
-      case "arrowleft": setup(idx - 1); break;
-      case "arrowright": setup(idx + 1); break;
-    }
+  startLabeler({
+    tracks,
+    labels,
+    media: (t: Track) => fullFrame(`/video/${(t as (typeof tracks)[number]).seq}`),
+    backend: {
+      save: (t, l) => call("POST", { id: t.id, ...l }),
+      clear: (t) => call("DELETE", { id: t.id }),
+    },
   });
-
-  setup(idx);
 </script>
-
-<style>
-  .app { display: flex; flex-direction: column; height: 100vh; }
-  header { display: flex; align-items: center; gap: 20px; padding: 10px 20px; border-bottom: 1px solid var(--line); }
-  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
-  .pos span { color: var(--muted); margin-left: 6px; font-size: 13px; }
-  .progress { flex: 1; height: 6px; background: var(--panel); border-radius: 3px; overflow: hidden; }
-  #progress-bar { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
-  .done { font-size: 14px; color: var(--muted); }
-  .done b { color: var(--ink); }
-
-  main { flex: 1; display: grid; grid-template-columns: 1fr 340px; gap: 20px; padding: 16px 20px; min-height: 0; }
-  .stage { position: relative; display: flex; flex-direction: column; align-items: center; min-height: 0; }
-  #zoom { width: min(100%, calc(100vh - 120px)); aspect-ratio: 1; background: #111; border-radius: 8px; }
-  .hud { display: flex; gap: 16px; font: 12px ui-monospace, monospace; color: var(--muted); margin-top: 6px; }
-  .status { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff;
-            padding: 8px 14px; border-radius: 6px; font-size: 14px; }
-
-  aside { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
-  #overview { width: 108px; height: 192px; border-radius: 6px; align-self: center; background: #111; }
-  button { font: inherit; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 6px 10px; cursor: pointer; color: var(--ink); }
-  button:hover { border-color: var(--accent); }
-  button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .playback { display: flex; gap: 6px; flex-wrap: wrap; }
-  .speeds { display: flex; }
-  .speeds button { border-radius: 0; margin-left: -1px; }
-  .speeds button:first-child { border-radius: 6px 0 0 6px; }
-  .speeds button:last-child { border-radius: 0 6px 6px 0; }
-
-  .classes { display: flex; flex-direction: column; gap: 8px; }
-  .cls { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 12px; border-left: 5px solid var(--c); }
-  .cls span { display: flex; flex-direction: column; }
-  .cls small { color: var(--muted); font-size: 12px; line-height: 1.3; }
-  .cls.active { background: var(--c); border-color: var(--c); color: #fff; }
-  .cls.active small { color: rgba(255, 255, 255, .85); }
-
-  .flags { display: flex; gap: 16px; font-size: 14px; }
-  .flags label { display: flex; align-items: center; gap: 6px; }
-  #note { font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
-  .nav { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .nav #clear { grid-column: span 2; color: var(--muted); font-size: 13px; }
-  .keys { font-size: 12px; color: var(--muted); margin: 0; line-height: 2; }
-  #video { position: fixed; width: 2px; height: 2px; opacity: 0; pointer-events: none; left: 0; bottom: 0; }
-
-  @media (max-width: 900px) {
-    main { grid-template-columns: 1fr; }
-    #zoom { width: 100%; }
-  }
-</style>

@@ -23,3 +23,5 @@ labeler/node_modules/
 labeler/dist/
 labeler/.astro/
 labels/*.tmp
+labeler/public-web/
+labeler/dist-web/

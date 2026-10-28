@@ -1,0 +1,197 @@
+---
+import Layout from "../../src/layouts/Layout.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+---
+
+<Layout title="Bienenflug-Labeler">
+  <main>
+    <header>
+      <div class="kicker">Studienarbeit · Bienen vor dem Flugloch</div>
+      <h1>Hilf mit, Flugbahnen zu labeln</h1>
+      <p class="lead">
+        Junge Honigbienen fliegen vor ihrem ersten Sammelflug Schleifen vor dem Stock, um sich die Lage einzuprägen
+        (Orientierungsflug). Ein Modell soll das aus Videos erkennen. Dafür braucht es Bahnen, die Menschen
+        unabhängig voneinander eingeordnet haben. Jede Bahn wird von mindestens drei Personen gelabelt;
+        am Ende entscheidet die Mehrheit.
+      </p>
+    </header>
+
+    <div id="storage-warning" class="warn" hidden>
+      Dein Browser erlaubt keinen lokalen Speicher (privates Fenster?). Labeln geht trotzdem, aber exportiere vor
+      dem Schließen des Tabs, sonst sind die Labels weg.
+    </div>
+
+    <ol class="steps">
+      <li>
+        <h2>Name</h2>
+        <form id="name-form" class="row">
+          <input id="name" type="text" placeholder="Vorname" maxlength="40" autocomplete="given-name" required />
+          <button type="submit">Speichern</button>
+          <span id="name-saved" class="muted"></span>
+        </form>
+        <p class="muted small">Nur damit Florian die Dateien auseinanderhalten kann. Alles bleibt in deinem Browser, bis du exportierst.</p>
+      </li>
+
+      <li>
+        <h2>Übungsrunde</h2>
+        <p>Zehn Bahnen, nach jeder siehst du, wie Florian sie eingeordnet hat. Vorher kurz den
+          <a href={`${base}leitfaden/`}>Leitfaden</a> lesen (2 Minuten).</p>
+        <a id="practice" class="card practice" href={`${base}label/?p=practice`} aria-disabled="true">
+          <div class="name">Übungsrunde</div>
+          <div class="big"><span id="practice-done">0</span> <small>/ <span id="practice-total">–</span></small></div>
+          <div class="bar"><div id="practice-bar"></div></div>
+          <div class="muted small" id="practice-score">&nbsp;</div>
+        </a>
+      </li>
+
+      <li>
+        <h2>Paket labeln</h2>
+        <p>Ein Paket hat etwa 50 Bahnen und dauert 15–20 Minuten. <b>Nimm das Paket, das Florian dir genannt hat</b>,
+          damit jede Bahn genug Stimmen bekommt.</p>
+        <div id="packages" class="cards"></div>
+        <p id="locked" class="muted small" hidden>Die Pakete werden nach der Übungsrunde freigeschaltet.</p>
+      </li>
+
+      <li>
+        <h2>Exportieren und schicken</h2>
+        <p>Lädt eine kleine Datei herunter. Schick sie Florian (Chat, Mail, egal). Du kannst beliebig oft exportieren,
+          die neueste Datei zählt.</p>
+        <div class="row">
+          <button id="export" class="primary">Labels exportieren</button>
+          <span id="export-info" class="muted"></span>
+        </div>
+        <details>
+          <summary>Labels aus einer früheren Datei laden (anderer Browser oder Rechner)</summary>
+          <input id="import" type="file" accept=".jsonl,application/json,text/plain" />
+          <span id="import-info" class="muted"></span>
+        </details>
+      </li>
+    </ol>
+
+    <footer>
+      Videos: <a href="https://huggingface.co/datasets/mrkschtr/thehiveisreal">mrkschtr/thehiveisreal</a>
+      (CC BY-NC 4.0), zugeschnitten. Studienarbeit WDS224, DHBW Ravensburg.
+    </footer>
+  </main>
+</Layout>
+
+<script>
+  import { BASE, exportFile, importText, load, persistent, site, store, unexported, type Site } from "../../src/lib/webstore";
+
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const state = load();
+  const nameInput = $<HTMLInputElement>("name");
+  nameInput.value = state.name;
+  if (!persistent) $("storage-warning").hidden = false;
+
+  $("name-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    state.name = nameInput.value.trim();
+    store(state);
+    $("name-saved").textContent = "gespeichert";
+    render();
+  });
+
+  $("export").addEventListener("click", () => {
+    if (!state.name) { nameInput.focus(); return; }
+    const { name, text } = exportFile(state);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "application/jsonl" }));
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    state.exported_at = new Date().toISOString();
+    store(state);
+    render();
+  });
+
+  $<HTMLInputElement>("import").addEventListener("change", async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    try {
+      const n = importText(state, await file.text());
+      store(state);
+      nameInput.value = state.name;
+      $("import-info").textContent = `${n} Labels übernommen`;
+    } catch {
+      $("import-info").textContent = "Die Datei ist keine Label-Datei.";
+    }
+    render();
+  });
+
+  let data: Site | null = null;
+  let failed = false;
+
+  function render() {
+    const named = !!state.name;
+    for (const el of document.querySelectorAll<HTMLElement>(".steps > li:not(:first-child)")) el.classList.toggle("off", !named);
+    const total = Object.values(state.labels).length + Object.values(state.practice).length;
+    const fresh = unexported(state);
+    $("export-info").textContent = total === 0 ? "noch keine Labels"
+      : fresh > 0 ? `${fresh} neue Labels seit dem letzten Export` : `alle ${total} Labels exportiert`;
+    if (!data) { $("packages").textContent = failed ? "Daten ließen sich nicht laden." : "lädt …"; return; }
+
+    const ids = data.practice.map((p) => p.id);
+    const done = ids.filter((id) => state.practice[id]);
+    const right = data.practice.filter((p) => state.practice[p.id]?.label === p.answer).length;
+    $("practice-done").textContent = String(done.length);
+    $("practice-total").textContent = String(ids.length);
+    $("practice-bar").style.width = `${(100 * done.length) / ids.length}%`;
+    $("practice-score").textContent = done.length ? `${right} von ${done.length} wie Florian` : " ";
+    $("practice").setAttribute("aria-disabled", String(!named));
+    const unlocked = named && done.length === ids.length;
+    $("locked").hidden = unlocked;
+
+    $("packages").innerHTML = "";
+    for (const p of data.packages) {
+      const n = p.items.filter((id) => state.labels[id]).length;
+      const a = document.createElement("a");
+      a.className = "card";
+      a.href = `${BASE}label/?p=${p.id}`;
+      a.setAttribute("aria-disabled", String(!unlocked));
+      a.innerHTML = `<div class="name">${p.name}</div>
+        <div class="big">${n} <small>/ ${p.items.length}</small></div>
+        <div class="bar"><div style="width:${(100 * n) / p.items.length}%"></div></div>`;
+      $("packages").append(a);
+    }
+  }
+  render();
+  site().then((d) => { data = d; }, () => { failed = true; }).finally(render);
+</script>
+
+<style>
+  main { max-width: 860px; margin: 0 auto; padding: 48px 16px 32px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: clamp(26px, 5vw, 34px); margin: 4px 0 10px; letter-spacing: -.02em; line-height: 1.15; }
+  .lead { color: var(--muted); max-width: 64ch; margin: 0 0 28px; }
+  .warn { background: #fff4e5; border: 1px solid #f0c27a; border-radius: 8px; padding: 10px 14px; margin-bottom: 20px; }
+  .steps { list-style: none; counter-reset: step; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 28px; }
+  .steps > li { counter-increment: step; position: relative; padding-left: 44px; transition: opacity .2s; }
+  .steps > li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 14px; }
+  .steps > li.off { opacity: .45; pointer-events: none; }
+  h2 { font-size: 18px; margin: 2px 0 8px; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input[type="text"] { font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; min-width: 0; flex: 0 1 220px; }
+  button { font: inherit; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 8px 14px; cursor: pointer; color: var(--ink); }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  details { margin-top: 12px; font-size: 14px; }
+  summary { cursor: pointer; color: var(--muted); margin-bottom: 8px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  :global(.card) { display: block; text-decoration: none; background: var(--panel); border-radius: 10px; padding: 14px 16px;
+    border: 2px solid transparent; transition: border-color .15s; }
+  :global(.card:hover) { border-color: var(--accent); }
+  :global(.card[aria-disabled="true"]) { opacity: .5; pointer-events: none; }
+  .practice { max-width: 240px; }
+  :global(.card .name) { font-weight: 600; }
+  :global(.card .big) { font-size: 26px; font-weight: 700; margin: 4px 0; }
+  :global(.card .big small) { font-size: 15px; color: var(--muted); font-weight: 400; }
+  :global(.card .bar) { height: 6px; background: #fff; border-radius: 3px; overflow: hidden; }
+  :global(.card .bar div) { height: 100%; background: var(--accent); width: 0; }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+</style>

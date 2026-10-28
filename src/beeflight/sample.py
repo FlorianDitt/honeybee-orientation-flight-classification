@@ -32,8 +32,16 @@ def stratum(r):
     return "other"
 
 
+def track_id(seq, t0, seen):
+    """seq:t0, with a letter suffix when two tracks of one sequence start in the same frame."""
+    base = f"{seq}:{t0}"
+    n = seen.get(base, 0)
+    seen[base] = n + 1
+    return base if n == 0 else base + "abcdefghijklmnopqrstuvwxyz"[n]
+
+
 def load(split):
-    items = []
+    items, seen = [], {}
     for seq in SPLITS[split]:
         path = FLIGHTS / f"{seq}.json"
         if not path.exists():
@@ -41,7 +49,7 @@ def load(split):
         d = json.loads(path.read_text())
         for r in d["rows"]:
             items.append({
-                "id": f"{seq}:{r['t0']}", "seq": seq, "t0": r["t0"], "t1": r["t"][-1],
+                "id": track_id(seq, r["t0"], seen), "seq": seq, "t0": r["t0"], "t1": r["t"][-1],
                 "top": d["top"], "scale": d["scale"], "t": r["t"], "xy": r["xy"],
                 "stratum": stratum(r),
             })

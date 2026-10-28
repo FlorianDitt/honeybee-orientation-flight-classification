@@ -73,8 +73,11 @@ Orientierungsflug-Kandidat. Diese Regel ist zugleich die **Baseline**, gegen die
 ## 4. Handlabels
 
 Etwa 300 Bahnen aus dem Trainingsblock, stratifiziert über Zeit und Selbst-Label, in vier Klassen nach
-[labeling.md](labeling.md). 50 Bahnen werden nach mindestens einer Woche ein zweites Mal gelabelt
-(Intra-Rater-Übereinstimmung, Cohen's κ), um die Unsicherheit der eigenen Labels zu quantifizieren.
+[labeling.md](labeling.md). Jede Bahn bekommt **drei Stimmen**: meine und die von zwei Helfenden aus einer
+Online-Version des Label-Tools, nach einer Übungsrunde mit Rückmeldung. Das finale Label ist die Mehrheit; ohne
+Mehrheit entscheidet mein Label, markiert als `strittig`. Die Übereinstimmung zwischen den Labelnden
+(Krippendorffs α) quantifiziert, wie eindeutig die Klassen überhaupt sind, und begrenzt damit die erreichbare
+Modellgüte. Optional werden 50 Bahnen nach einer Woche von mir ein zweites Mal gelabelt (Cohen's κ).
 
 Zusätzlich 60–100 Bahnen aus der Validierung für die Modellauswahl. Testbahnen werden erst gelabelt,
 wenn das Modell eingefroren ist.

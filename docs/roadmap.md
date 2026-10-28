@@ -58,9 +58,11 @@ Am Ende stehen drei Dinge:
 
 ## Phase 3: Labels (Woche 2)
 
+- [x] **Online-Labeler** für Freunde (GitHub Pages, Übungsrunde, Pakete, Export) und `beeflight-vote`
 - [ ] **300 Trainingsbahnen** und **80 Validierungsbahnen** gelabelt (≈ 3–4 h, auf mehrere Tage verteilt)
+- [ ] 8 Pakete an Helfende verteilen (je zwei pro Paket), Exporte nach `labels/votes/`, `beeflight-vote`
 - [ ] Mindestens **40 Orientierungsflüge** im Training, sonst gezielt kurvige Abflüge nachziehen
-- [ ] 50 Bahnen markieren für das Zweitlabeln in Woche 3 (Cohen's κ)
+- [ ] Übereinstimmung berichten: Krippendorffs α über alle Labelnden (Zweitlabeln für Cohen's κ nur noch optional)
 
 ## Phase 4: Modelle (Woche 3)
 
@@ -100,7 +102,7 @@ Am Ende stehen drei Dinge:
 - [ ] Zweimal laut proben mit Uhr (15 min), Fragen vorbereiten:
   - Woher weißt du, dass es junge Bienen sind? *(gar nicht direkt; Verhalten, nicht Alter)*
   - Warum nicht einfach Krümmung? *(Baseline-Vergleich, Grenzfälle suchender Anflug)*
-  - Wie verlässlich sind deine eigenen Labels? *(κ)*
+  - Wie verlässlich sind deine Labels? *(Mehrheit aus drei Stimmen, Krippendorffs α)*
   - Warum ist Test B so klein? *(Wetter, Verkehr; KI zeigt die Unsicherheit)*
 
 ## Was gestrichen wird, wenn die Zeit knapp wird

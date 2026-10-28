@@ -1,0 +1,98 @@
+/* @theme hive */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400&display=swap");
+
+:root {
+  --ink: #16181d;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --bg: #fbfaf7;
+  --accent: #d99a1e;
+  --train: #2f4858;
+  --val: #6b8fa3;
+  --test-a: #d99a1e;
+  --test-b: #b5541c;
+  --buffer: #d1d5db;
+}
+
+section {
+  width: 1280px;
+  height: 720px;
+  padding: 64px 80px 56px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Inter", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+h1, h2 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0 0 28px;
+}
+h1 { font-size: 56px; }
+h2 { font-size: 38px; }
+h2::before {
+  content: "";
+  display: block;
+  width: 40px;
+  height: 4px;
+  background: var(--accent);
+  margin-bottom: 18px;
+}
+h3 {
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+p, li { margin: 0 0 10px; }
+ul { padding-left: 1.1em; }
+li::marker { color: var(--accent); }
+strong { font-weight: 600; }
+code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82em;
+  background: #f1efe9;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* footer + page number */
+footer, section::after {
+  font-size: 14px;
+  color: var(--muted);
+}
+footer { position: absolute; left: 80px; bottom: 26px; }
+section::after { position: absolute; right: 80px; bottom: 26px; padding: 0; }
+
+/* title slide */
+section.title {
+  justify-content: center;
+}
+section.title h1 { font-size: 60px; max-width: 980px; }
+section.title h1::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 5px;
+  background: var(--accent);
+  margin-top: 30px;
+}
+section.title p { color: var(--muted); font-size: 22px; }
+
+.note {
+  margin-top: auto;
+  margin-bottom: 14px;
+  font-size: 16px;
+  color: var(--muted);
+}

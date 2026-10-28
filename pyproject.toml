@@ -1,0 +1,37 @@
+[project]
+name = "beeflight"
+version = "0.1.0"
+description = "Orientierungsflug oder Sammelflug? Klassifikation von Flugbahnen junger Bienen vor dem Flugloch (WDS224)"
+authors = [{ name = "Florian Dittmann" }]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "av>=14",
+    "huggingface-hub>=0.30",
+    "matplotlib>=3.9",
+    "numpy>=2.1",
+    "opencv-python-headless>=4.10",
+    "scipy>=1.14",
+]
+
+[project.optional-dependencies]
+# trajectory classifier (GRU / 1D-CNN), added once hand labels exist
+ml = ["torch>=2.5"]
+
+[project.scripts]
+beeflight-splits = "beeflight.splits:main"
+beeflight-tracks = "beeflight.tracks:main"
+beeflight-figures = "beeflight.figures:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/beeflight"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

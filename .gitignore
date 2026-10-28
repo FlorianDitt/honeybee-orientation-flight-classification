@@ -1,0 +1,19 @@
+# data and generated results (videos are ~100 MB each, re-download with beeflight-splits --download)
+data/
+outputs/
+archive/prototypes/out/
+
+# python
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# editor
+.idea/
+.vscode/
+
+# rendered slides
+presentation/*.pdf
+presentation/*.pptx
+presentation/*.html

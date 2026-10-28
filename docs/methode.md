@@ -15,7 +15,7 @@ Stand der Vorstudie: klassisches Hintergrundmodell, später durch einen gelernte
 | Auflösung | Graustufen, halbe Auflösung (540 × 960) | `SCALE = 0.5` |
 | Bildausschnitt | ab Oberkante Flugbrett abwärts | `BOARD = {"2123": (820, 1000), "2125": (770, 1040)}` (volle Auflösung) |
 | Hintergrund | Median über jeden 15. Frame der Sequenz | |
-| Vordergrund | Abweichung vom Hintergrund > Schwelle, Opening 2×2, Closing 5×5 | `thr = 22` |
+| Vordergrund | Abweichung vom Hintergrund > Schwelle, Opening 2×2, Closing 5×5 | `thr = 18` (Vorstudie: 22) |
 | Blobs | Zusammenhangskomponenten | Fläche 25–3000 px (halbe Auflösung) |
 | Gras-Maske | Pixel, die in > 8 % aller Frames Vordergrund sind, um 7 × 7 dilatiert; Blobs darin werden verworfen | |
 
@@ -32,7 +32,12 @@ um von Hand korrigierte Frames.
   Positionen und Detektionen.
 - **Konstantgeschwindigkeits-Modell**, geglättet: `v ← 0,5·v + 0,5·Δx/Δt`.
 - Gate 45 px (halbe Auflösung), Lücken bis **3 Frames** werden überbrückt.
-- Bahnen mit < 15 Detektionen werden verworfen.
+- **Verbinden von Fragmenten** (`beeflight.tracks.stitch`): Eine Bahn, die im Gras endet, wird mit einer Bahn
+  verbunden, die bis zu 40 Frames später im Gras beginnt, wenn Anfang und Ende zur Vorhersage mit konstanter
+  Geschwindigkeit passen (Toleranz 12 px + 2 px pro Frame Lücke, in beide Richtungen geprüft). Gierig nach
+  Abweichung, jede Bahn höchstens einmal fortgesetzt; Bahnen am Brett oder Bildrand nie.
+- Bahnen mit < 15 Detektionen werden danach verworfen (vorher, damit auch kurze Stücke verbunden werden).
+- Version `background-v2` (steht in jeder Ausgabe und jedem Label); `background-v1` war der Stand der Vorstudie.
 
 ## 3. Flugbahnen, Merkmale und Selbst-Labels (`beeflight.tracks.features`)
 
@@ -42,8 +47,8 @@ um von Hand korrigierte Frames.
 
 | Zone | Bedingung |
 |---|---|
-| `board` | Punkt höchstens 15 px unterhalb der Brett-Unterkante |
-| `edge` | Punkt höchstens 15 px vom linken, rechten oder unteren Bildrand |
+| `board` | Punkt höchstens 30 px (halbe Auflösung, ≈ 2 Bienenlängen) unterhalb der Brett-Unterkante |
+| `edge` | Punkt höchstens 30 px vom linken, rechten oder unteren Bildrand |
 | `lost` | sonst: Bahn reißt mitten im Bild ab (Fragment) |
 
 **Merkmale pro Bahn:**

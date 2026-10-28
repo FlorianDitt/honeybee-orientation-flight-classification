@@ -17,7 +17,8 @@ Stock mit anderem Holz, Licht und Kamera-Abstand (**Test B**).
 
 **Status:** Machbarkeitsstudie abgeschlossen ([docs/vorstudie.md](docs/vorstudie.md)). Auf 7 × 30 s von Stock A
 finden sich 509 Flugbahnen, davon 21 kurvige Abflüge vom Flugbrett als Orientierungsflug-Kandidaten.
-Größte offene Baustelle: 71 % der Bahnen reißen über dem Gras ab.
+Tracker v2 (niedrigere Schwelle, breitere Zonen, Verbinden von Fragmenten) senkt den Anteil abgerissener Bahnen
+im Training von 69 % auf 41 % ([Nachtrag](docs/vorstudie.md#nachtrag-tracker-v2)); der Rest ist die offene Baustelle.
 
 <br clear="right">
 

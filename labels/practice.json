@@ -10,36 +10,36 @@
    "answer": "sammelabflug"
   },
   {
-   "id": "rec2123_seq035:1774",
+   "id": "rec2123_seq057:1108",
    "answer": "artefakt"
   },
   {
-   "id": "rec2123_seq058:777",
+   "id": "rec2123_seq027:482",
    "answer": "anflug"
   },
   {
-   "id": "rec2123_seq029:394",
+   "id": "rec2123_seq025:1267",
    "answer": "orientierung"
+  },
+  {
+   "id": "rec2123_seq060:1558",
+   "answer": "orientierung"
+  },
+  {
+   "id": "rec2123_seq029:1750",
+   "answer": "anflug"
   },
   {
    "id": "rec2123_seq057:602",
    "answer": "orientierung"
   },
   {
-   "id": "rec2123_seq026:66",
-   "answer": "anflug"
-  },
-  {
-   "id": "rec2123_seq016:209",
-   "answer": "orientierung"
-  },
-  {
-   "id": "rec2123_seq025:671",
+   "id": "rec2123_seq025:672",
    "answer": "sammelabflug"
   },
   {
-   "id": "rec2123_seq054:1704",
-   "answer": "artefakt"
+   "id": "rec2123_seq065:939",
+   "answer": "anflug"
   }
  ]
 }

@@ -1,6 +1,6 @@
 import numpy as np
 
-from beeflight.tracks import features, track
+from beeflight.tracks import BOARD_MARGIN, EDGE_MARGIN, features, stitch, track, zone_of
 
 SHAPE = (500, 500)
 
@@ -30,3 +30,30 @@ def test_tracker_follows_two_crossing_bees():
     dets = [np.array([[*a[i], 100], [*b[i], 100]], float) for i in t]
     tracks = [p for p in track(dets) if len(p) > 5]
     assert len(tracks) == 2 and all(len(p) == 40 for p in tracks)
+
+
+def line(t0, t1, x0, vx, y=250.0):
+    t = np.arange(t0, t1)
+    return np.c_[t, x0 + vx * (t - t0), np.full(len(t), y)]
+
+
+def test_stitch_joins_a_bee_lost_over_the_grass():
+    a = line(0, 30, 100, 4)  # ends at x=216, in the open
+    b = line(42, 70, 100 + 4 * 42, 4)  # reappears where it should be 12 frames later
+    out = stitch([a, b], SHAPE, board_bottom=50)
+    assert len(out) == 1 and len(out[0]) == 58
+
+
+def test_stitch_ignores_far_or_departed_tracks():
+    a = line(0, 30, 100, 4)
+    far = line(42, 70, 100 + 4 * 42, 4, y=420)  # same time, wrong place
+    assert len(stitch([a, far], SHAPE, board_bottom=50)) == 2
+    gone = line(0, 30, 360, 4.5)  # leaves at the right edge
+    back = line(40, 60, 480, -4)
+    assert len(stitch([gone, back], SHAPE, board_bottom=50)) == 2
+
+
+def test_zone_margins():
+    assert zone_of((250, 50 + BOARD_MARGIN - 1), SHAPE, 50) == "board"
+    assert zone_of((EDGE_MARGIN - 1, 250), SHAPE, 50) == "edge"
+    assert zone_of((250, 250), SHAPE, 50) == "lost"

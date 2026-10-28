@@ -18,6 +18,9 @@ from scipy.optimize import linear_sum_assignment
 from .splits import ROOT, SPLITS, video_path
 
 SCALE = 0.5
+TRACKER = "background-v2"
+# half-res px: a track ending this close to the board or the frame edge has landed or left the frame
+BOARD_MARGIN, EDGE_MARGIN = 30, 30
 # full-res rows: top of the board (bees sit there) and its lower edge (flight zone starts below)
 BOARD = {"2123": (820, 1000), "2125": (770, 1040)}
 OUT = ROOT / "outputs" / "flights"
@@ -32,7 +35,7 @@ def frames(seq_id, step=1):
                 yield i, cv2.resize(g, None, fx=SCALE, fy=SCALE, interpolation=cv2.INTER_AREA)
 
 
-def detect(seq_id, y_top, thr=22):
+def detect(seq_id, y_top, thr=18):
     bg = np.median(np.stack([g[y_top:] for _, g in frames(seq_id, step=15)]), axis=0).astype(np.int16)
     dets, fg_count = [], np.zeros(bg.shape, np.int32)
     for _, g in frames(seq_id):
@@ -75,6 +78,87 @@ def track(dets, gate=45.0, max_gap=3):
     return [np.array(tr["pts"]) for tr in done + active]
 
 
+def zone_of(pt, shape, board_bottom):
+    h, w = shape
+    if pt[1] < board_bottom + BOARD_MARGIN:
+        return "board"
+    if pt[0] < EDGE_MARGIN or pt[0] > w - EDGE_MARGIN or pt[1] > h - EDGE_MARGIN:
+        return "edge"
+    return "lost"
+
+
+def stitch(tracks, shape, board_bottom, max_gap=40, radius=12.0, spread=2.0, vmax=30.0):
+    """Join fragments of one flight: the bee vanishes over the grass and reappears as a new track.
+
+    A track that ends in the open ("lost") is linked to a track that starts in the open up to `max_gap`
+    frames later, if the start lies near the constant-velocity extrapolation of the end and vice versa
+    (tolerance grows with the gap, the bee may turn). Links are taken greedily, best first, one per end.
+    Tracks leaving at the frame edge or landing on the board are never continued.
+    """
+    tracks = [p for p in tracks if len(p) >= 3]
+
+    def vel(p, end):
+        q = p[-5:] if end else p[:5]
+        dt = q[-1, 0] - q[0, 0]
+        return (q[-1, 1:] - q[0, 1:]) / dt if dt > 0 else np.zeros(2)
+
+    ends = [(p[-1, 0], p[-1, 1:], vel(p, True), zone_of(p[-1, 1:], shape, board_bottom)) for p in tracks]
+    starts = [(p[0, 0], p[0, 1:], vel(p, False), zone_of(p[0, 1:], shape, board_bottom)) for p in tracks]
+    cand = []
+    for i, (te, pe, ve, ze) in enumerate(ends):
+        if ze != "lost":
+            continue
+        for j, (ts, ps, vs, zs) in enumerate(starts):
+            gap = ts - te
+            if i == j or zs != "lost" or not 1 <= gap <= max_gap:
+                continue
+            if np.linalg.norm(ps - pe) > vmax * gap:
+                continue
+            tol = radius + spread * gap
+            err = 0.5 * (np.linalg.norm(pe + ve * gap - ps) + np.linalg.norm(ps - vs * gap - pe))
+            if err < tol:
+                cand.append((err / tol, i, j))
+    nxt, has_prev = {}, set()
+    for _, i, j in sorted(cand):
+        if i in nxt or j in has_prev:
+            continue
+        # no cycles: j must not already lead back to i
+        k = j
+        while k in nxt and k != i:
+            k = nxt[k]
+        if k == i:
+            continue
+        nxt[i] = j
+        has_prev.add(j)
+    out = []
+    for i in range(len(tracks)):
+        if i in has_prev:
+            continue
+        parts, k = [tracks[i]], i
+        while k in nxt:
+            k = nxt[k]
+            parts.append(tracks[k])
+        out.append(np.concatenate(parts))
+    return out
+
+
+def flight_rows(raw, shape, board_bottom, stitched=True):
+    """Raw tracker output -> flight tracks with features, as written to outputs/flights/<seq>.json."""
+    tracks = stitch(raw, shape, board_bottom) if stitched else raw
+    rows = []
+    for p in tracks:
+        if len(p) < 15:
+            continue
+        f = features(p, shape, board_bottom)
+        # flight: mostly below the board and actually moving
+        if f["frac_below_board"] < 0.6 or f["path"] < 60 or f["speed"] < 1.0:
+            continue
+        f["t"] = p[:, 0].astype(int).tolist()  # frame index of each point (gaps possible)
+        f["xy"] = p[:, 1:].round(1).tolist()
+        rows.append(f)
+    return rows
+
+
 def features(p, shape, board_bottom):
     t, xy = p[:, 0], p[:, 1:]
     steps = np.diff(xy, axis=0)
@@ -84,14 +168,6 @@ def features(p, shape, board_bottom):
     ch = xy[3:] - xy[:-3]
     ok = np.linalg.norm(ch, axis=1) > 3
     ang = np.unwrap(np.arctan2(ch[ok, 1], ch[ok, 0])) if ok.sum() > 2 else np.zeros(1)
-    h, w = shape
-
-    def zone(pt):
-        if pt[1] < board_bottom + 15:
-            return "board"
-        if pt[0] < 15 or pt[0] > w - 15 or pt[1] > h - 15:
-            return "edge"
-        return "lost"
 
     return {
         "t0": int(t[0]), "n": len(p), "dur_s": float((t[-1] - t[0]) / 59.94),
@@ -100,7 +176,7 @@ def features(p, shape, board_bottom):
         "turn_deg": float(np.degrees(ang[-1] - ang[0])) if len(ang) > 1 else 0.0,
         "abs_turn_deg": float(np.degrees(np.abs(np.diff(ang)).sum())) if len(ang) > 1 else 0.0,
         "speed": float(np.median(seg)) if len(seg) else 0.0,
-        "start": zone(xy[0]), "end": zone(xy[-1]),
+        "start": zone_of(xy[0], shape, board_bottom), "end": zone_of(xy[-1], shape, board_bottom),
         "frac_below_board": float((xy[:, 1] > board_bottom).mean()),
     }
 
@@ -122,21 +198,8 @@ def main():
         rec = seq_id[3:7]
         top, bottom = (int(v * SCALE) for v in BOARD[rec])
         dets, clutter, bg = detect(seq_id, top)
-        tracks = track(dets)
-        shape = bg.shape
-        rows = []
-        for p in tracks:
-            p = p.copy()
-            if len(p) < 15:
-                continue
-            f = features(p, shape, bottom - top)
-            # flight: mostly below the board and actually moving
-            if f["frac_below_board"] < 0.6 or f["path"] < 60 or f["speed"] < 1.0:
-                continue
-            f["t"] = p[:, 0].astype(int).tolist()  # frame index of each point (gaps possible)
-            f["xy"] = p[:, 1:].round(1).tolist()
-            rows.append(f)
-        (OUT / f"{seq_id}.json").write_text(json.dumps({"seq": seq_id, "top": top, "scale": SCALE, "rows": rows}))
+        rows = flight_rows(track(dets), bg.shape, bottom - top)
+        (OUT / f"{seq_id}.json").write_text(json.dumps({"seq": seq_id, "tracker": TRACKER, "top": top, "scale": SCALE, "rows": rows}))
         # overview: loops red, straight green, rest yellow
         img = cv2.cvtColor((bg.clip(0, 255) // 2).astype(np.uint8), cv2.COLOR_GRAY2BGR)
         img[clutter] = (img[clutter] * 0.5).astype(np.uint8)

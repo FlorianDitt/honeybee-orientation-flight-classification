@@ -1,6 +1,7 @@
 """Export the label queues as short cropped clips for the static labeler on GitHub Pages.
 
-The full videos (about 100 MB each) cannot be hosted on Pages, so every queued track becomes a clip of
+The full videos (about 100 MB each) cannot be hosted on Pages, so every track of the stratified sample
+(the first `core` items of a queue) becomes a clip of
 its own: the track plus 20 frames before and after, cropped to the wide view box of the local labeler
 and scaled down to at most 720 px. A still of the full frame serves as the overview. The clips go to
 labeler/public-web/ (not versioned); `npm run deploy:web` in labeler/ publishes them.
@@ -140,6 +141,9 @@ def practice_ids(queue_train):
     for cls, n in PRACTICE.items():
         pool = [r for r in sure if r["label"] == cls]
         picks += rng.sample(pool, min(n, len(pool)))
+    # a class with too few confident labels: fill up from the others
+    rest = [r for r in sure if r not in picks]
+    picks += rng.sample(rest, min(sum(PRACTICE.values()) - len(picks), len(rest)))
     rng.shuffle(picks)
     items = [{"id": r["id"], "answer": r["label"]} for r in picks]
     path.write_text(json.dumps({"source": "labels/train.jsonl", "items": items}, indent=1) + "\n")
@@ -165,7 +169,10 @@ def main():
     (WEB / "clips").mkdir(parents=True, exist_ok=True)
     (WEB / "data").mkdir(exist_ok=True)
 
-    queues = {s: json.loads((LABELS / f"queue_{s}.json").read_text())["items"] for s in NAMES}
+    queues = {}
+    for s in NAMES:
+        q = json.loads((LABELS / f"queue_{s}.json").read_text())
+        queues[s] = q["items"][:q.get("core", len(q["items"]))]  # online only the stratified sample
     practice = practice_ids(queues["train"])
     skip = {p["id"] for p in practice}
     items, pkgs = {}, []

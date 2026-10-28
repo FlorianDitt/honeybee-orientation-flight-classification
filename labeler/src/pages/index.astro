@@ -1,6 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { CLASSES, SPLITS, readLabels, readQueue } from "../lib/store";
+import { CLASSES, SPLITS, readCore, readLabels, readQueue } from "../lib/store";
 
 const NAMES: Record<string, string> = {
   train: "Training",
@@ -14,7 +14,9 @@ const rows = SPLITS.map((split) => {
   const labels = readLabels(split);
   const counts = Object.fromEntries(CLASSES.map((c) => [c, 0]));
   for (const l of labels.values()) counts[l.label] += 1;
-  return { split, name: NAMES[split], total: queue?.length ?? 0, done: labels.size, counts, ready: !!queue };
+  const core = readCore(split);
+  const coreDone = (queue ?? []).slice(0, core).filter((i) => labels.has(i.id)).length;
+  return { split, name: NAMES[split], total: queue?.length ?? 0, done: labels.size, counts, ready: !!queue, core, coreDone };
 });
 const ready = rows.filter((r) => r.ready);
 const missing = rows.filter((r) => !r.ready);
@@ -44,6 +46,7 @@ uv run beeflight-sample --split val --n 80</pre>
           <div class="name">{r.name}</div>
           <div class="big">{r.done} <span>/ {r.total}</span></div>
           <div class="bar"><div style={`width:${r.total ? (100 * r.done) / r.total : 0}%`} /></div>
+          {r.core < r.total && <div class="core">Stichprobe zuerst: <b>{r.coreDone} / {r.core}</b></div>}
           <ul>
             {CLASSES.map((c) => (
               <li><i style={`background:var(--c-${c})`} />{c} <b>{r.split === "recheck" ? "–" : r.counts[c]}</b></li>
@@ -82,5 +85,7 @@ uv run beeflight-sample --split val --n 80</pre>
   li { display: flex; align-items: center; gap: 8px; }
   li b { margin-left: auto; color: var(--ink); }
   li i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .core { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .core b { color: var(--ink); }
   .hint { color: var(--muted); font-size: 13px; margin-top: 20px; }
 </style>

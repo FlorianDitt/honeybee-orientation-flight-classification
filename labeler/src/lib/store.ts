@@ -11,7 +11,7 @@ export const SPLITS = ["train", "val", "recheck", "test_same_hive", "test_other_
 export type Split = (typeof SPLITS)[number];
 export const CLASSES = ["orientierung", "sammelabflug", "anflug", "artefakt"] as const;
 export const FLAGS = ["fragment", "unsicher"] as const;
-export const TRACKER = "background-v1";
+export const TRACKER = "background-v2";
 
 export interface QueueItem {
   id: string;
@@ -36,9 +36,19 @@ export interface Label {
 export const isSplit = (s: unknown): s is Split => SPLITS.includes(s as Split);
 
 export function readQueue(split: Split): QueueItem[] | null {
+  return readQueueFile(split)?.items ?? null;
+}
+
+/** Number of leading items that form the stratified sample (the rest is everything else, for completeness). */
+export function readCore(split: Split): number {
+  const q = readQueueFile(split);
+  return q?.core ?? q?.items.length ?? 0;
+}
+
+function readQueueFile(split: Split): { items: QueueItem[]; core?: number } | null {
   const path = resolve(LABELS_DIR, `queue_${split}.json`);
   if (!existsSync(path)) return null;
-  return JSON.parse(readFileSync(path, "utf8")).items;
+  return JSON.parse(readFileSync(path, "utf8"));
 }
 
 function labelPath(split: Split) {

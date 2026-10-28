@@ -46,9 +46,12 @@ erkennbar ist.
 
 ## Ablauf
 
-1. **Stichprobe ziehen** mit `uv run beeflight-sample --split train --n 300` (und `--split val --n 80`):
+1. **Stichprobe ziehen** mit `uv run beeflight-sample --split train --n 300 --all` (und `--split val --n 80 --all`):
    stratifiziert nach Selbst-Label, kurvige Abflüge überrepräsentiert (30 %), Reihenfolge gemischt.
+   Mit `--all` folgen danach alle übrigen Bahnen des Splits (lokal labelbar, online nur die Stichprobe).
    Das Selbst-Label wird beim Labeln nicht angezeigt (sonst Anker-Effekt).
+   Nach einem Tracker-Wechsel überträgt `--carry labels/archive/<version>/train.jsonl` die alten Labels auf
+   dieselben Flüge im neuen Tracking; stark gewachsene Bahnen (verbundene Fragmente) werden neu gelabelt.
 2. **Labeln** in der Web-App ([labeler/README.md](../labeler/README.md)): `cd labeler && npm run dev`,
    dann http://127.0.0.1:4321. Etwa 10–15 s pro Bahn, also ~1 h für 300 Bahnen; besser in Blöcken von 50.
 3. **Zweitlabeln** nach ≥ 1 Woche: `uv run beeflight-sample --recheck 50`, in der App „Zweitlabeln (blind)“.

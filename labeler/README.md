@@ -15,8 +15,8 @@ synchron ein und speichert ein Label pro Tastendruck. Es gibt sie in zwei Varian
 ```bash
 # einmalig im Projekt-Root: Bahnen erzeugen und Warteschlangen ziehen
 uv run beeflight-tracks --split train --split val --skip-existing
-uv run beeflight-sample --split train --n 300
-uv run beeflight-sample --split val --n 80
+uv run beeflight-sample --split train --n 300 --all
+uv run beeflight-sample --split val --n 80 --all
 
 # im Ordner labeler/
 npm install
@@ -71,7 +71,7 @@ weißes Quadrat der Startpunkt. Rechts oben das Gesamtbild mit dem Ausschnitt. A
 
 | Datei | Inhalt |
 |---|---|
-| `labels/queue_<split>.json` | Warteschlange von `beeflight-sample`, gemischt, mit Geometrie (Frames + Koordinaten) |
+| `labels/queue_<split>.json` | Warteschlange von `beeflight-sample`: zuerst die Stichprobe (`core`), dann alle übrigen Bahnen, mit Geometrie |
 | `labels/<split>.jsonl` | ein Label pro Zeile: Klasse, Flags, Notiz, Zeitstempel **plus die komplette Bahn** |
 
 Weil jedes Label die Bahn selbst enthält, bleiben die Labels gültig, auch wenn der Tracker später ausgetauscht wird

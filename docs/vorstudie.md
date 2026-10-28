@@ -51,6 +51,33 @@ uv run beeflight-figures
 - **Stock B:** nur ~9 Flugbahnen in 30 s (bedeckt, kühler); die Bahnen sind aber sauber getrackt, eine
   Schleife ist dabei. Test B wird klein, das Wetter ist eine Störgröße für den Vergleich.
 
+## Nachtrag: Tracker v2
+
+Beim Labeln fiel auf, dass viele Bahnen mitten im Flug enden. Eine Analyse auf 6 Validierungssequenzen ergab drei
+Ursachen, in dieser Reihenfolge der Wirkung:
+
+1. **Zu enge Zonen.** Viele „verlorene“ Bienen landeten oder verließen das Bild, hörten aber 1–2 Bienenlängen vor
+   der Zonengrenze auf, sichtbar zu sein (die Brettkante gehört zur Störmaske). Zonen 15 → 30 px: von 64 % auf
+   38 % Bahnen mit einem Ende im Gras.
+2. **Zu hohe Schwelle.** Getarnte Bienen über Gras unterschreiten `thr = 22`. Mit 18 steigen die vollständigen
+   Bahnen um 12 %; 14 bringt kaum mehr, nur mehr Rauschen.
+3. **Lücken.** Fragmente über Bewegungsvorhersage verbinden bringt nur 3 Prozentpunkte: Meist taucht die Biene
+   gar nicht wieder auf, statt als neues Stück.
+
+Die Störmaske war nicht die Ursache (nur 12 % der Abrisse liegen in ihrer Nähe).
+
+| | v1 (Vorstudie) | v2 |
+|---|---|---|
+| Bahnen mit einem Ende im Gras, 7 Sequenzen oben | 74 % | 49 % |
+| … Training (55 Sequenzen) | 69 % | 41 % |
+| … Validierung (14 Sequenzen) | 66 % | 32 % |
+| vollständige Bahnen, Training | 1292 | 2459 |
+| Brett → Brett (Schleife und Landung), 7 Sequenzen | 15 | 63 |
+
+Kurvige Abflüge werden etwas weniger (21 → 16 in den 7 Sequenzen), weil Schleifen, die wieder am Brett enden,
+jetzt als Brett → Brett zählen: nach Leitfaden ebenfalls Orientierungsflüge. Die Folien zeigen noch die Zahlen
+der Vorstudie.
+
 ## Bewertung
 
 | Kriterium | Ergebnis |

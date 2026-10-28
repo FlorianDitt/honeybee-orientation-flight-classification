@@ -27,7 +27,10 @@ const HELP: Record<string, string> = {
 
   <main>
     <section class="stage">
-      <canvas id="zoom" width="720" height="720" aria-label="Vergrößerter Ausschnitt der Flugbahn"></canvas>
+      <div id="viewport" class="viewport">
+        <video id="video" muted playsinline preload="auto"></video>
+        <canvas id="zoom" width="720" height="720" aria-label="Vergrößerter Ausschnitt der Flugbahn"></canvas>
+      </div>
       <div class="hud">
         <span id="frame">Frame –</span>
         <span id="phase"></span>
@@ -75,8 +78,6 @@ const HELP: Record<string, string> = {
     </aside>
   </main>
 </div>
-<video id="video" muted playsinline preload="auto"></video>
-
 <style>
   .app { display: flex; flex-direction: column; height: 100vh; }
   header { display: flex; align-items: center; gap: 20px; padding: 10px 20px; border-bottom: 1px solid var(--line); }
@@ -89,7 +90,11 @@ const HELP: Record<string, string> = {
 
   main { flex: 1; display: grid; grid-template-columns: 1fr 340px; gap: 20px; padding: 16px 20px; min-height: 0; }
   .stage { position: relative; display: flex; flex-direction: column; align-items: center; min-height: 0; }
-  #zoom { width: min(100%, calc(100vh - 120px)); aspect-ratio: 1; background: #111; border-radius: 8px; }
+  /* the video itself is shown and zoomed with CSS (mobile browsers do not decode hidden videos for a canvas);
+     the canvas on top only carries the track overlay */
+  .viewport { position: relative; width: min(100%, calc(100vh - 120px)); aspect-ratio: 1; overflow: hidden; background: #111; border-radius: 8px; }
+  #video { position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; pointer-events: none; }
+  #zoom { position: absolute; inset: 0; width: 100%; height: 100%; }
   .hud { display: flex; gap: 16px; font: 12px ui-monospace, monospace; color: var(--muted); margin-top: 6px; }
   .status { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff;
             padding: 8px 14px; border-radius: 6px; font-size: 14px; max-width: 90%; white-space: pre-line; text-align: center; }
@@ -120,10 +125,9 @@ const HELP: Record<string, string> = {
   .nav { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .nav #clear { grid-column: span 2; color: var(--muted); font-size: 13px; }
   .keys { font-size: 12px; color: var(--muted); margin: 0; line-height: 2; }
-  #video { position: fixed; width: 2px; height: 2px; opacity: 0; pointer-events: none; left: 0; bottom: 0; }
 
   @media (max-width: 900px) {
     main { grid-template-columns: 1fr; }
-    #zoom { width: 100%; }
+    .viewport { width: 100%; }
   }
 </style>

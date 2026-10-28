@@ -56,6 +56,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 export function startLabeler(opt: Options) {
   const { tracks, labels } = opt;
   const video = $<HTMLVideoElement>("video");
+  const viewport = $<HTMLDivElement>("viewport");
   const zoom = $<HTMLCanvasElement>("zoom").getContext("2d")!;
   const over = $<HTMLCanvasElement>("overview").getContext("2d")!;
   const note = $<HTMLInputElement>("note");
@@ -81,22 +82,42 @@ export function startLabeler(opt: Options) {
     const srcChanged = next.src !== media.src || !video.src;
     media = next;
     box = fitBox(tr.pts, wide, media.region);
+    place();
     seg = { start: Math.max(media.offset, tr.t0 - PAD_FRAMES), end: Math.min(media.last, tr.t1 + PAD_FRAMES) };
     if (srcChanged) {
       showStatus("Video lädt …");
-      for (const c of [zoom, over]) { c.fillStyle = "#111"; c.fillRect(0, 0, c.canvas.width, c.canvas.height); }
+      zoom.clearRect(0, 0, zoom.canvas.width, zoom.canvas.height);
+      over.fillStyle = "#111";
+      over.fillRect(0, 0, over.canvas.width, over.canvas.height);
+      video.style.visibility = "hidden";  // no stale frame of the previous video under the new overlay
       video.src = media.src;
       if (media.overview) still.src = media.overview;
     }
     video.currentTime = frameTime(seg.start);
     video.playbackRate = rate;
-    video.play().catch(() => {});
+    play();
     const l = labels[tr.id];
     flagEls.fragment.checked = !!l?.flags.includes("fragment");
     flagEls.unsicher.checked = !!l?.flags.includes("unsicher");
     note.value = l?.note ?? "";
     renderUi();
   }
+
+  /** Scale and shift the video so that the view box fills the viewport. */
+  function place() {
+    if (!video.videoWidth) return;
+    const { region: r, k: vk } = media;
+    const sc = viewport.clientWidth / (box.s * vk);
+    video.style.width = `${video.videoWidth}px`;
+    video.style.height = `${video.videoHeight}px`;
+    video.style.transform = `scale(${sc}) translate(${-(box.x - r.x) * vk}px, ${-(box.y - r.y) * vk}px)`;
+  }
+
+  // autoplay can be blocked (iOS low power mode): then one tap starts it
+  const play = () => video.play().catch(() => showStatus("Zum Abspielen auf das Video tippen", "tap"));
+  viewport.addEventListener("click", () => {
+    if ($("status").dataset.kind === "tap") { hideStatus(); video.play(); }
+  });
 
   function currentIndex(frame: number) {
     const t = tracks[idx].t;
@@ -121,9 +142,8 @@ export function startLabeler(opt: Options) {
     const color = COLORS[labels[tr.id]?.label] ?? "#d99a1e";
     const zs = zoom.canvas.width / box.s;
     const zmap = (p: Pt): Pt => [(p[0] - box.x) * zs, (p[1] - box.y) * zs];
-    const { region: r, k: vk } = media;
 
-    zoom.drawImage(video, (box.x - r.x) * vk, (box.y - r.y) * vk, box.s * vk, box.s * vk, 0, 0, zoom.canvas.width, zoom.canvas.height);
+    zoom.clearRect(0, 0, zoom.canvas.width, zoom.canvas.height);
     zoom.lineJoin = zoom.lineCap = "round";
     zoom.setLineDash([6, 6]);
     zoom.strokeStyle = "rgba(255,255,255,.55)";
@@ -186,6 +206,9 @@ export function startLabeler(opt: Options) {
     };
     requestAnimationFrame(tick);
   }
+  video.addEventListener("loadedmetadata", place);
+  video.addEventListener("loadeddata", () => { video.style.visibility = ""; });
+  new ResizeObserver(place).observe(viewport);
   video.addEventListener("seeked", () => draw(media.offset + Math.floor(video.currentTime * FPS)));
   video.addEventListener("canplay", () => { if ($("status").dataset.kind === "load") hideStatus(); });
   video.addEventListener("error", () => showStatus(`Video zu ${tracks[idx].id} fehlt oder lässt sich nicht laden.`, "error"));
@@ -252,10 +275,10 @@ export function startLabeler(opt: Options) {
     else showStatus("Alle Bahnen dieser Warteschlange sind gelabelt.");
   }
 
-  const togglePlay = () => (video.paused ? video.play() : video.pause());
+  const togglePlay = () => (video.paused ? play() : video.pause());
   const setRate = (r: number) => { rate = r; video.playbackRate = r; renderUi(); };
-  const restart = () => { video.currentTime = frameTime(seg.start); video.play(); };
-  const toggleWide = () => { wide = !wide; box = fitBox(tracks[idx].pts, wide, media.region); };
+  const restart = () => { video.currentTime = frameTime(seg.start); play(); };
+  const toggleWide = () => { wide = !wide; box = fitBox(tracks[idx].pts, wide, media.region); place(); };
 
   for (const b of document.querySelectorAll<HTMLButtonElement>(".cls")) b.onclick = () => save(b.dataset.class!);
   for (const b of document.querySelectorAll<HTMLButtonElement>("[data-rate]")) b.onclick = () => setRate(Number(b.dataset.rate));

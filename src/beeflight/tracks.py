@@ -52,8 +52,11 @@ def merge_close(d, radius=10.0):
     return np.array(out)
 
 
-def detect(seq_id, y_top, thr=18):
-    """Foreground blobs per frame as rows (x, y, area), half resolution, y relative to y_top."""
+def detect(seq_id, y_top, thr=18, keep_rows=0):
+    """Foreground blobs per frame as rows (x, y, area), half resolution, y relative to y_top.
+
+    The clutter mask does not apply to the first `keep_rows` rows (used to keep the landing board).
+    """
     bg = np.median(np.stack([g[y_top:] for _, g in frames(seq_id, step=15)]), axis=0).astype(np.int16)
     dets, fg_count = [], np.zeros(bg.shape, np.int32)
     for _, g in frames(seq_id):
@@ -67,6 +70,7 @@ def detect(seq_id, y_top, thr=18):
     # (letting tracks continue through this mask was tried: they wander into the board and swap bees)
     clutter = fg_count > 0.08 * len(dets)
     clutter = cv2.dilate(clutter.astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool)
+    clutter[:keep_rows] = False
     keep = []
     for d in dets:
         xi = np.clip(d[:, 0].astype(int), 0, bg.shape[1] - 1)
@@ -222,27 +226,30 @@ def main():
     ap.add_argument("seqs", nargs="*")
     ap.add_argument("--split", action="append", choices=list(SPLITS), default=[])
     ap.add_argument("--skip-existing", action="store_true")
+    ap.add_argument("--board", action="store_true",
+                    help="track on the landing board too (no clutter mask there), writes outputs/flights_board/")
     args = ap.parse_args()
     seqs = args.seqs + [s for name in args.split for s in SPLITS[name]]
-    OUT.mkdir(parents=True, exist_ok=True)
+    out, tracker = (OUT.with_name("flights_board"), TRACKER + "-board") if args.board else (OUT, TRACKER)
+    out.mkdir(parents=True, exist_ok=True)
     for seq_id in seqs:
-        if args.skip_existing and (OUT / f"{seq_id}.json").exists():
+        if args.skip_existing and (out / f"{seq_id}.json").exists():
             continue
         if not video_path(seq_id).exists():
             print(f"{seq_id}: video missing, skipped", flush=True)
             continue
         rec = seq_id[3:7]
         top, bottom = (int(v * SCALE) for v in BOARD[rec])
-        dets, clutter, bg = detect(seq_id, top)
+        dets, clutter, bg = detect(seq_id, top, keep_rows=bottom - top if args.board else 0)
         rows = flight_rows(track(dets), bg.shape, bottom - top)
-        (OUT / f"{seq_id}.json").write_text(json.dumps({"seq": seq_id, "tracker": TRACKER, "top": top, "scale": SCALE, "rows": rows}))
+        (out / f"{seq_id}.json").write_text(json.dumps({"seq": seq_id, "tracker": tracker, "top": top, "scale": SCALE, "rows": rows}))
         # overview: loops red, straight green, rest yellow
         img = cv2.cvtColor((bg.clip(0, 255) // 2).astype(np.uint8), cv2.COLOR_GRAY2BGR)
         img[clutter] = (img[clutter] * 0.5).astype(np.uint8)
         for f in rows:
             col = (0, 0, 255) if f["abs_turn_deg"] > 360 else (0, 220, 0) if f["straight"] > 0.8 else (0, 220, 255)
             cv2.polylines(img, [np.array(f["xy"], np.int32)], False, col, 1, cv2.LINE_AA)
-        cv2.imwrite(str(OUT / f"{seq_id}.jpg"), img)
+        cv2.imwrite(str(out / f"{seq_id}.jpg"), img)
         n = len(rows)
         loops = sum(f["abs_turn_deg"] > 360 for f in rows)
         print(f"{seq_id}: {n} flight tracks, {loops} with >=360 deg turning, "

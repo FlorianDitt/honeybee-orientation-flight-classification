@@ -17,6 +17,8 @@ dependencies = [
 [project.optional-dependencies]
 # trajectory classifier (GRU / 1D-CNN), added once hand labels exist
 ml = ["torch>=2.5"]
+# bee detector + ByteTrack (Ultralytics), CPU build of torch
+detector = ["ultralytics>=8.3", "lap>=0.5.12", "torch>=2.5", "torchvision>=0.20"]
 
 [project.scripts]
 beeflight-splits = "beeflight.splits:main"
@@ -25,6 +27,18 @@ beeflight-figures = "beeflight.figures:main"
 beeflight-sample = "beeflight.sample:main"
 beeflight-clips = "beeflight.clips:main"
 beeflight-vote = "beeflight.vote:main"
+beeflight-detector = "beeflight.detector:main"
+beeflight-sort = "beeflight.sort:main"
+beeflight-chiron = "beeflight.chiron:main"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
 
 [dependency-groups]
 dev = ["pytest>=8"]

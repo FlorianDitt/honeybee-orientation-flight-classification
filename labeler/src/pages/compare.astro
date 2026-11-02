@@ -1,0 +1,236 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { compare, OWNER } from "../lib/compare";
+import { CLASSES } from "../lib/store";
+
+const { rows, people, pairs, confusion, scores } = compare();
+const SPLIT_NAMES: Record<string, string> = { train: "Training", val: "Validierung", practice: "Übung" };
+const HOW: Record<string, string> = { majority: "Mehrheit", owner: "dein Label (strittig)", open: "offen", single: "nur eine Stimme" };
+const SHORT: Record<string, string> = { orientierung: "Orient.", sammelabflug: "Sammel", anflug: "Anflug", artefakt: "Artef." };
+const friends = people.filter((p) => p !== OWNER);
+const multi = rows.filter((r) => r.split !== "practice" && Object.keys(r.votes).length > 1);
+const differ = multi.filter((r) => !r.agree).length;
+const pct = ([a, n]: [number, number]) => (n ? `${Math.round((100 * a) / n)} %` : "–");
+const status = (r: (typeof rows)[number]) =>
+  r.split === "practice" ? (Object.keys(r.votes).length ? (r.agree ? "agree" : "differ") : "none")
+  : Object.keys(r.votes).length < 2 ? "single" : r.agree ? "agree" : "differ";
+---
+
+<Layout title="Labels vergleichen">
+  <main>
+    <a href="/" class="back">← Übersicht</a>
+    <header>
+      <div class="kicker">beeflight · Handlabels</div>
+      <h1>Labels vergleichen</h1>
+      <p>Deine Labels und die hochgeladenen Exporte nebeneinander. Ergebnis nach den Regeln von <code>beeflight-vote</code>
+        (strikte Mehrheit, sonst dein Label als strittig). Ein Klick auf eine Bahn öffnet sie im Labeler.</p>
+    </header>
+
+    <div class="tiles">
+      <div class="tile"><div class="big">{rows.filter((r) => r.split !== "practice").length}</div><div>Bahnen mit Label</div></div>
+      <div class="tile"><div class="big">{multi.length}</div><div>mit ≥ 2 Stimmen</div></div>
+      <div class="tile"><div class="big">{differ}</div><div>davon uneinig ({pct([differ, multi.length])})</div></div>
+      <div class="tile"><div class="big">{friends.length}</div><div>Helfende</div></div>
+    </div>
+
+    {friends.length === 0 ? (
+      <p class="hint">Noch keine Exporte hochgeladen, unten stehen nur deine Labels. Exporte über die Startseite einspielen.</p>
+    ) : (
+      <div class="summary">
+        <section>
+          <h2>Übereinstimmung</h2>
+          <p class="sub">Anteil gleicher Klasse auf Bahnen, die beide gelabelt haben (n darunter).</p>
+          <table class="matrix">
+            <thead><tr><th></th>{people.map((p) => <th>{p}</th>)}</tr></thead>
+            <tbody>
+              {people.map((a) => (
+                <tr>
+                  <th>{a}</th>
+                  {people.map((b) => a === b ? <td class="self">–</td> : (
+                    <td style={`--a:${pairs[a][b][1] ? pairs[a][b][0] / pairs[a][b][1] : 0}`} class={pairs[a][b][1] ? "heat" : ""}>
+                      {pct(pairs[a][b])}<small>{pairs[a][b][1]}</small>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <h3>Übungsrunde</h3>
+          <ul class="scores">
+            {scores.map((s) => <li><b>{s.who}</b> {s.practice[1] ? `${s.practice[0]} / ${s.practice[1]} richtig` : "nicht gemacht"}</li>)}
+          </ul>
+        </section>
+        <section>
+          <h2>Verwechslungen</h2>
+          <p class="sub">Zeilen: dein Label · Spalten: Stimmen der anderen auf denselben Bahnen.</p>
+          <table class="matrix">
+            <thead><tr><th></th>{CLASSES.map((c) => <th><i style={`background:var(--c-${c})`} />{SHORT[c]}</th>)}</tr></thead>
+            <tbody>
+              {CLASSES.map((a) => {
+                const max = Math.max(1, ...CLASSES.map((b) => confusion[a][b]));
+                return (
+                  <tr>
+                    <th><i style={`background:var(--c-${a})`} />{SHORT[a]}</th>
+                    {CLASSES.map((b) => (
+                      <td class={`heat ${a === b ? "diag" : "off"}`} style={`--a:${confusion[a][b] / max}`}>{confusion[a][b] || ""}</td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    )}
+
+    <div class="filters">
+      <select id="f-split">
+        <option value="">Alle Splits</option>
+        <option value="train">Training</option>
+        <option value="val">Validierung</option>
+        <option value="practice">Übung</option>
+      </select>
+      <select id="f-status">
+        <option value="">Alle Bahnen</option>
+        <option value="differ" selected={friends.length > 0}>Nur uneinig</option>
+        <option value="agree">Nur einig</option>
+        <option value="single">Nur eine Stimme</option>
+      </select>
+      <select id="f-class">
+        <option value="">Alle Klassen</option>
+        {CLASSES.map((c) => <option value={c}>{c}</option>)}
+      </select>
+      <select id="f-person">
+        <option value="">Alle Personen</option>
+        {people.map((p) => <option value={p}>hat gelabelt: {p}</option>)}
+      </select>
+      <label class="check"><input id="f-flag" type="checkbox" /> mit Flag</label>
+      <input id="f-search" type="search" placeholder="Bahn suchen …" />
+      <span id="count" class="count"></span>
+    </div>
+
+    <table class="rows">
+      <thead>
+        <tr>
+          <th>Bahn</th><th>Split</th>
+          {people.map((p) => <th>{p}</th>)}
+          <th>Ergebnis</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const href = r.inQueue ? `/label/${r.split === "practice" ? "train" : r.split}?track=${encodeURIComponent(r.id)}` : undefined;
+          const flagged = Object.values(r.votes).some((v) => v.flags.length);
+          return (
+            <tr data-split={r.split} data-status={status(r)} data-classes={Object.values(r.votes).map((v) => v.label).concat(r.answer ?? []).join(" ")}
+                data-people={Object.keys(r.votes).join(" ")} data-flag={flagged ? "1" : ""} data-href={href} class={href ? "link" : ""}>
+              <td><code>{r.id}</code>{r.stratum && <small>{r.stratum}</small>}{!r.inQueue && <small class="warn">nicht in der Warteschlange</small>}</td>
+              <td>{SPLIT_NAMES[r.split]}</td>
+              {people.map((p) => {
+                const v = r.votes[p];
+                const answer = r.split === "practice" && p === OWNER ? r.answer : undefined;
+                if (!v && !answer) return <td class="none">·</td>;
+                const label = v?.label ?? answer!;
+                const odd = r.result && label !== r.result;
+                return (
+                  <td>
+                    <span class={`chip ${odd ? "odd" : ""}`} style={`--c:var(--c-${label})`} title={v?.note || undefined}>{SHORT[label]}</span>
+                    {v?.flags.map((f) => <span class="flag" title={f}>{f === "fragment" ? "F" : "?"}</span>)}
+                    {v?.note && <span class="flag" title={v.note}>✎</span>}
+                  </td>
+                );
+              })}
+              <td>
+                {r.result ? <span class="chip solid" style={`--c:var(--c-${r.result})`}>{SHORT[r.result]}</span> : "–"}
+                <small>{r.split === "practice" ? "Referenz" : HOW[r.how]}</small>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+    <p id="empty" class="hint" hidden>Keine Bahn passt zum Filter.</p>
+  </main>
+</Layout>
+
+<script>
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const rows = [...document.querySelectorAll<HTMLTableRowElement>("table.rows tbody tr")];
+  const controls = ["f-split", "f-status", "f-class", "f-person", "f-flag", "f-search"].map((id) => $<HTMLInputElement>(id));
+  const [split, status, cls, person, flag, search] = controls;
+
+  function apply() {
+    const q = search.value.trim().toLowerCase();
+    let n = 0;
+    for (const tr of rows) {
+      const d = tr.dataset;
+      const show = (!split.value || d.split === split.value)
+        && (!status.value || d.status === status.value)
+        && (!cls.value || d.classes!.split(" ").includes(cls.value))
+        && (!person.value || d.people!.split(" ").includes(person.value))
+        && (!flag.checked || !!d.flag)
+        && (!q || tr.cells[0].textContent!.toLowerCase().includes(q));
+      tr.hidden = !show;
+      n += +show;
+    }
+    $("count").textContent = `${n} von ${rows.length}`;
+    $("empty").hidden = n > 0;
+  }
+  for (const c of controls) c.addEventListener("input", apply);
+  for (const tr of rows) {
+    if (tr.dataset.href) tr.addEventListener("click", (e) => {
+      const href = tr.dataset.href!;
+      if (e.metaKey || e.ctrlKey) window.open(href, "_blank");
+      else location.href = href;
+    });
+  }
+  apply();
+</script>
+
+<style>
+  main { max-width: 1200px; margin: 0 auto; padding: 28px 16px 48px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 16px; }
+  h1 { font-size: 34px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  header p { color: var(--muted); margin: 0 0 24px; max-width: 760px; }
+  h2 { font-size: 18px; margin: 0 0 2px; }
+  h3 { font-size: 14px; margin: 18px 0 6px; }
+  code { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 13px; }
+  header code { background: var(--panel); padding: 1px 6px; border-radius: 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  .hint { color: var(--muted); font-size: 14px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .tile { background: var(--panel); border-radius: 10px; padding: 14px 16px; font-size: 13px; color: var(--muted); }
+  .tile .big { font-size: 28px; font-weight: 700; color: var(--ink); }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 32px; margin-bottom: 32px; }
+  .matrix { border-collapse: separate; border-spacing: 2px; font-size: 13px; }
+  .matrix th { font-weight: 600; color: var(--muted); padding: 4px 8px; text-align: left; white-space: nowrap; }
+  .matrix td { min-width: 64px; text-align: center; padding: 8px 6px; border-radius: 4px; background: var(--panel); font-variant-numeric: tabular-nums; }
+  .matrix td small { display: block; color: var(--muted); font-size: 11px; }
+  .matrix td.heat { background: color-mix(in srgb, var(--accent) calc(var(--a) * 70%), var(--panel)); }
+  .matrix td.off { background: color-mix(in srgb, #c2410c calc(var(--a) * 60%), var(--panel)); }
+  .matrix td.diag { background: color-mix(in srgb, #3f9d6b calc(var(--a) * 55%), var(--panel)); }
+  .matrix td.self { color: var(--muted); }
+  .matrix i, .chip i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+  .scores { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+  .scores li { padding: 2px 0; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 0; position: sticky; top: 0; background: var(--bg); z-index: 1; border-bottom: 1px solid var(--line); }
+  select, input[type="search"] { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+  input[type="search"] { min-width: 180px; }
+  .check { font-size: 14px; display: flex; gap: 6px; align-items: center; }
+  .count { margin-left: auto; color: var(--muted); font-size: 13px; }
+  .rows { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .rows th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .rows td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+  .rows td small { display: block; color: var(--muted); font-size: 11px; }
+  .rows td small.warn { color: #b42318; }
+  .rows td.none { color: var(--line); }
+  .rows tr.link { cursor: pointer; }
+  .rows tr.link:hover td { background: var(--panel); }
+  .chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+          border: 1.5px solid var(--c); color: var(--ink); background: color-mix(in srgb, var(--c) 14%, #fff); }
+  .chip.solid { background: var(--c); color: #fff; }
+  .chip.odd { outline: 2px solid #b42318; outline-offset: 1px; }
+  .flag { display: inline-block; font-size: 11px; color: var(--muted); margin-left: 4px; }
+  @media (max-width: 700px) { .rows { display: block; overflow-x: auto; } }
+</style>

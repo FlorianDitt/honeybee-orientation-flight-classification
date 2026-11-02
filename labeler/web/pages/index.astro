@@ -10,12 +10,39 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
       <div class="kicker">Studienarbeit · Bienen vor dem Flugloch</div>
       <h1>Hilf mit, Flugbahnen zu labeln</h1>
       <p class="lead">
-        Junge Honigbienen fliegen vor ihrem ersten Sammelflug Schleifen vor dem Stock, um sich die Lage einzuprägen
-        (Orientierungsflug). Ein Modell soll das aus Videos erkennen. Dafür braucht es Bahnen, die Menschen
-        unabhängig voneinander eingeordnet haben. Jede Bahn wird von mindestens drei Personen gelabelt;
-        am Ende entscheidet die Mehrheit.
+        Ein Modell soll in Videos vom Bienenstock erkennen, welche Bienen gerade ihren Stock kennenlernen. Dafür
+        braucht es Flugbahnen, die Menschen unabhängig voneinander eingeordnet haben. Jede Bahn wird von mindestens
+        drei Personen gelabelt; am Ende entscheidet die Mehrheit. Das dauert etwa 20 Minuten pro Paket.
       </p>
     </header>
+
+    <section class="intro">
+      <h2>Worum es geht</h2>
+      <div class="facts">
+        <div>
+          <b>Erst Stock, dann draußen</b>
+          Eine Arbeiterin arbeitet anfangs im Stock: putzen, Larven füttern, Waben bauen. Erst danach sammelt sie
+          Nektar und Pollen.
+        </div>
+        <div>
+          <b>Orientierungsflüge</b>
+          Vorher fliegt sie mehrere kurze Erkundungsflüge. Sie dreht sich zum Eingang um und fliegt Bögen und
+          Schleifen davor, um sich Stock und Landschaft einzuprägen. Ohne diese Flüge findet sie nicht heim.
+        </div>
+        <div>
+          <b>Warum zählen?</b>
+          Wie viele Bienen so fliegen, zeigt, wie viele neue Sammlerinnen nachkommen. Eine Kamera am Eingang könnte
+          das messen, ohne das Volk zu stören.
+        </div>
+      </div>
+      <p class="hint">
+        <b>Wichtig beim Labeln:</b> Auch heimkehrende Bienen kurven vor dem Eingang, bevor sie landen.
+        Kurvig allein heißt also nicht Orientierungsflug. Achte darauf, <b>wo die Bahn anfängt und wo sie endet</b>.
+      </p>
+      <p class="muted small">
+        Hintergrund: Capaldi et al. (2000), <i>Nature</i> 403; Degen et al. (2016), <i>Current Biology</i> 26.
+      </p>
+    </section>
 
     <div id="storage-warning" class="warn" hidden>
       Dein Browser erlaubt keinen lokalen Speicher (privates Fenster?). Labeln geht trotzdem, aber exportiere vor
@@ -165,6 +192,12 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
   .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
   h1 { font-size: clamp(26px, 5vw, 34px); margin: 4px 0 10px; letter-spacing: -.02em; line-height: 1.15; }
   .lead { color: var(--muted); max-width: 64ch; margin: 0 0 28px; }
+  .intro { margin: 0 0 36px; }
+  .intro h2 { font-size: 18px; margin: 0 0 12px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .facts > div { background: var(--panel); border-radius: 10px; padding: 12px 14px; font-size: 14px; line-height: 1.45; }
+  .facts b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .hint { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; }
   .warn { background: #fff4e5; border: 1px solid #f0c27a; border-radius: 8px; padding: 10px 14px; margin-bottom: 20px; }
   .steps { list-style: none; counter-reset: step; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 28px; }
   .steps > li { counter-increment: step; position: relative; padding-left: 44px; transition: opacity .2s; }

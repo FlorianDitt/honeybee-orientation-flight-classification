@@ -43,7 +43,7 @@ exportieren“ und die `.jsonl`-Datei an dich schicken. Die Pakete sind erst nac
 **Pakete verteilen:** Training hat 6 Pakete, Validierung 2. Für drei Stimmen pro Bahn braucht jedes Paket zwei
 Helfende plus dich. Bei 4 Helfenden mit je 4 Paketen ist alles doppelt abgedeckt.
 
-**Auswerten:** Exportdateien nach `labels/votes/` legen, dann `uv run beeflight-vote`
+**Auswerten:** Exportdateien auf der lokalen Startseite über **Exporte hochladen** einspielen (oder von Hand nach `labels/votes/` legen), dann `uv run beeflight-vote`
 (Mehrheitsregel und Ausgabe siehe [docs/labeling.md](../docs/labeling.md#mehrere-labelnde)).
 
 Die Übungsbahnen stehen fest in `labels/practice.json` und kommen in keinem Paket vor. Die Pages-Seite ist öffentlich,

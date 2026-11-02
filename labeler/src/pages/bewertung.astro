@@ -1,0 +1,261 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { PER_TRACKER, VERDICTS, evalSample, readEval } from "../lib/evaluation";
+import { trackerRuns } from "../lib/trackers";
+
+const { items, trackers, missing } = evalSample();
+const done = readEval();
+const verdicts = Object.fromEntries(items.filter((i) => done.has(i.id)).map((i) => [i.id, done.get(i.id)!.verdict]));
+const names = Object.fromEntries(trackers.map((k) => [k, trackerRuns(items.find((i) => i.tracker === k)?.seq ?? "").find((r) => r.key === k)?.name ?? k]));
+const table = trackers.map((k) => {
+  const mine = items.filter((i) => i.tracker === k && verdicts[i.id]);
+  const n = mine.length;
+  return { k, name: names[k], n, counts: VERDICTS.map((v) => mine.filter((i) => verdicts[i.id] === v.key).length) };
+});
+const pct = (a: number, n: number) => (n ? `${Math.round((100 * a) / n)} %` : "–");
+---
+
+<Layout title="Tracker bewerten">
+  <main>
+    <a href="/" class="back">← Übersicht</a>
+    <header>
+      <div class="kicker">beeflight · Tracker</div>
+      <h1>Tracker blind bewerten</h1>
+      <p>{PER_TRACKER} zufällige Bahnen pro Tracker aus den Validierungssequenzen, gemischt und ohne Namen. Schau zu,
+        ob der Punkt die ganze Zeit auf <b>derselben Biene</b> bleibt und ob die Bahn am Brett oder Bildrand beginnt und endet.</p>
+    </header>
+
+    {missing.length > 0 && <p class="warn">Es fehlen noch Ergebnisse ({missing.length} Sequenzen), z. B. {missing[0]}. Die Stichprobe ändert sich, sobald sie da sind: erst danach bewerten.</p>}
+
+    <div class="layout">
+      <div class="stage">
+        <canvas id="view" width="760" height="760"></canvas>
+        <div id="status" class="status" hidden></div>
+      </div>
+      <aside>
+        <div class="pos"><span id="pos"></span> · <span id="progress"></span></div>
+        <div class="bar"><i id="bar"></i></div>
+        <div class="verdicts">
+          {VERDICTS.map((v, k) => (
+            <button class="v" data-v={v.key}><kbd>{k + 1}</kbd> <b>{v.name}</b><small>{v.hint}</small></button>
+          ))}
+        </div>
+        <div class="row">
+          <button id="prev">← zurück</button>
+          <button id="next">weiter →</button>
+          <button id="clear">Bewertung löschen</button>
+        </div>
+        <div class="row">
+          <button id="play">❚❚</button>
+          <button id="speed">½×</button>
+          <button id="wide">Ausschnitt weiter</button>
+          <span id="frame" class="frame"></span>
+        </div>
+        <p class="keys"><kbd>1</kbd>–<kbd>4</kbd> bewerten · <kbd>←</kbd> <kbd>→</kbd> Bahn · <kbd>Leertaste</kbd> Pause ·
+          <kbd>S</kbd> Tempo · <kbd>Z</kbd> Ausschnitt. Gestrichelt: ganze Bahn, farbig: schon geflogen, Kreis: aktuelle Position.</p>
+
+        <details class="result">
+          <summary>Ergebnis anzeigen (erst nach dem Bewerten öffnen)</summary>
+          <table>
+            <thead><tr><th>Tracker</th><th>n</th>{VERDICTS.map((v) => <th>{v.name}</th>)}</tr></thead>
+            <tbody>
+              {table.map((r) => (
+                <tr><th>{r.name}</th><td>{r.n}</td>{r.counts.map((c) => <td>{pct(c, r.n)}<small>{c}</small></td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+          <p class="sub">Neu laden aktualisiert die Tabelle.</p>
+        </details>
+      </aside>
+    </div>
+    <video id="video" muted playsinline preload="auto"></video>
+    <script type="application/json" id="data" set:html={JSON.stringify({ items, verdicts })} />
+  </main>
+</Layout>
+
+<script>
+  import { FPS } from "../lib/labeler";
+
+  type Item = { id: string; seq: string; top: number; scale: number; t: number[]; xy: [number, number][] };
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const { items, verdicts } = JSON.parse($("data").textContent!) as { items: Item[]; verdicts: Record<string, string> };
+  const video = $<HTMLVideoElement>("video");
+  const ctx = $<HTMLCanvasElement>("view").getContext("2d")!;
+  const PAD = 20;
+  const SPEEDS = [0.25, 0.5, 1];
+  let speed = 1;
+  let wide = false;
+  let idx = Math.max(0, items.findIndex((i) => !verdicts[i.id]));
+  let pts: [number, number][] = [];   // full-res pixels
+  let box = { x: 0, y: 0, s: 400 };
+  let seg = { start: 0, end: 0 };
+
+  const cur = () => items[idx];
+  const frameTime = (f: number) => (f + 0.5) / FPS;
+
+  function setup(i: number) {
+    idx = (i + items.length) % items.length;
+    const it = cur();
+    pts = it.xy.map(([x, y]) => [x / it.scale, (y + it.top) / it.scale]);
+    fit();
+    seg = { start: Math.max(0, it.t[0] - PAD), end: it.t.at(-1)! + PAD };
+    const src = `/video/${it.seq}`;
+    if (!video.src.endsWith(src)) video.src = src;
+    video.currentTime = frameTime(seg.start);
+    video.playbackRate = SPEEDS[speed];
+    video.play().catch(() => {});
+    ui();
+  }
+
+  function fit() {
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const m = wide ? 260 : 90;
+    const x0 = Math.min(...xs) - m, x1 = Math.max(...xs) + m, y0 = Math.min(...ys) - m, y1 = Math.max(...ys) + m;
+    const s = Math.min(1080, Math.max(240, x1 - x0, y1 - y0));
+    const clamp = (v: number, hi: number) => Math.min(Math.max(0, v), hi);
+    box = { s, x: clamp((x0 + x1) / 2 - s / 2, 1080 - s), y: clamp((y0 + y1) / 2 - s / 2, 1920 - s) };
+  }
+
+  function draw(frame: number) {
+    const it = cur();
+    const W = ctx.canvas.width, k = W / box.s;
+    if (video.readyState >= 2) ctx.drawImage(video, box.x, box.y, box.s, box.s, 0, 0, W, W);
+    const map = (p: [number, number]) => [(p[0] - box.x) * k, (p[1] - box.y) * k];
+    const path = (to: number) => {
+      ctx.beginPath();
+      for (let j = 0; j <= to; j++) { const [x, y] = map(pts[j]); j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+    };
+    ctx.lineCap = ctx.lineJoin = "round";
+    ctx.setLineDash([6, 6]); ctx.strokeStyle = "rgba(255,255,255,.6)"; ctx.lineWidth = 1.5; path(pts.length - 1);
+    ctx.setLineDash([]);
+    let j = -1;
+    while (j + 1 < it.t.length && it.t[j + 1] <= frame) j++;
+    if (j >= 1) { ctx.strokeStyle = "#d99a1e"; ctx.lineWidth = 3; path(j); }
+    if (j >= 0 && frame <= it.t.at(-1)!) {
+      const [x, y] = map(pts[j]);
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 20, 0, 7); ctx.stroke();
+    }
+    const [sx, sy] = map(pts[0]);
+    ctx.fillStyle = "#fff"; ctx.fillRect(sx - 4, sy - 4, 8, 8);
+    $("frame").textContent = frame < it.t[0] ? "vor der Bahn" : frame > it.t.at(-1)! ? "nach der Bahn" : `Frame ${frame}`;
+  }
+
+  const onFrame = (_: number, meta: VideoFrameCallbackMetadata) => {
+    const f = Math.round(meta.mediaTime * FPS);
+    draw(f);
+    if (f >= seg.end) video.currentTime = frameTime(seg.start);
+    video.requestVideoFrameCallback(onFrame);
+  };
+  if (typeof video.requestVideoFrameCallback === "function") video.requestVideoFrameCallback(onFrame);
+  else {
+    const tick = () => {
+      const f = Math.floor(video.currentTime * FPS);
+      draw(f);
+      if (f >= seg.end) video.currentTime = frameTime(seg.start);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  video.addEventListener("seeked", () => draw(Math.floor(video.currentTime * FPS)));
+  video.addEventListener("play", () => ($("play").textContent = "❚❚"));
+  video.addEventListener("pause", () => ($("play").textContent = "▶"));
+  video.addEventListener("error", () => status(`Video ${cur().seq} lässt sich nicht laden.`));
+
+  function status(msg: string | null) {
+    const s = $("status");
+    s.hidden = !msg;
+    s.textContent = msg ?? "";
+  }
+
+  function ui() {
+    const n = items.filter((i) => verdicts[i.id]).length;
+    $("pos").textContent = `Bahn ${idx + 1} / ${items.length}`;
+    $("progress").textContent = `${n} bewertet`;
+    $("bar").style.width = `${(100 * n) / items.length}%`;
+    for (const b of document.querySelectorAll<HTMLButtonElement>(".v")) b.classList.toggle("active", verdicts[cur().id] === b.dataset.v);
+  }
+
+  async function judge(v: string) {
+    const it = cur();
+    const res = await fetch("/api/tracker-eval", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: it.id, verdict: v }) });
+    if (!res.ok) { status(`Speichern fehlgeschlagen: ${(await res.json()).error}`); return; }
+    status(null);
+    verdicts[it.id] = v;
+    const next = items.findIndex((i, k) => k > idx && !verdicts[i.id]);
+    const any = items.findIndex((i) => !verdicts[i.id]);
+    if (next >= 0) setup(next);
+    else if (any >= 0) setup(any);
+    else { ui(); status("Alles bewertet. Seite neu laden und das Ergebnis öffnen."); }
+  }
+
+  async function clear() {
+    const it = cur();
+    await fetch("/api/tracker-eval", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: it.id }) });
+    delete verdicts[it.id];
+    ui();
+  }
+
+  const toggle = () => (video.paused ? video.play() : video.pause());
+  const cycle = () => {
+    speed = (speed + 1) % SPEEDS.length;
+    video.playbackRate = SPEEDS[speed];
+    $("speed").textContent = ["¼×", "½×", "1×"][speed];
+  };
+  const widen = () => { wide = !wide; fit(); $("wide").textContent = wide ? "Ausschnitt enger" : "Ausschnitt weiter"; };
+
+  for (const b of document.querySelectorAll<HTMLButtonElement>(".v")) b.addEventListener("click", () => judge(b.dataset.v!));
+  $("prev").addEventListener("click", () => setup(idx - 1));
+  $("next").addEventListener("click", () => setup(idx + 1));
+  $("clear").addEventListener("click", clear);
+  $("play").addEventListener("click", toggle);
+  $("speed").addEventListener("click", cycle);
+  $("wide").addEventListener("click", widen);
+  addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const n = Number(e.key);
+    if (n >= 1 && n <= 4) return void judge(document.querySelectorAll<HTMLButtonElement>(".v")[n - 1].dataset.v!);
+    switch (e.key.toLowerCase()) {
+      case " ": e.preventDefault(); toggle(); break;
+      case "arrowleft": setup(idx - 1); break;
+      case "arrowright": setup(idx + 1); break;
+      case "s": cycle(); break;
+      case "z": widen(); break;
+    }
+  });
+  if (items.length) setup(idx);
+  else status("Keine Bahnen in der Stichprobe.");
+</script>
+
+<style>
+  main { max-width: 1300px; margin: 0 auto; padding: 28px 16px 48px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 16px; }
+  h1 { font-size: 34px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  header p { color: var(--muted); margin: 0 0 20px; max-width: 900px; }
+  .warn { color: #b42318; font-size: 14px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 760px) 1fr; gap: 24px; align-items: start; }
+  .stage { position: relative; }
+  canvas { width: 100%; aspect-ratio: 1; display: block; background: #111; border-radius: 10px; }
+  .status { position: absolute; left: 12px; bottom: 12px; right: 12px; background: rgba(0,0,0,.75); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 14px; }
+  .pos { font-size: 14px; color: var(--muted); }
+  .bar { height: 6px; background: var(--panel); border-radius: 3px; margin: 6px 0 16px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 0; }
+  .verdicts { display: grid; gap: 8px; }
+  .v { text-align: left; font: inherit; font-size: 15px; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; color: var(--ink); }
+  .v small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .v.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, #fff); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+  .row button { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; color: var(--ink); }
+  .frame { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .keys { color: var(--muted); font-size: 13px; margin-top: 14px; }
+  .result { margin-top: 20px; font-size: 14px; }
+  .result summary { cursor: pointer; color: var(--muted); }
+  .result table { border-collapse: collapse; margin-top: 10px; }
+  .result th, .result td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
+  .result td small { display: block; color: var(--muted); font-size: 11px; }
+  .sub { color: var(--muted); font-size: 12px; }
+  /* not display:none: the browser has to keep presenting frames for requestVideoFrameCallback */
+  video { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+</style>

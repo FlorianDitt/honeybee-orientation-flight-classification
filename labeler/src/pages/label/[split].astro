@@ -1,7 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import LabelView from "../../components/LabelView.astro";
-import { isSplit, readLabels, readQueue } from "../../lib/store";
+import { isSplit, readLabels, readQueue, readQueueTracker } from "../../lib/store";
 
 const { split } = Astro.params;
 if (!isSplit(split)) return Astro.redirect("/");
@@ -14,7 +14,7 @@ const payload = JSON.stringify({ split, items, labels });
 
 <Layout title={`Labeln · ${split}`}>
   <script type="application/json" id="payload" set:html={payload} />
-  <LabelView back="/" name={split} total={items.length} />
+  <LabelView back="/" name={split} total={items.length} tracker={readQueueTracker(split)} />
 </Layout>
 
 <script>
@@ -37,6 +37,7 @@ const payload = JSON.stringify({ split, items, labels });
 
   startLabeler({
     tracks,
+    start: new URLSearchParams(location.search).get("track") ?? undefined,
     labels,
     media: (t: Track) => fullFrame(`/video/${(t as (typeof tracks)[number]).seq}`),
     backend: {

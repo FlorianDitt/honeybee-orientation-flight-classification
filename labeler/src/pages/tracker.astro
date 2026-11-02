@@ -1,0 +1,318 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { comparableSeqs, seqsOf, trackerRuns } from "../lib/trackers";
+
+const seqs = comparableSeqs();
+const chiron = seqsOf("flights_chiron");
+const want = Astro.url.searchParams.get("seq") ?? "";
+const seq = seqs.includes(want) ? want : seqs.find((s) => chiron.has(s)) ?? seqs[0] ?? "";
+const runs = seq ? trackerRuns(seq) : [];
+const keys = runs.map((r) => r.key);
+const pick = (k: string | null, fallback: string) => (k && keys.includes(k) ? k : fallback);
+const left = pick(Astro.url.searchParams.get("a"), keys[0] ?? "");
+const right = pick(Astro.url.searchParams.get("b"), keys.includes("flights_chiron") ? "flights_chiron" : keys.at(-1) ?? "");
+---
+
+<Layout title="Tracker vergleichen">
+  <main>
+    <a href="/" class="back">← Übersicht</a>
+    <header>
+      <div class="kicker">beeflight · Tracker</div>
+      <h1>Tracker vergleichen</h1>
+      <p>Dasselbe Video zweimal, links und rechts je ein Tracker. <b class="ok">Grün</b>: vollständige Bahn (Brett oder
+        Bildrand an beiden Enden). <b class="frag">Orange</b>: Bruchstück. <b class="brk">×</b>: hier bricht eine Bahn im
+        Gras ab, <b class="brk">○</b>: hier beginnt eine mitten im Bild. Darunter jede Bahn als Balken über die Zeit, ein Klick springt hin.</p>
+    </header>
+
+    {!seq ? (
+      <p class="hint">Noch keine Sequenz mit Ergebnissen von zwei Trackern. Erst z. B. <code>uv run beeflight-chiron --split val</code>.</p>
+    ) : (
+      <>
+        <form class="bar" method="get">
+          <label>Sequenz
+            <select name="seq" id="seq">{seqs.map((s) => <option value={s} selected={s === seq}>{s}{chiron.has(s) ? " · mit Chiron" : ""}</option>)}</select>
+          </label>
+          <input type="hidden" name="a" id="qa" value={left} />
+          <input type="hidden" name="b" id="qb" value={right} />
+          <button type="button" id="play">▶ Abspielen</button>
+          <button type="button" id="speed">½×</button>
+          <span id="clock" class="clock">0,00 s · Frame 0</span>
+          <label class="check"><input type="checkbox" id="all" /> alle Bahnen einblenden</label>
+          <label class="check"><input type="checkbox" id="breaks" checked /> alle Bruchstellen</label>
+        </form>
+        <input type="range" id="seek" min="0" max="1798" value="0" step="1" />
+
+        <div class="panels">
+          {["a", "b"].map((side) => (
+            <section class="panel">
+              <div class="head">
+                <select id={`pick-${side}`}>
+                  {runs.map((r) => <option value={r.key} selected={r.key === (side === "a" ? left : right)}>{r.name}</option>)}
+                </select>
+                <span class="stats" id={`stats-${side}`}></span>
+              </div>
+              <canvas id={`view-${side}`}></canvas>
+              <canvas id={`time-${side}`} class="timeline" height="70"></canvas>
+            </section>
+          ))}
+        </div>
+        <p class="keys"><kbd>Leertaste</kbd> Pause · <kbd>←</kbd> <kbd>→</kbd> ein Frame · <kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd> eine Sekunde · <kbd>S</kbd> Tempo</p>
+        <video id="video" src={`/video/${seq}`} muted playsinline preload="auto"></video>
+        <script type="application/json" id="runs" set:html={JSON.stringify(runs)} />
+      </>
+    )}
+  </main>
+</Layout>
+
+<script>
+  import { FPS } from "../lib/labeler";
+
+  type Flight = { t: number[]; xy: [number, number][]; start: string; end: string; dur_s: number };
+  type Run = { key: string; name: string; top: number; scale: number; rows: Flight[] };
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const data = document.getElementById("runs");
+
+  if (data) {
+    const runs: Run[] = JSON.parse(data.textContent!);
+    const byKey = new Map(runs.map((r) => [r.key, r]));
+    const video = $<HTMLVideoElement>("video");
+    const seek = $<HTMLInputElement>("seek");
+    const showAll = $<HTMLInputElement>("all");
+    const showBreaks = $<HTMLInputElement>("breaks");
+    const SPEEDS = [0.25, 0.5, 1];
+    let speed = 1;
+    let last = 1798;
+    let frame = 0;
+
+    const complete = (r: Flight) => r.start !== "lost" && r.end !== "lost";
+    const COLOR = { ok: "#3f9d6b", frag: "#e0662a", brk: "#ff3b30" };
+
+    interface Panel { side: string; run: Run; view: CanvasRenderingContext2D; time: CanvasRenderingContext2D; lanes: number[] }
+    const panels: Panel[] = ["a", "b"].map((side) => ({
+      side,
+      run: byKey.get($<HTMLSelectElement>(`pick-${side}`).value)!,
+      view: $<HTMLCanvasElement>(`view-${side}`).getContext("2d")!,
+      time: $<HTMLCanvasElement>(`time-${side}`).getContext("2d")!,
+      lanes: [],
+    }));
+
+    /** Last point index of a track at or before `f`, -1 before it starts. */
+    function upto(t: number[], f: number) {
+      let lo = 0, hi = t.length - 1, k = -1;
+      while (lo <= hi) {
+        const m = (lo + hi) >> 1;
+        if (t[m] <= f) { k = m; lo = m + 1; } else hi = m - 1;
+      }
+      return k;
+    }
+
+    function setup(p: Panel) {
+      const { run } = p;
+      const c = p.view.canvas;
+      c.width = Math.round(1080 * run.scale);
+      c.height = Math.round(1920 * run.scale) - run.top;
+      // greedy lanes for the timeline: a track takes the first lane that is free at its start
+      const ends: number[] = [];
+      const order = run.rows.map((_, i) => i).sort((i, j) => run.rows[i].t[0] - run.rows[j].t[0]);
+      p.lanes = new Array(run.rows.length);
+      for (const i of order) {
+        const r = run.rows[i];
+        let l = ends.findIndex((e) => e < r.t[0] - 5);
+        if (l < 0) { l = ends.length; ends.push(0); }
+        ends[l] = r.t.at(-1)!;
+        p.lanes[i] = l;
+      }
+      const n = run.rows.length;
+      const ok = run.rows.filter(complete).length;
+      const brk = run.rows.filter((r) => r.end === "lost").length;
+      const long = run.rows.filter((r) => r.dur_s > 1).length;
+      const pct = (a: number) => (n ? Math.round((100 * a) / n) : 0);
+      $(`stats-${p.side}`).innerHTML =
+        `<b>${n}</b> Bahnen · <b class="ok">${ok}</b> vollständig (${pct(ok)} %) · <b class="brk">${brk}</b> brechen ab · ${long} länger als 1 s`;
+    }
+
+    function drawView(p: Panel) {
+      const { run, view: ctx } = p;
+      const s = run.scale;
+      const { width: w, height: h } = ctx.canvas;
+      if (video.readyState >= 2) ctx.drawImage(video, 0, run.top / s, 1080, h / s, 0, 0, w, h);
+      else { ctx.fillStyle = "#111"; ctx.fillRect(0, 0, w, h); }
+      ctx.lineCap = ctx.lineJoin = "round";
+      for (const r of run.rows) {
+        const col = complete(r) ? COLOR.ok : COLOR.frag;
+        const t0 = r.t[0], t1 = r.t.at(-1)!;
+        if (showAll.checked) {
+          ctx.strokeStyle = "rgba(255,255,255,.28)";
+          ctx.lineWidth = 1;
+          line(ctx, r.xy, r.xy.length - 1);
+        }
+        if (showBreaks.checked) {
+          if (r.start === "lost") ring(ctx, r.xy[0], "rgba(255,90,80,.9)", 5);
+          if (r.end === "lost") cross(ctx, r.xy.at(-1)!, "rgba(255,90,80,.9)", 5);
+        }
+        if (frame < t0 || frame > t1 + 40) continue;
+        const k = upto(r.t, frame);
+        if (frame <= t1) {
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 2;
+          line(ctx, r.xy, k);
+          const [x, y] = r.xy[k];
+          ctx.fillStyle = col;
+          ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
+          if (r.start === "lost" && frame - t0 < 40) ring(ctx, r.xy[0], COLOR.brk, 8);
+        } else if (r.end === "lost") {
+          // just broke off: show where, for 40 frames
+          ctx.strokeStyle = col;
+          ctx.globalAlpha = 1 - (frame - t1) / 40;
+          ctx.lineWidth = 2;
+          line(ctx, r.xy, r.xy.length - 1);
+          cross(ctx, r.xy.at(-1)!, COLOR.brk, 9);
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    function line(ctx: CanvasRenderingContext2D, xy: [number, number][], to: number) {
+      ctx.beginPath();
+      for (let k = 0; k <= to; k++) k ? ctx.lineTo(xy[k][0], xy[k][1]) : ctx.moveTo(xy[k][0], xy[k][1]);
+      ctx.stroke();
+    }
+    // dark halo first, so the marks stay visible on bright grass
+    function halo(ctx: CanvasRenderingContext2D, c: string, w: number) {
+      ctx.strokeStyle = "rgba(0,0,0,.7)"; ctx.lineWidth = w + 2.5; ctx.stroke();
+      ctx.strokeStyle = c; ctx.lineWidth = w; ctx.stroke();
+    }
+    function ring(ctx: CanvasRenderingContext2D, [x, y]: [number, number], c: string, r: number) {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+      halo(ctx, c, 2);
+    }
+    function cross(ctx: CanvasRenderingContext2D, [x, y]: [number, number], c: string, r: number) {
+      ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r);
+      halo(ctx, c, 2.5);
+    }
+
+    function drawTime(p: Panel) {
+      const ctx = p.time;
+      const c = ctx.canvas;
+      const w = (c.width = c.clientWidth * devicePixelRatio);
+      const lanes = Math.max(1, ...p.lanes.map((l) => l + 1));
+      const h = (c.height = 70 * devicePixelRatio);
+      const lh = Math.min(6 * devicePixelRatio, h / lanes);
+      ctx.fillStyle = "#f1efe9"; ctx.fillRect(0, 0, w, h);
+      p.run.rows.forEach((r, i) => {
+        ctx.fillStyle = complete(r) ? COLOR.ok : COLOR.frag;
+        const x0 = (r.t[0] / last) * w, x1 = (r.t.at(-1)! / last) * w;
+        ctx.fillRect(x0, p.lanes[i] * lh, Math.max(1.5, x1 - x0), Math.max(1, lh - 1));
+      });
+      ctx.fillStyle = "#16181d";
+      ctx.fillRect((frame / last) * w - 1, 0, 2 * devicePixelRatio, h);
+    }
+
+    function render() {
+      for (const p of panels) { drawView(p); drawTime(p); }
+      seek.value = String(frame);
+      $("clock").textContent = `${(frame / FPS).toFixed(2).replace(".", ",")} s · Frame ${frame}`;
+    }
+
+    const goto = (f: number) => {
+      frame = Math.max(0, Math.min(last, Math.round(f)));
+      video.currentTime = (frame + 0.5) / FPS;
+      render();
+    };
+
+    const onFrame = (_: number, meta: VideoFrameCallbackMetadata) => {
+      frame = Math.round(meta.mediaTime * FPS);
+      render();
+      video.requestVideoFrameCallback(onFrame);
+    };
+    if (typeof video.requestVideoFrameCallback === "function") video.requestVideoFrameCallback(onFrame);
+    else {
+      const tick = () => { if (!video.paused) { frame = Math.floor(video.currentTime * FPS); render(); } requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    }
+    video.addEventListener("loadedmetadata", () => {
+      last = Math.floor(video.duration * FPS) - 1;
+      seek.max = String(last);
+      render();
+    });
+    video.addEventListener("loadeddata", render);
+    video.addEventListener("seeked", () => { frame = Math.floor(video.currentTime * FPS); render(); });
+    video.addEventListener("play", () => ($("play").textContent = "❚❚ Pause"));
+    video.addEventListener("pause", () => ($("play").textContent = "▶ Abspielen"));
+
+    const toggle = () => (video.paused ? video.play() : video.pause());
+    const cycleSpeed = () => {
+      speed = (speed + 1) % SPEEDS.length;
+      video.playbackRate = SPEEDS[speed];
+      $("speed").textContent = ["¼×", "½×", "1×"][speed];
+    };
+    video.playbackRate = SPEEDS[speed];
+    $("play").addEventListener("click", toggle);
+    $("speed").addEventListener("click", cycleSpeed);
+    seek.addEventListener("input", () => { video.pause(); goto(Number(seek.value)); });
+    showAll.addEventListener("change", render);
+    showBreaks.addEventListener("change", render);
+    $<HTMLSelectElement>("seq").addEventListener("change", (e) => (e.target as HTMLSelectElement).form!.submit());
+
+    for (const p of panels) {
+      const pick = $<HTMLSelectElement>(`pick-${p.side}`);
+      pick.addEventListener("change", () => {
+        p.run = byKey.get(pick.value)!;
+        $<HTMLInputElement>(`q${p.side}`).value = pick.value;
+        history.replaceState(null, "", `?seq=${$<HTMLSelectElement>("seq").value}&a=${$<HTMLInputElement>("qa").value}&b=${$<HTMLInputElement>("qb").value}`);
+        setup(p);
+        render();
+      });
+      p.time.canvas.addEventListener("click", (e) => {
+        const c = p.time.canvas;
+        video.pause();
+        goto((e.offsetX / c.clientWidth) * last);
+      });
+      setup(p);
+    }
+
+    addEventListener("keydown", (e) => {
+      if ((e.target as HTMLElement).tagName === "SELECT") return;
+      if (e.key === " ") { e.preventDefault(); toggle(); }
+      else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        video.pause();
+        goto(frame + (e.key === "ArrowRight" ? 1 : -1) * (e.shiftKey ? Math.round(FPS) : 1));
+      } else if (e.key === "s" || e.key === "S") cycleSpeed();
+    });
+    addEventListener("resize", render);
+    render();
+  }
+</script>
+
+<style>
+  main { max-width: 1400px; margin: 0 auto; padding: 28px 16px 48px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 16px; }
+  h1 { font-size: 34px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  header p { color: var(--muted); margin: 0 0 20px; max-width: 900px; }
+  code { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 13px; background: var(--panel); padding: 1px 6px; border-radius: 4px; }
+  .hint { color: var(--muted); }
+  .ok { color: #3f9d6b; }
+  .frag { color: #e0662a; }
+  .brk { color: #ff3b30; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 0; position: sticky; top: 0; background: var(--bg); z-index: 1; }
+  .bar label { font-size: 14px; display: flex; gap: 6px; align-items: center; }
+  select, button { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; }
+  button#play { min-width: 110px; font-weight: 600; }
+  .clock { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; min-width: 150px; }
+  #seek { width: 100%; margin: 4px 0 14px; accent-color: var(--accent); }
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .panel .head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 6px; }
+  .panel select { font-weight: 600; }
+  .stats { font-size: 13px; color: var(--muted); }
+  .stats b { color: var(--ink); }
+  .stats b.ok { color: #3f9d6b; }
+  .stats b.brk { color: #ff3b30; }
+  canvas { display: block; width: 100%; border-radius: 8px; background: #111; }
+  canvas.timeline { height: 70px; margin-top: 6px; background: var(--panel); cursor: pointer; border-radius: 6px; }
+  /* not display:none: the browser has to keep presenting frames for requestVideoFrameCallback */
+  video { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+  .keys { color: var(--muted); font-size: 13px; margin-top: 14px; }
+  @media (max-width: 800px) { .panels { grid-template-columns: 1fr; } }
+</style>

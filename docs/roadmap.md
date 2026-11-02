@@ -50,16 +50,106 @@ Tracker v2 und v3 haben den Anteil vollständiger Bahnen von 32 % auf 67 % gehob
   (`beeflight-sample --carry`), alte Stände in `labels/archive/background-v1/`
 - [x] Tracker v3: Blobs zusammenfassen, keine Neugeburt neben einer Bahn, Kurven, Überlappungen verbinden
 
-- [ ] **Bootstrap-Labels**: Bounding Boxes aus vollständigen Bahnen der Vorstudie (sichere Detektionen) als
-      Trainingsdaten, ein paar hundert Frames von Hand korrigiert
-- [ ] Kleiner Detektor (YOLO, Nano-Variante) auf Ausschnitten der Flugzone trainieren, Bewegungskanal
-      (Differenzbild) als Zusatzinput testen, weil getarnte Bienen vor allem durch Bewegung auffallen
-- [ ] Detektor als Backend in `tracks.py` einhängen (`--detector yolo|background`)
-- [ ] Messen auf Validierung: Anteil vollständiger Bahnen vorher und nachher
+### Zwei-Paper-Plan: ByteTrack + HyDaT
 
-> **Gate 1 (Ende Woche 2):** Steigt der Anteil vollständiger Bahnen nicht deutlich (Ziel: von 67 % auf > 80 %),
-> bleibt das Hintergrundmodell. Fragmente werden dann als eigene Auswertung berichtet, und die Präsentation
-> erzählt den Detektor als ehrlichen Negativbefund. Nicht länger als eine Woche investieren.
+Für die Präsentation stützt sich der Detektor-Tracker auf genau zwei Paper:
+
+1. **ByteTrack** (Zhang et al. 2022, arXiv 2110.06864) ist der Tracker, unverändert aus Ultralytics übernommen.
+   Kernidee BYTE: Detektionen mit hoher Konfidenz setzen Bahnen fort und starten neue, solche mit niedriger
+   Konfidenz dürfen nur Bahnen fortsetzen, die sonst verloren gingen.
+2. **HyDaT** (Ratnayake et al. 2021, PLOS ONE) ist die Verbesserung: Hintergrundmodell und gelernter Detektor
+   zusammen statt Detektor allein (dort 86,6 % gegen 60,7 % der Frames mit YOLO allein, bei gleich wenig
+   Trainingsdaten). Umsetzung: Die Blobs des Hintergrundmodells (Tracker v3) gehen als Boxen mit niedriger
+   Konfidenz in ByteTrack ein. So füllen sie Lücken, wo YOLO eine getarnte Biene verliert, starten aber nie
+   eine Bahn.
+
+Eine Anpassung, kein drittes Paper: ByteTrack ordnet über die Überlappung (IoU) zu. Auf den v3-Bahnen fallen
+mit bienengroßen Boxen (30 px) 5,4 % der Schritte unter IoU 0,2, mit **60-px-Boxen** 0,5 %. Darum sind alle
+Boxen 60 px groß. Schwachstelle bleibt der erste Schritt einer neuen Bahn (noch keine Geschwindigkeit:
+27 % unter IoU 0,2). Als Variante ordnet `--match center` über den Mittelpunktsabstand zu (Kosten
+Abstand / 112 px, gedeckelt bei 1; ByteTracks Schwellen entsprechen dann 90, 78 und 56 px). C-BIoU
+(Yang et al., WACV 2023) zeigt, dass vergrößerte Boxen ein etablierter Ansatz sind.
+
+Ablation auf den 14 Validierungssequenzen (`beeflight-detector compare --split val`), vollständig = weder
+Start noch Ende „lost“, kurvig = Gesamtdrehung > 360°:
+
+| Tracker | Bahnen | vollständig | kurvig | übrige | Bahnzeit | Start lost |
+|---|---|---|---|---|---|---|
+| v3 (Hintergrundmodell) | 884 | **80,0 %** | 81,7 % | 78,8 % | 696 s | 12 % |
+| ByteTrack (IoU) | 340 | 19,1 % | 29,0 % | 14,6 % | 189 s | 71 % |
+| ByteTrack + HyDaT (IoU) | 386 | 19,4 % | 31,1 % | 14,2 % | 216 s | 71 % |
+| ByteTrack (Mittelpunkt) | 603 | 33,7 % | 39,2 % | 30,7 % | 437 s | 53 % |
+| ByteTrack + HyDaT (Mittelpunkt) | 719 | 36,4 % | 39,5 % | 34,6 % | 527 s | 54 % |
+
+Befund: Der Detektor sieht die Bienen auch im unteren Bildteil, ByteTrack verknüpft sie dort aber kaum
+(v3: 8 495 Bahnpunkte unterhalb von 300 px halber Auflösung unter der Brettoberkante, ByteTrack: 193). Nahe der
+Kamera fliegt eine Biene ≈ 40 px pro Frame (volle Auflösung). Zwei 60-px-Boxen mit diesem Versatz haben IoU 0,2,
+genau ByteTracks Grenze. `fuse_score` multipliziert die IoU zusätzlich mit der Konfidenz, und unscharfe Bienen
+haben wenig davon. Neue Bahnen brauchen im zweiten Frame einen Treffer. Die Bahnen beginnen deshalb erst nahe
+dem Brett, mitten im Bild. ByteTrack ist für Fußgänger gebaut (scharf, groß, langsam). HyDaT hilft
+(+0,3 bzw. +2,7 Punkte), Mittelpunktszuordnung hilft mehr (+14 bis +17 Punkte), beides bleibt weit unter v3.
+
+- [x] `beeflight-detector bootstrap`: Kacheln der Flugzone (640 px, volle Auflösung) mit 60-px-Boxen um die
+      Punkte der v3-Bahnen, jede zweite Trainingssequenz, alle 2 s ein Frame
+- [ ] Bootstrap-Labels stichprobenartig prüfen: entfällt nach Gate 1 (Detektor nicht weiterverfolgt)
+- [x] `beeflight-detector train`: YOLO11n auf der CPU, 30 Epochen (YOLO-Val: P 0,79, R 0,61, mAP50 ≈ 0,7)
+- [x] `beeflight-detector track --mode bytetrack|hybrid --match iou|center`: schreibt
+      `outputs/flights_{bytetrack,hybrid}[_center]/` im selben Format wie v3; die Handlabels auf v3 bleiben unberührt
+- [x] `beeflight-detector compare --split val`: Ablation gemessen (Tabelle oben)
+- [ ] Zahlen in die Vorstudie und auf Folie 2
+- [ ] ~~Bewegungskanal (Differenzbild) als Zusatzinput~~ entfällt nach Gate 1
+
+> **Gate 1 (Ende Woche 2), entschieden:** ByteTrack + HyDaT erreicht auf Validierung 36 % vollständige Bahnen,
+> v3 80 %. **Das Hintergrundmodell (v3) bleibt.** Die Präsentation erzählt den Detektor als ehrlichen
+> Negativbefund: Die Zuordnung von ByteTrack setzt kleine Bewegung zwischen Frames voraus, schnelle Insekten nahe
+> der Kamera brechen diese Annahme.
+
+### Zitierbarer Tracker: SORT auf den Blobs des Hintergrundmodells
+
+v3 ist im Kern ein Standardverfahren, nur ohne Paper als Vorlage. Deshalb ersetzt `beeflight-sort` (`src/beeflight/sort.py`)
+nur den Zuordnungsschritt durch **SORT** (Bewley et al. 2016, arXiv 1602.00763): Kalman-Filter mit konstanter
+Geschwindigkeit, Hungarian-Zuordnung, neue Bahn je unzugeordneter Detektion. Detektion, Stitching und Merkmale
+bleiben die von v3, die Blobs werden in `outputs/blobs/` gecacht (v3 darauf reproduziert die gespeicherten Bahnen
+exakt). Domänen-Paper ist **Chiron et al. 2013** (EURASIP JIVP 2013:59): Bienen vor dem Flugloch,
+Median-Hintergrund, Kalman-Filter und Global Nearest Neighbor per Hungarian-Methode auf Abstand statt Überlappung,
+Bahn gelöscht nach 3 Fehlframes. MHT war dort kaum besser als GNN, verpasste Detektionen schaden weit mehr als
+Fehlalarme.
+
+Anpassungen, einzeln auf Validierung gemessen (vollständige Bahnen):
+
+| Schritt | vollständig |
+|---|---|
+| SORT wie veröffentlicht (Mittelpunktsabstand statt IoU, Bahn stirbt nach 1 Fehlframe) | 62,1 % |
+| Bahn übersteht 5 Fehlframes (wie v3) | 66,8 % |
+| + Geschwindigkeitsrauschen 1 statt 0,01 (Biene wendet in wenigen Frames, Fußgänger nicht) | 76,6 % |
+| + kein Bahnstart innerhalb 20 px einer gerade zugeordneten Biene (Flügel/Schatten) = **SORT für Bienen** | 79,7 % |
+| (+ v3s Kosten über die letzte Position, nicht übernommen) | 80,3 % |
+
+Gewählt wurde auf Validierung, darum Bestätigung auf den 55 Trainingssequenzen, an denen nichts eingestellt wurde:
+
+| | v3 Val | SORT Val | SORT für Bienen Val | v3 Train | SORT Train | SORT für Bienen Train |
+|---|---|---|---|---|---|---|
+| Bahnen | 884 | 972 | 898 | 4 039 | 4 159 | 4 061 |
+| vollständig | 80,0 % | 62,1 % | 79,7 % | 63,6 % | 51,3 % | **64,5 %** |
+| Zeit in vollständigen Bahnen | 571 s | 397 s | 550 s | 1 875 s | 1 267 s | 1 838 s |
+| Bahnen > 1 s | 23,6 % | 15,9 % | 22,7 % | 22,3 % | 13,8 % | 20,7 % |
+| kurvig vollständig | 81,7 % | 66,4 % | 78,7 % | 57,0 % | 48,5 % | 57,9 % |
+| übrige vollständig | 78,8 % | 59,9 % | 80,5 % | 68,6 % | 52,7 % | 68,9 % |
+
+SORT für Bienen und v3 sind gleichauf (Train +0,9 Punkte vollständig, 2 % weniger Zeit in vollständigen Bahnen).
+SORT wie veröffentlicht ist überall klar schlechter.
+
+**Stückelungs-Bias:** Auf Train sind kurvige Bahnen bei beiden Trackern deutlich seltener vollständig als übrige
+(57 % gegen 69 %), auf Validierung nicht. Genau davor warnt Polytrack (Abschnitt 5.1). Der Indikator
+„Anteil Orientierungsflüge“ unterschätzt Orientierungsflüge also eher. In der Auswertung berichten und
+Fragmente als eigene Kategorie mitzählen.
+
+- [x] `beeflight-sort track|compare`: SORT und SORT für Bienen, Ablation und Train-Bestätigung (Tabellen oben)
+- [x] Entscheiden, ob die Labels umziehen: **ja, auf Chiron + Huang (`flights_chiron_linked`)**, 02.11.2026.
+      v3-Stand in `labels/archive/background-v3/`; 140 von 205 eigenen Labels übertragen (Rest: Bahn stark
+      verändert, neu labeln), 237 von 321 Stimmen von Labeler3 über `labels/id_map_<split>.json`. Online-Seite
+      bleibt bis zum Ende der laufenden Runde auf v3.
+- [ ] Optional nach Chiron: Mahalanobis- statt euklidischer Abstand als Kosten
 
 ## Phase 3: Labels (Woche 2)
 

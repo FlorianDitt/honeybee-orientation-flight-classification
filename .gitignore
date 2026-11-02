@@ -25,3 +25,6 @@ labeler/.astro/
 labels/*.tmp
 labeler/public-web/
 labeler/dist-web/
+
+# model weights (yolo11n.pt is downloaded by ultralytics on first use)
+*.pt

@@ -169,10 +169,19 @@ def main():
     (WEB / "clips").mkdir(parents=True, exist_ok=True)
     (WEB / "data").mkdir(exist_ok=True)
 
-    queues = {}
+    queues, trackers, id_map = {}, set(), {}
     for s in NAMES:
         q = json.loads((LABELS / f"queue_{s}.json").read_text())
         queues[s] = q["items"][:q.get("core", len(q["items"]))]  # online only the stratified sample
+        trackers.add(q.get("tracker", "background-v3"))
+        # after a tracker change the browsers of friends rename their labels with this map (webstore.ts)
+        path = LABELS / f"id_map_{s}.json"
+        if path.exists():
+            d = json.loads(path.read_text())
+            id_map.setdefault(d["from"], {}).update(d["map"])
+    if len(trackers) > 1:
+        raise SystemExit(f"train and val queues come from different trackers: {sorted(trackers)}")
+    tracker = trackers.pop()
     practice = practice_ids(queues["train"])
     skip = {p["id"] for p in practice}
     items, pkgs = {}, []
@@ -194,11 +203,15 @@ def main():
             seq, n = job.result()
             print(f"[{k}/{len(jobs)}] {seq}: {n} clips")
 
-    site = {"version": 1, "fps": [FPS.numerator, FPS.denominator], "frame": [W, H],
-            "items": items, "packages": pkgs, "practice": practice}
+    site = {"version": 1, "tracker": tracker, "id_map": id_map, "fps": [FPS.numerator, FPS.denominator],
+            "frame": [W, H], "items": items, "packages": pkgs, "practice": practice}
     (WEB / "data" / "site.json").write_text(json.dumps(site, separators=(",", ":")))
     size = sum(p.stat().st_size for p in (WEB / "clips").iterdir()) / 1e6
-    print(f"{len(items)} tracks, {len(pkgs)} packages, {len(practice)} practice -> labeler/public-web ({size:.0f} MB)")
+    used = {e["clip"].split("/")[1] for e in items.values()} | {e["still"].split("/")[1] for e in items.values()}
+    stale = [p for p in (WEB / "clips").iterdir() if p.name not in used]
+    for p in stale:  # clips of an earlier queue; their names may come back for other flights
+        p.unlink()
+    print(f"{len(items)} tracks ({tracker}), {len(pkgs)} packages, {len(practice)} practice -> labeler/public-web ({size:.0f} MB)")
 
 
 if __name__ == "__main__":

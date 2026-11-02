@@ -35,6 +35,8 @@ export interface Options {
   /** practice mode: a message shown after saving instead of moving on */
   feedback?(track: Track, label: Label): string | null;
   onDone?(): void;
+  /** id of the track to open first; default: the first unlabeled one */
+  start?: string;
 }
 
 export const fullFrame = (src: string): Media => ({ src, offset: 0, last: 1799, region: { x: 0, y: 0, w: W, h: H }, k: 1 });
@@ -63,7 +65,8 @@ export function startLabeler(opt: Options) {
   const flagEls = { fragment: $<HTMLInputElement>("flag-fragment"), unsicher: $<HTMLInputElement>("flag-unsicher") };
   const still = new Image();
 
-  let idx = Math.max(0, tracks.findIndex((t) => !labels[t.id]));
+  const startAt = opt.start ? tracks.findIndex((t) => t.id === opt.start) : -1;
+  let idx = startAt >= 0 ? startAt : Math.max(0, tracks.findIndex((t) => !labels[t.id]));
   let rate = 0.25;
   let wide = false;
   let media: Media = opt.media(tracks[idx]);

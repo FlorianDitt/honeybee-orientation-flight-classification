@@ -1,6 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { CLASSES, SPLITS, readCore, readLabels, readQueue } from "../lib/store";
+import { CLASSES, SPLITS, readCore, readLabels, readQueue, readSplits, readVoteFiles } from "../lib/store";
 
 const NAMES: Record<string, string> = {
   train: "Training",
@@ -20,6 +20,28 @@ const rows = SPLITS.map((split) => {
 });
 const ready = rows.filter((r) => r.ready);
 const missing = rows.filter((r) => !r.ready);
+const votes = readVoteFiles();
+
+// data split as committed in src/beeflight/splits.py: time blocks, buffers in between, test used once
+const SEQ_MIN = 30.03 / 60;
+const PARTS = [
+  { split: "train", name: "Training", role: "Labeln und Training" },
+  { split: "val", name: "Validierung", role: "Schwellen, Hyperparameter, Modellauswahl" },
+  { split: "test_same_hive", name: "Test A · gleicher Stock", role: "Wie gut ist die Methode? Nur einmal am Ende" },
+  { split: "test_other_hive", name: "Test B · anderer Stock", role: "Wie gut überträgt sie sich? Nur einmal am Ende" },
+];
+const splitFile = readSplits();
+const num = (seq: string) => Number(seq.slice(-3));
+const range = (ids: string[]) => `${ids[0].slice(0, 7)} · Seq. ${ids[0].slice(-3)}–${ids.at(-1)!.slice(-3)}`;
+const parts = splitFile ? PARTS.map((p) => {
+  const ids = splitFile.splits[p.split] ?? [];
+  const row = rows.find((r) => r.split === p.split);
+  return { ...p, ids, range: ids.length ? range(ids) : "–", minutes: ids.length * SEQ_MIN, tracks: row?.ready ? row.total : null, done: row?.done ?? 0 };
+}) : [];
+// timeline of hive A (rec2123): one cell per sequence, colored by split
+const timeline = splitFile ? [...PARTS.slice(0, 3).flatMap((p) => (splitFile.splits[p.split] ?? []).map((id) => ({ id, split: p.split }))),
+  ...splitFile.buffers.filter((b) => b.startsWith("rec2123")).map((id) => ({ id, split: "buffer" }))].sort((a, b) => num(a.id) - num(b.id)) : [];
+const hiveB = splitFile?.splits.test_other_hive ?? [];
 ---
 
 <Layout title="Bienenflug-Labeler">
@@ -59,8 +81,129 @@ uv run beeflight-sample --split val --n 80</pre>
     {missing.length > 0 && ready.length > 0 && (
       <p class="hint">Ohne Warteschlange: {missing.map((r) => r.name).join(", ")}. Anlegen mit <code>uv run beeflight-sample …</code></p>
     )}
+
+    {splitFile && (
+      <section class="datasplit">
+        <h2>Datensplit</h2>
+        <p class="sub">Nach Zeitblöcken, nie nach Frames oder Bahnen. Puffersequenzen dazwischen werden verworfen, damit
+          keine Bahn eine Grenze überquert. Definiert in <code>src/beeflight/splits.py</code>.</p>
+        <div class="timeline">
+          <div class="hive">
+            <span>Stock A · rec2123</span>
+            <div class="cells" style={`grid-template-columns:repeat(${timeline.length},1fr)`}>
+              {timeline.map((c) => <i class={`s-${c.split}`} title={`${c.id} · ${c.split === "buffer" ? "Puffer (verworfen)" : c.split}`} />)}
+            </div>
+            <div class="ticks"><span>Seq. {timeline[0]?.id.slice(-3)}</span><span>Zeit →</span><span>Seq. {timeline.at(-1)?.id.slice(-3)}</span></div>
+          </div>
+          <div class="hive b">
+            <span>Stock B · rec2125</span>
+            <div class="cells" style={`grid-template-columns:repeat(${hiveB.length},1fr)`}>
+              {hiveB.map((id) => <i class="s-test_other_hive" title={`${id} · test_other_hive`} />)}
+            </div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="s-train" />Training</span><span><i class="s-val" />Validierung</span>
+          <span><i class="s-test_same_hive" />Test A</span><span><i class="s-test_other_hive" />Test B</span><span><i class="s-buffer" />Puffer</span>
+        </div>
+        <table>
+          <thead><tr><th>Teil</th><th>Sequenzen</th><th>Dauer</th><th>Zweck</th><th>Bahnen · gelabelt</th></tr></thead>
+          <tbody>
+            {parts.map((p) => (
+              <tr>
+                <td><i class={`dot s-${p.split}`} /><b>{p.name}</b></td>
+                <td>{p.range} <small>{p.ids.length} × 30 s</small></td>
+                <td>{p.minutes.toFixed(1)} min</td>
+                <td>{p.role}</td>
+                <td>{p.tracks === null ? <span class="muted">noch nicht getrackt</span> : <>{p.tracks} · {p.done}</>}</td>
+              </tr>
+            ))}
+            <tr class="buffer">
+              <td><i class="dot s-buffer" /><b>Puffer</b></td>
+              <td>{splitFile.buffers.map((b) => `Seq. ${b.slice(-3)}`).join(", ")}</td>
+              <td>{(splitFile.buffers.length * SEQ_MIN).toFixed(1)} min</td>
+              <td>verworfen</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    )}
+
+    <section class="votes">
+      <div class="votes-head">
+        <div>
+          <h2>Stimmen der Helfenden</h2>
+          <p>Exporte aus der Online-Version (<code>.jsonl</code>) landen in <code>labels/votes/</code>, danach
+            <code>uv run beeflight-vote</code>.</p>
+        </div>
+        <div class="actions">
+        <a class="compare" href="/compare">Labels vergleichen</a>
+        <a class="compare" href="/tracker">Tracker vergleichen</a>
+        <a class="compare" href="/bewertung">Tracker bewerten</a>
+        <label class="upload">
+          Exporte hochladen
+          <input id="upload" type="file" accept=".jsonl,application/jsonl,text/plain" multiple hidden />
+        </label>
+        </div>
+      </div>
+      <p id="upload-status" class="status" hidden></p>
+      {votes.length === 0 ? (
+        <p class="hint">Noch keine Exporte.</p>
+      ) : (
+        <table>
+          <thead><tr><th>Name</th><th>Datei</th><th>Labels</th><th>Übung</th><th>Hochgeladen</th><th></th></tr></thead>
+          <tbody>
+            {votes.map((v) => (
+              <tr>
+                <td><b>{v.annotator}</b></td>
+                <td><code>{v.file}</code></td>
+                <td>{v.labels} <span class="split">{Object.entries(v.splits).map(([s, n]) => `${NAMES[s] ?? s} ${n}`).join(" · ")}</span></td>
+                <td>{v.practice}</td>
+                <td>{new Date(v.modified).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</td>
+                <td><button class="delete" type="button" data-file={v.file} title="Datei löschen">Löschen</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   </main>
 </Layout>
+
+<script>
+  const input = document.getElementById("upload") as HTMLInputElement;
+  const status = document.getElementById("upload-status") as HTMLParagraphElement;
+  const show = (text: string, error = false) => {
+    status.hidden = false;
+    status.textContent = text;
+    status.classList.toggle("error", error);
+  };
+  input.addEventListener("change", async () => {
+    const lines: string[] = [];
+    let failed = false;
+    for (const file of input.files ?? []) {
+      const res = await fetch(`/api/votes?name=${encodeURIComponent(file.name)}`, { method: "POST", body: await file.text() });
+      const r = await res.json();
+      failed ||= !res.ok;
+      lines.push(res.ok
+        ? `${file.name}: ${r.annotator}, ${r.labels} Labels + ${r.practice} Übung${r.replaced ? " (ersetzt)" : ""}`
+        : `${file.name}: ${r.error}`);
+    }
+    input.value = "";
+    if (failed) show(lines.join("\n"), true);
+    else location.reload();
+  });
+  document.querySelectorAll<HTMLButtonElement>("button.delete").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      const file = btn.dataset.file!;
+      if (!confirm(`${file} wirklich löschen?`)) return;
+      const res = await fetch(`/api/votes?name=${encodeURIComponent(file)}`, { method: "DELETE" });
+      if (res.ok) location.reload();
+      else show(`${file}: ${(await res.json()).error}`, true);
+    }),
+  );
+</script>
 
 <style>
   main { max-width: 980px; margin: 0 auto; padding: 48px 16px; }
@@ -88,4 +231,43 @@ uv run beeflight-sample --split val --n 80</pre>
   .core { font-size: 13px; color: var(--muted); margin-top: 8px; }
   .core b { color: var(--ink); }
   .hint { color: var(--muted); font-size: 13px; margin-top: 20px; }
+  .datasplit { margin-top: 40px; border-top: 1px solid var(--line); padding-top: 24px; }
+  .datasplit h2 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+  .timeline { display: grid; grid-template-columns: 75fr 21fr; gap: 16px; }
+  .hive > span { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .cells { display: grid; gap: 1px; height: 28px; margin-top: 4px; }
+  .cells i { border-radius: 2px; }
+  .ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .s-train { background: #d99a1e; }
+  .s-val { background: #3d93c9; }
+  .s-test_same_hive { background: #16181d; }
+  .s-test_other_hive { background: #6b7280; }
+  .s-buffer { background: repeating-linear-gradient(45deg, #e5e7eb 0 3px, #fff 3px 6px); outline: 1px solid #e5e7eb; outline-offset: -1px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend i, .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .dot { margin-right: 8px; }
+  td small { display: block; font-size: 12px; color: var(--muted); }
+  .datasplit tr.buffer td { color: var(--muted); }
+  .muted { color: var(--muted); }
+  @media (max-width: 640px) { .timeline { grid-template-columns: 1fr; } .datasplit table { display: block; overflow-x: auto; } }
+  .votes { margin-top: 40px; border-top: 1px solid var(--line); padding-top: 24px; }
+  .votes-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+  .votes h2 { font-size: 20px; margin: 0 0 4px; }
+  .votes-head p { color: var(--muted); font-size: 14px; margin: 0; }
+  .upload { background: var(--accent); color: #fff; font-weight: 600; padding: 9px 16px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+  .actions { display: flex; gap: 8px; }
+  .compare { border: 1.5px solid var(--accent); color: var(--ink); text-decoration: none; font-weight: 600; padding: 7.5px 16px; border-radius: 8px; white-space: nowrap; }
+  .compare:hover { background: var(--panel); }
+  .upload:hover { filter: brightness(.95); }
+  .status { white-space: pre-line; font-size: 13px; background: var(--panel); padding: 10px 14px; border-radius: 8px; }
+  .status.error { color: #b42318; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+  th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .delete { background: none; border: 1.5px solid #e4a8a2; color: #b42318; font: inherit; font-size: 13px; font-weight: 600;
+            padding: 3px 10px; border-radius: 6px; cursor: pointer; }
+  .delete:hover { background: #fef3f2; }
+  td .split { display: block; font-size: 12px; color: var(--muted); }
 </style>

@@ -1,0 +1,45 @@
+{
+ "source": "labels/train.jsonl",
+ "items": [
+  {
+   "id": "rec2123_seq055:901",
+   "answer": "sammelabflug"
+  },
+  {
+   "id": "rec2123_seq025:1144",
+   "answer": "sammelabflug"
+  },
+  {
+   "id": "rec2123_seq059:1547",
+   "answer": "artefakt"
+  },
+  {
+   "id": "rec2123_seq063:647",
+   "answer": "anflug"
+  },
+  {
+   "id": "rec2123_seq055:461",
+   "answer": "orientierung"
+  },
+  {
+   "id": "rec2123_seq026:1669",
+   "answer": "orientierung"
+  },
+  {
+   "id": "rec2123_seq043:1586",
+   "answer": "anflug"
+  },
+  {
+   "id": "rec2123_seq057:151",
+   "answer": "orientierung"
+  },
+  {
+   "id": "rec2123_seq028:1732",
+   "answer": "sammelabflug"
+  },
+  {
+   "id": "rec2123_seq037:1595b",
+   "answer": "artefakt"
+  }
+ ]
+}

@@ -1,6 +1,6 @@
 import random
 
-from beeflight.sample import QUOTA, draw, match, stratum, track_id
+from beeflight.sample import QUOTA, carry, draw, id_map, match, stratum, track_id
 
 
 def row(start, end, straight=0.9, dur=1.0):
@@ -59,3 +59,15 @@ def test_match_finds_same_flight_but_not_grown_or_other():
     assert match(old, [elsewhere, same, grown]) is same
     assert match(old, [elsewhere, grown]) is None
     assert match(old, [track("other", 10, 30)]) is None
+
+
+def test_id_map_gives_each_new_track_to_one_old_track_and_carry_follows_it():
+    a, b = track("s", 10, 30), track("s", 10, 30, x0=93.0)  # two old tracks of the same flight
+    new = track("s", 9, 31)
+    new["top"], new["scale"] = 0, 0.5
+    assert id_map([a, b], [new]) == {a["id"]: new["id"]}  # b loses: the new track is taken
+    label = {**b, "label": "anflug", "flags": [], "note": "", "labeled_at": "x", "split": "train", "tracker": "old"}
+    mapping = id_map([b, a], [new])  # labeled track first, as in main()
+    out = carry([label], [new], mapping, "new")
+    assert list(out) == [new["id"]] and out[new["id"]]["label"] == "anflug"
+    assert out[new["id"]]["tracker"] == "new" and out[new["id"]]["carried_from"]["id"] == b["id"]

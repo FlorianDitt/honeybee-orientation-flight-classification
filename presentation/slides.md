@@ -35,11 +35,11 @@ ul.m li { margin-bottom: 7px; }
 <div>
   <div class="q">Erkennt ein Modell an der Flugbahn, ob eine junge Biene gerade ihren Stock kennenlernt?</div>
   <ul class="m">
-    <li>Vor dem ersten Sammelflug lernen junge Bienen die Lage ihres Stocks: <strong>Schleifen und Bögen</strong> mit Blick zum Flugloch statt direktem Abflug</li>
-    <li>Anteil Orientierungsflüge ≈ <strong>Nachschub an Sammlerinnen</strong>, ein Maß für die Vitalität des Volkes</li>
-    <li>Pestizide (Neonicotinoide) stören Orientierung und Heimfindung: ein Monitor am Flugloch wäre ein <strong>nicht-invasives Frühwarnsignal</strong></li>
+    <li><strong>Orientierungsflug:</strong> Vor dem ersten Sammelflug fliegen junge Arbeiterinnen mehrere Erkundungsflüge. Am Flugloch wenden sie sich zum Stock und fliegen <strong>Bögen und Schleifen</strong>; mit jedem Flug schneller und weiter, abhängig von Erfahrung, nicht Alter</li>
+    <li><strong>Zweck:</strong> Sie lernen Landschaftsmerkmale, mit denen sie später heimfinden. Ohne Orientierungsflüge keine Sammlerin</li>
+    <li><strong>Indikator:</strong> Anteil Orientierungsflüge ≈ Nachschub an Sammlerinnen. Eine Kamera am Flugloch misst das <strong>nicht-invasiv</strong>, ohne Radar oder RFID, z. B. als Frühwarnsignal bei Pestiziden</li>
   </ul>
-  <div class="lit"><b>Capaldi et al. (2000)</b>: Orientierungsflüge per Harmonic Radar, <i>Nature</i><br><b>Degen et al. (2015)</b>: Erkundungsverhalten bei Orientierungsflügen, <i>Animal Behaviour</i><br><b>Henry et al. (2012)</b>: Pestizid senkt Heimkehrrate von Sammlerinnen, <i>Science</i></div>
+  <div class="lit"><b>Capaldi et al. (2000)</b>: Ontogenese des Orientierungsflugs, Harmonic Radar, <i>Nature</i><br><b>Degen et al. (2016)</b>: Bienen lernen Landschaftsmerkmale beim Orientierungsflug, <i>Curr. Biol.</i><br><b>Henry et al. (2012)</b>: Pestizid senkt Heimkehrrate von Sammlerinnen, <i>Science</i></div>
   <div class="facts">
     <div class="fact"><b>96 × 30 s</b>75 Seq. Stock A, 21 Stock B</div>
     <div class="fact"><b>59,94 fps</b>1080 × 1920, GoPro</div>
@@ -160,7 +160,7 @@ ul li { margin-bottom: 6px; }
 <div>
   <h3>Erkenntnisse und Grenzen</h3>
   <ul>
-    <li><strong>Kurvig ≠ Orientierung:</strong> auch suchende Anflüge kurven, genau das muss das Modell trennen</li>
+    <li><strong>Kurvig ≠ Orientierung:</strong> auch suchende Anflüge kurven, genau das muss das Modell trennen. Auch Menschen: erste Zweitstimmen 65 % gleich, 22 von 31 Abweichungen sind „Orientierung“</li>
     <li><strong>Tarnung:</strong> über dem Gras reißen noch 33 % der Bahnen an einem Ende ab</li>
     <li><strong>Stock B bedeckt:</strong> ~9 Bahnen pro 30 s, Test B klein</li>
   </ul>

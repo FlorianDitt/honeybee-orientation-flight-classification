@@ -8,28 +8,32 @@ Angemeldet im Moodle-Forum WDS224 (Themenanmeldung), Oktober 2026.
 
 ## Biologischer Hintergrund
 
-Eine Arbeiterin verbringt ihre ersten Lebenswochen im Stock (Brutpflege, Wabenbau, Wächterdienst). Bevor sie
-Sammlerin wird, muss sie lernen, wo ihr Stock liegt. Dazu macht sie **Orientierungsflüge**:
+Eine Arbeiterin arbeitet zuerst im Stock (Brutpflege, Wabenbau, Wächterdienst) und wird erst später Sammlerin.
+Vorher muss sie lernen, wo ihr Stock liegt. Dazu macht sie, oft schon während der Stockdienste, mehrere
+**Orientierungsflüge**:
 
 - Sie verlässt das Flugloch, **dreht sich zum Stock um** und fliegt in **Bögen und Schleifen** vor dem Eingang,
   die mit der Zeit größer werden.
-- Die ersten Flüge sind kurz und bleiben nahe am Stock; spätere erkunden die Umgebung weiter
-  (Capaldi et al. 2000, per Harmonic Radar vermessen).
-- Orientierungsflüge sind exploratives Lernen der Landmarken; die Bahnen unterscheiden sich systematisch von
-  zielgerichteten Sammelflügen (Degen et al. 2015).
+- Mit jedem Flug fliegt sie schneller und deckt eine größere Fläche ab, meist in einem schmalen Sektor um den
+  Stock; das hängt von der Zahl der Flüge ab, nicht vom Alter (Capaldi et al. 2000, per Harmonic Radar vermessen).
+- Dabei lernt sie Landschaftsmerkmale, mit denen sie später heimfindet (Degen et al. 2016).
 - An warmen Tagen sieht man oft viele junge Bienen gleichzeitig vor dem Stock schweben (Imkersprache:
   „Vorspiel“).
 
 Eine **Sammlerin** dagegen fliegt nach dem Start zügig und relativ gerade in Richtung ihrer Trachtquelle ab.
 Eine **heimkehrende** Biene nähert sich dem Flugloch, kurvt eventuell suchend und landet.
 
+Ausführlicher, mit dem, was davon im Video sichtbar ist: [biologie.md](biologie.md).
+
 ## Warum das wichtig ist
 
 **Vitalität des Volkes.** Wie viele Orientierungsflüge stattfinden, zeigt, wie viele neue Sammlerinnen
-nachkommen. Ein Volk mit wenig Nachwuchs an Sammlerinnen ist geschwächt, etwa durch Brutkrankheiten,
-Varroa oder Königinnenverlust.
+nachkommen. Das Signal ist aber nicht einfach „mehr ist besser“: Ein Volk mit wenig Nachwuchs (Brutkrankheiten,
+Königinnenverlust) zeigt wenige, ein Volk, das Sammlerinnen verliert (Varroa, Pestizide), schickt junge Bienen
+früher los und zeigt *mehr*. Aussagekräftig ist die Abweichung vom Normalwert des Volkes, und Tageszeit und Wetter
+müssen herausgerechnet werden (siehe [biologie.md](biologie.md#was-der-indikator-kann-und-was-nicht)).
 
-**Pestizide und Naturschutz.** Neonicotinoide stören Orientierung und Heimfindung: In einem Feldversuch kehrten
+**Pestizide und Naturschutz.** Neonicotinoide stören die Heimfindung: In einem Feldversuch kehrten
 mit Thiamethoxam behandelte Sammlerinnen deutlich seltener zurück (Henry et al. 2012). Ein automatischer
 Monitor, der die Form der Flugbahnen am Flugloch auswertet, wäre ein **nicht-invasives Frühwarnsignal**:
 ohne RFID-Chips, ohne Radar-Transponder, ohne das Volk zu öffnen, nur mit einer Kamera.
@@ -47,7 +51,8 @@ feste Kamera sie zuverlässig sieht, und genau den zeigt der Datensatz.
    viele Handlabels braucht man zusätzlich (Lernkurve)?
 4. **Generalisierung:** Wie stark fällt die Leistung vom selben Stock (Test A) zum fremden Stock (Test B) ab,
    und liegt das an der Bahnform oder am Tracking (anderes Holz, Licht, Abstand)?
-5. **Indikator:** Wie verändert sich der Anteil der Orientierungsflüge über die 37 min Aufnahme?
+5. **Indikator:** Wie verändert sich der Anteil der Orientierungsflüge über die 37 min Aufnahme? (Beschreibend:
+   über so kurze Zeit misst das vor allem Schübe und Wetter, kein Gesundheitsurteil.)
 
 ## Hypothesen
 
@@ -81,14 +86,14 @@ feste Kamera sie zuverlässig sieht, und genau den zeigt der Datensatz.
 | Clustering Fliegen/Sitzen/Krabbeln (V. Merl) | Dort: Bewegungsart unüberwacht. Hier: nur fliegende Bienen, überwachte Klassifikation des Flugzwecks. |
 | Bewegungsrichtung und Bildrate (V. Schudy) | Dort: Richtung in den nächsten 0,25 s auf dem Brett. Hier: Gestalt der gesamten Flugbahn. |
 | Tracker-Vergleich (V. Holst) | Tracking ist hier Mittel zum Zweck, kein Methodenvergleich. |
-| Job-Erkennung Wächter/Sammler (J. Holley) | Dort: Rollen auf dem Brett aus Interaktionen. Hier: Alter/Erfahrung aus der Flugbahn. |
+| Job-Erkennung Wächter/Sammler (J. Holley) | Dort: Rollen auf dem Brett aus Interaktionen. Hier: Flugverhalten aus der Flugbahn, nicht das Alter. |
 | Altersklassifikator über Flügel (M. Timmermann) | Dort: Aussehen der Flügel (alte Bienen). Hier: Verhalten junger Bienen. |
 
 ## Risiken
 
 | Risiko | Gegenmaßnahme |
 |---|---|
-| Kurvige Bahnen sind nicht immer Orientierungsflüge (suchende Anflüge, Ausweichen, Wind) | Eigene Klasse „suchender Anflug“; Startpunkt als Merkmal (H2); Handlabels für Grenzfälle |
+| Kurvige Bahnen sind nicht immer Orientierungsflüge (suchende Anflüge, Räuberinnen, Ausweichen, Wind) | Eigene Klasse „suchender Anflug“; Startpunkt als Merkmal (H2); Handlabels für Grenzfälle |
 | Bahnen reißen über Gras ab | Detektor für die Flugzone trainieren; Fragmente über Bewegungsvorhersage verbinden; Ergebnis getrennt für vollständige und fragmentierte Bahnen berichten |
 | Blickrichtung zum Stock ist bei ~30 px kaum messbar | Nicht als Label verwenden, nur Bahnform und Position |
 | Stock B (bedeckt) hat wenig Flugverkehr: ~9 Bahnen / 30 s | Test B als kleines Set mit Konfidenzintervall berichten; Wetter als Störgröße diskutieren |
@@ -97,7 +102,9 @@ feste Kamera sie zuverlässig sieht, und genau den zeigt der Datensatz.
 ## Literatur
 
 - Capaldi, E. A., Smith, A. D., Osborne, J. L., et al. (2000). Ontogeny of orientation flight in the honeybee
-  revealed by harmonic radar. *Nature*, 403, 537–540.
+  revealed by harmonic radar. *Nature*, 403, 537–540. doi:10.1038/35000564
+- Degen, J., Kirbach, A., Reiter, L., et al. (2016). Honeybees learn landscape features during exploratory
+  orientation flights. *Current Biology*, 26(20), 2800–2804. doi:10.1016/j.cub.2016.08.013
 - Degen, J., Kirbach, A., Reiter, L., et al. (2015). Exploratory behaviour of honeybees during orientation flights.
   *Animal Behaviour*, 102, 45–57.
 - Henry, M., Béguin, M., Requier, F., et al. (2012). A common pesticide decreases foraging success and survival in

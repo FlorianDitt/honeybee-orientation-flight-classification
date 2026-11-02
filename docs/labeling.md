@@ -2,6 +2,12 @@
 
 Gelabelt wird **eine ganze Flugbahn**, nicht ein einzelner Frame. Grundlage ist das Video in Originalgeschwindigkeit
 und verlangsamt (0,25×), mit eingezeichneter Bahn. Im Zweifel die Bahn als `unsicher` markieren statt zu raten.
+Biologischer Hintergrund und Abgrenzung der Klassen: [biologie.md](biologie.md).
+
+**Kurvig allein ist kein Orientierungsflug.** Auch suchende Anflüge kurven. Entscheidend ist, wo die Bahn beginnt
+und endet (siehe Abgrenzung in [biologie.md](biologie.md#abgrenzung-zu-den-anderen-klassen)). Diese Regel steht seit
+dem 02.11.2026 auch prominent auf der Online-Seite, weil Zweitlabelnde kurvige Bahnen sonst fast immer als
+`orientierung` einordnen.
 
 ## Klassen
 
@@ -42,7 +48,9 @@ erkennbar ist.
 | Biene kommt von außen, kreist vor dem Flugloch, landet | `anflug` |
 | Biene kommt von außen, kreist, fliegt wieder weg | `orientierung`, Flag `unsicher` |
 | Gerader Abflug mit einem einzelnen Bogen am Bildrand | `sammelabflug` |
-| Wespe | `artefakt` (Wespen-Erkennung ist ein anderes Thema) |
+| Wespe, Hornisse | `artefakt` (Wespen-Erkennung ist ein anderes Thema) |
+| Biene pendelt von außen kommend zickzack vor dem Eingang (mögliche Räuberin) | `anflug`, Flag `unsicher` |
+| Auffällig große, plumpe Biene (Drohne) | nach Bahnform, Notiz „Drohne“ |
 
 ## Ablauf
 
@@ -52,6 +60,10 @@ erkennbar ist.
    Das Selbst-Label wird beim Labeln nicht angezeigt (sonst Anker-Effekt).
    Nach einem Tracker-Wechsel überträgt `--carry labels/archive/<version>/train.jsonl` die alten Labels auf
    dieselben Flüge im neuen Tracking; stark gewachsene Bahnen (verbundene Fragmente) werden neu gelabelt.
+   `--flights outputs/flights_<tracker>` wählt das Tracking (Standard v3); seit 02.11.2026 wird auf
+   Chiron + Huang (`flights_chiron_linked`) gelabelt. Liegt die alte Queue neben den alten Labels, entsteht
+   zusätzlich `labels/id_map_<split>.json`, über die `beeflight-vote` die Stimmen der Helfenden mitnimmt.
+   Die Label-Ansicht zeigt oben an, mit welchem Tracking die Bahnen entstanden sind.
 2. **Labeln** in der Web-App ([labeler/README.md](../labeler/README.md)): `cd labeler && npm run dev`,
    dann http://127.0.0.1:4321. Etwa 10–15 s pro Bahn, also ~1 h für 300 Bahnen; besser in Blöcken von 50.
 3. **Zweitlabeln** nach ≥ 1 Woche: `uv run beeflight-sample --recheck 50`, in der App „Zweitlabeln (blind)“.

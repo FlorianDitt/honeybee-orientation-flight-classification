@@ -8,6 +8,9 @@ Votes come from labels/<split>.jsonl (the owner, local labeler) and every file i
 - no majority and no owner vote: the track stays open
 - a flag (fragment, unsicher) is kept if at least half of the voters set it
 
+After a tracker change (beeflight-sample --carry), labels/id_map_<split>.json moves votes made on the old
+tracks to the new ones; votes on old tracks without a match are dropped and counted.
+
 Writes labels/final_<split>.jsonl with the geometry from the queue and prints agreement
 (Krippendorff's alpha, nominal) plus per-annotator practice score and agreement with the majority.
 
@@ -29,8 +32,34 @@ def read_jsonl(path):
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def collect(owner):
-    """-> votes[split][id][annotator] = record, practice[annotator][id] = label"""
+OLD_TRACKER = "background-v3"  # web exports from before the tracker name was stored
+
+
+def id_maps():
+    """-> {split: (old tracker, {old id: new id})} from labels/id_map_<split>.json (empty without a tracker change)"""
+    out = {}
+    for s in SPLITS:
+        path = LABELS / f"id_map_{s}.json"
+        d = json.loads(path.read_text()) if path.exists() else {}
+        out[s] = (d.get("from"), d.get("map", {}))
+    return out
+
+
+def new_id(r, maps):
+    """Id of a vote on the current tracks: old and new ids look alike (seq:t0), so only votes made on the
+    old tracker are translated."""
+    old_tracker, mapping = maps.get(r["split"], (None, {}))
+    if old_tracker and r.get("tracker", OLD_TRACKER) == old_tracker:
+        return mapping.get(r["id"], r["id"])
+    return r["id"]
+
+
+def collect(owner, maps=None):
+    """-> votes[split][id][annotator] = record, practice[annotator][id] = label
+
+    Friends' votes on old tracks are moved to the new id via `maps`; the owner's labels are already carried.
+    """
+    maps = maps or {}
     votes = {s: defaultdict(dict) for s in SPLITS}
     practice = defaultdict(dict)
     for s in SPLITS:
@@ -46,9 +75,10 @@ def collect(owner):
             if r.get("practice"):
                 practice[who][r["id"]] = r["label"]
             elif r.get("split") in votes:
-                old = votes[r["split"]][r["id"]].get(who)
+                tid = new_id(r, maps)
+                old = votes[r["split"]][tid].get(who)
                 if old is None or old["labeled_at"] < r["labeled_at"]:
-                    votes[r["split"]][r["id"]][who] = r
+                    votes[r["split"]][tid][who] = r
     return votes, practice
 
 
@@ -92,9 +122,12 @@ def main():
     ap.add_argument("--min-votes", type=int, default=3, help="tracks with fewer votes are reported, not written")
     args = ap.parse_args()
     owner = args.owner.lower()
-    votes, practice = collect(owner)
+    maps = id_maps()
+    votes, practice = collect(owner, maps)
     answers = {p["id"]: p["answer"] for p in json.loads((LABELS / "practice.json").read_text())["items"]} \
         if (LABELS / "practice.json").exists() else {}
+    # practice ids may still be old ones; to recognise practice tracks in the queue, map them too
+    practice_tracks = set(answers) | {maps["train"][1].get(i) for i in answers} - {None}
 
     agree = defaultdict(lambda: [0, 0])
     for s in SPLITS:
@@ -103,9 +136,9 @@ def main():
         for tid, by in votes[s].items():
             if tid not in queue:
                 continue
-            if tid in answers:  # practice tracks: only the owner labels them for real
+            if tid in practice_tracks:  # practice tracks: only the owner labels them for real
                 by = {k: v for k, v in by.items() if k == owner}
-            if len(by) < args.min_votes and tid not in answers:
+            if len(by) < args.min_votes and tid not in practice_tracks:
                 short += 1
                 continue
             label, flags, how = decide(by, owner)
@@ -124,7 +157,10 @@ def main():
         (LABELS / f"final_{s}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in out))
         n_votes = Counter(len(by) for tid, by in votes[s].items() if tid in queue)
         alpha = krippendorff_alpha([[r["label"] for r in by.values()] for by in votes[s].values()])
+        lost = sum(len(by) for tid, by in votes[s].items() if tid not in queue)
         print(f"\n{s}: {len(queue)} tracks in queue, votes per track {dict(sorted(n_votes.items()))}")
+        if lost:
+            print(f"  {lost} votes on tracks that are not in the queue (old tracker, no match): dropped")
         print(f"  final: {len(out)} -> labels/final_{s}.jsonl  ({dict(status)}; {short} with < {args.min_votes} votes)")
         print(f"  classes: {dict(Counter(r['label'] for r in out))}")
         print(f"  Krippendorff's alpha (nominal): {alpha:.3f}")

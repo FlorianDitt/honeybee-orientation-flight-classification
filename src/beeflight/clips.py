@@ -8,6 +8,9 @@ labeler/public-web/ (not versioned); `npm run deploy:web` in labeler/ publishes 
 
 Friends start with a practice round on tracks the owner labeled without flags; those tracks are
 fixed once in labels/practice.json and left out of the packages, so nobody labels them twice.
+The tutorial (labels/tutorial.json: example tracks per class with an explanation) replaces the practice
+round on the site; its tracks get clips too and are taken out of their package afterwards, so the other
+tracks keep their package.
 
 Usage: beeflight-clips                 # train + val
        beeflight-clips --split val --force
@@ -184,11 +187,23 @@ def main():
     tracker = trackers.pop()
     practice = practice_ids(queues["train"])
     skip = {p["id"] for p in practice}
+    tutorial = json.loads((LABELS / "tutorial.json").read_text())["items"]
     items, pkgs = {}, []
     for s in NAMES:
         for i in queues[s]:
             items[i["id"]] = {**plan(i), "split": s}
         pkgs += packages(s, queues[s], skip)
+    shown = {t["id"] for t in tutorial}
+    for p in pkgs:  # the answer of a tutorial track is shown, so nobody labels it
+        p["items"] = [i for i in p["items"] if i not in shown]
+    for s in NAMES:  # tutorial tracks may lie outside the online sample
+        full = json.loads((LABELS / f"queue_{s}.json").read_text())["items"]
+        for i in full:
+            if i["id"] in shown and i["id"] not in items:
+                items[i["id"]] = {**plan(i), "split": s}
+    if missing_tut := shown - set(items):
+        raise SystemExit(f"tutorial tracks not in any queue: {sorted(missing_tut)}")
+    skip |= shown
 
     by_seq = {}
     for e in items.values():
@@ -204,7 +219,7 @@ def main():
             print(f"[{k}/{len(jobs)}] {seq}: {n} clips")
 
     site = {"version": 1, "tracker": tracker, "id_map": id_map, "fps": [FPS.numerator, FPS.denominator],
-            "frame": [W, H], "items": items, "packages": pkgs, "practice": practice}
+            "frame": [W, H], "items": items, "packages": pkgs, "practice": practice, "tutorial": tutorial}
     (WEB / "data" / "site.json").write_text(json.dumps(site, separators=(",", ":")))
     size = sum(p.stat().st_size for p in (WEB / "clips").iterdir()) / 1e6
     used = {e["clip"].split("/")[1] for e in items.values()} | {e["still"].split("/")[1] for e in items.values()}

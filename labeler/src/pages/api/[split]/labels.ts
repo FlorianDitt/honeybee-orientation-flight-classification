@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { CLASSES, FLAGS, isSplit, readLabels, readQueue, removeLabel, writeLabel } from "../../../lib/store";
+import { CLASSES, FLAGS, REASONS, isSplit, readLabels, readQueue, removeLabel, writeLabel } from "../../../lib/store";
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -18,7 +18,8 @@ export const POST: APIRoute = async ({ params, request }) => {
   if (!CLASSES.includes(body.label)) return json({ error: "unknown class" }, 400);
   const flags = (Array.isArray(body.flags) ? body.flags : []).filter((f: string) => FLAGS.includes(f as never));
   const note = typeof body.note === "string" ? body.note.slice(0, 500) : "";
-  const rec = writeLabel(split, item, { label: body.label, flags, note });
+  const reason = body.label === "artefakt" && REASONS.includes(body.reason) ? body.reason : undefined;
+  const rec = writeLabel(split, item, { label: body.label, flags, note, ...(reason && { reason }) });
   return json({ ok: true, labeled_at: rec.labeled_at });
 };
 

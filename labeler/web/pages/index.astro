@@ -61,14 +61,13 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
       </li>
 
       <li>
-        <h2>Übungsrunde</h2>
-        <p>Zehn Bahnen, nach jeder siehst du, wie Florian sie eingeordnet hat. Vorher kurz den
-          <a href={`${base}leitfaden/`}>Leitfaden</a> lesen (2 Minuten).</p>
-        <a id="practice" class="card practice" href={`${base}label/?p=practice`} aria-disabled="true">
-          <div class="name">Übungsrunde</div>
-          <div class="big"><span id="practice-done">0</span> <small>/ <span id="practice-total">–</span></small></div>
-          <div class="bar"><div id="practice-bar"></div></div>
-          <div class="muted small" id="practice-score">&nbsp;</div>
+        <h2>Tutorial</h2>
+        <p>Für jede Klasse zwei Beispielbahnen mit kurzer Erklärung, worauf es ankommt. Nur anschauen, nichts
+          ankreuzen (etwa 5 Minuten). Zum Nachlesen gibt es den <a href={`${base}leitfaden/`}>Leitfaden</a>.</p>
+        <a id="tutorial" class="card practice" href={`${base}label/?p=tutorial`} aria-disabled="true">
+          <div class="name">Tutorial</div>
+          <div class="big"><span id="tutorial-total">–</span> <small>Beispiele</small></div>
+          <div class="muted small" id="tutorial-state">&nbsp;</div>
         </a>
       </li>
 
@@ -77,17 +76,20 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
         <p>Ein Paket hat etwa 50 Bahnen und dauert 15–20 Minuten. <b>Nimm das Paket, das Florian dir genannt hat</b>,
           damit jede Bahn genug Stimmen bekommt.</p>
         <div id="packages" class="cards"></div>
-        <p id="locked" class="muted small" hidden>Die Pakete werden nach der Übungsrunde freigeschaltet.</p>
+        <p id="locked" class="muted small" hidden>Die Pakete werden nach dem Tutorial freigeschaltet.</p>
       </li>
 
       <li>
-        <h2>Exportieren und schicken</h2>
-        <p>Lädt eine kleine Datei herunter. Schick sie Florian (Chat, Mail, egal). Du kannst beliebig oft exportieren,
-          die neueste Datei zählt.</p>
+        <h2>Ergebnisse senden</h2>
+        <p>Ein Tipp öffnet das Teilen-Menü deines Handys: Wähle WhatsApp, Signal oder Mail und schick die Datei an
+          Florian. Du kannst beliebig oft senden, die neueste Datei zählt.</p>
         <div class="row">
-          <button id="export" class="primary">Labels exportieren</button>
+          <button id="share" class="primary">Ergebnisse senden</button>
+          <button id="export">Als Datei speichern</button>
           <span id="export-info" class="muted"></span>
         </div>
+        <p id="share-fallback" class="muted small" hidden>Dein Browser kann nicht direkt teilen: Die Datei wurde
+          heruntergeladen. Schick sie Florian bitte als Anhang (Chat oder Mail).</p>
         <details>
           <summary>Labels aus einer früheren Datei laden (anderer Browser oder Rechner)</summary>
           <input id="import" type="file" accept=".jsonl,application/json,text/plain" />
@@ -120,17 +122,43 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     render();
   });
 
-  $("export").addEventListener("click", () => {
-    if (!state.name) { nameInput.focus(); return; }
-    const { name, text } = exportFile(state);
+  function download(name: string, text: string) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([text], { type: "application/jsonl" }));
     a.download = name;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+  function exported() {
     state.exported_at = new Date().toISOString();
     store(state);
     render();
+  }
+
+  $("export").addEventListener("click", () => {
+    if (!state.name) { nameInput.focus(); return; }
+    const { name, text } = exportFile(state);
+    download(name, text);
+    exported();
+  });
+
+  // Web Share API: the phone's share sheet with the file attached (WhatsApp, Signal, Mail, ...)
+  $("share").addEventListener("click", async () => {
+    if (!state.name) { nameInput.focus(); return; }
+    const { name, text } = exportFile(state);
+    const file = new File([text], name, { type: "text/plain" });
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "Bienenflug-Labels", text: `Labels von ${state.name}` });
+        exported();
+        return;
+      } catch (e) {
+        if ((e as DOMException).name === "AbortError") return;  // closed the share sheet
+      }
+    }
+    download(name, text);
+    $("share-fallback").hidden = false;
+    exported();
   });
 
   $<HTMLInputElement>("import").addEventListener("change", async (e) => {
@@ -156,18 +184,15 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     const total = Object.values(state.labels).length + Object.values(state.practice).length;
     const fresh = unexported(state);
     $("export-info").textContent = total === 0 ? "noch keine Labels"
-      : fresh > 0 ? `${fresh} neue Labels seit dem letzten Export` : `alle ${total} Labels exportiert`;
+      : fresh > 0 ? `${fresh} neue Labels seit dem letzten Senden` : `alle ${total} Labels gesendet`;
     if (!data) { $("packages").textContent = failed ? "Daten ließen sich nicht laden." : "lädt …"; return; }
 
-    const ids = data.practice.map((p) => p.id);
-    const done = ids.filter((id) => state.practice[id]);
-    const right = data.practice.filter((p) => state.practice[p.id]?.label === p.answer).length;
-    $("practice-done").textContent = String(done.length);
-    $("practice-total").textContent = String(ids.length);
-    $("practice-bar").style.width = `${(100 * done.length) / ids.length}%`;
-    $("practice-score").textContent = done.length ? `${right} von ${done.length} wie Florian` : " ";
-    $("practice").setAttribute("aria-disabled", String(!named));
-    const unlocked = named && done.length === ids.length;
+    // packages open after the tutorial; whoever finished the old practice round keeps access
+    const practiceDone = data.practice.length > 0 && data.practice.every((p) => state.practice[p.id]);
+    $("tutorial-total").textContent = String(data.tutorial?.length ?? 0);
+    $("tutorial-state").textContent = state.tutorial_seen ? "✓ angesehen" : "\u00a0";
+    $("tutorial").setAttribute("aria-disabled", String(!named));
+    const unlocked = named && (!!state.tutorial_seen || practiceDone);
     $("locked").hidden = unlocked;
 
     $("packages").innerHTML = "";

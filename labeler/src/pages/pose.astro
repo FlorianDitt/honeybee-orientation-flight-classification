@@ -1,0 +1,293 @@
+---
+// Pilot for body orientation: click head and tail of the bee in single-frame crops. The automatic estimate
+// is not shown (blind); `uv run beeflight-pose eval` compares both afterwards.
+import Layout from "../layouts/Layout.astro";
+import { readPose, readPoseQueue } from "../lib/pose";
+
+const queue = readPoseQueue();
+const labels = Object.fromEntries(readPose());
+const payload = JSON.stringify({ queue, labels });
+---
+
+<Layout title="Kopf und Hinterleib">
+  <script type="application/json" id="payload" set:html={payload} />
+  <main>
+    <a href="/" class="back">← Übersicht</a>
+    <header>
+      <div class="kicker">beeflight · Pilot Körperachse</div>
+      <h1>Kopf und Hinterleib anklicken</h1>
+      <p>Ein Standbild einer fliegenden Biene in voller Auflösung. Erst auf den <b style="color:#e0662a">Kopf</b> klicken,
+        dann auf das <b style="color:#3d93c9">Ende des Hinterleibs</b>. Mit <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> siehst du
+        das Bild 2 Frames davor, das Bild selbst und 2 Frames danach; das hilft, die Biene vom Hintergrund zu trennen.
+        Der Ring markiert, wo der Tracker die Biene sieht.</p>
+    </header>
+
+    {!queue && <p class="warn">Noch keine Stichprobe: <code>uv run beeflight-pose sample</code></p>}
+
+    <div class="layout" hidden={!queue}>
+      <div class="stage">
+        <canvas id="view" width="576" height="576"></canvas>
+        <div class="frames" role="group" aria-label="Frame">
+          <button data-f="-1"><kbd>Q</kbd> −2</button>
+          <button data-f="0"><kbd>W</kbd> Bild</button>
+          <button data-f="1"><kbd>E</kbd> +2</button>
+          <button id="flicker"><kbd>F</kbd> Wechseln</button>
+          <button id="zoom"><kbd>Z</kbd> Zoom</button>
+          <button id="smooth"><kbd>P</kbd> Pixel</button>
+        </div>
+      </div>
+      <aside>
+        <div class="pos"><b id="pos">–</b> · <span id="progress"></span></div>
+        <div class="bar"><i id="bar"></i></div>
+        <p id="state" class="state"></p>
+        <div class="row">
+          <button id="unsure"><kbd>U</kbd> Richtung unsicher</button>
+          <button id="unclear"><kbd>X</kbd> Unklar / keine Biene</button>
+        </div>
+        <div class="row">
+          <button id="prev">← zurück</button>
+          <button id="next">weiter →</button>
+          <button id="open">nächste offene <kbd>N</kbd></button>
+          <button id="clear">löschen <kbd>⌫</kbd></button>
+        </div>
+        <dl>
+          <dt>Richtung unsicher</dt>
+          <dd>Die Achse ist klar, aber nicht, welches Ende der Kopf ist. Trotzdem beide Punkte setzen (dein bester Tipp).</dd>
+          <dt>Unklar</dt>
+          <dd>Keine erkennbare Körperform: nur ein Fleck, zwei Bienen, Gras oder Schatten.</dd>
+          <dt>Tipp</dt>
+          <dd>Der Kopf ist meist das dunkle, rundere Ende, der Hinterleib länger und gestreift. Die Flügel liegen als
+            heller Schleier über der Brust.</dd>
+        </dl>
+      </aside>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  type Item = { id: string; name: string; seq: string; t: number; px: number; py: number };
+  type Rec = { id: string; head: [number, number] | null; tail: [number, number] | null; flags: string[] };
+  const { queue, labels } = JSON.parse(document.getElementById("payload")!.textContent!) as {
+    queue: { crop: number; context: number; items: Item[] } | null; labels: Record<string, Rec>;
+  };
+
+  if (queue) {
+    const $ = (id: string) => document.getElementById(id)!;
+    const canvas = $("view") as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d")!;
+    const items = queue.items;
+    const C = queue.crop;
+    const offsets = [-queue.context, 0, queue.context];
+    let idx = Math.max(0, items.findIndex((i) => !labels[i.id]));
+    let frame = 1;
+    let zoomed = false;
+    let pixel = false;
+    let flicker: number | null = null;
+    let pending: { head: [number, number] | null; flags: string[] } = { head: null, flags: [] };
+    let images: HTMLImageElement[] = [];
+
+    const sign = (o: number) => (o >= 0 ? `+${o}` : `${o}`);
+    const view = () => {
+      const s = zoomed ? C * 0.55 : C;  // visible crop size in crop px
+      const it = items[idx];
+      const cx = zoomed ? Math.min(Math.max(it.px, s / 2), C - s / 2) : C / 2;
+      const cy = zoomed ? Math.min(Math.max(it.py, s / 2), C - s / 2) : C / 2;
+      return { x0: cx - s / 2, y0: cy - s / 2, k: canvas.width / s };
+    };
+
+    function load() {
+      const it = items[idx];
+      images = offsets.map((o) => {
+        const img = new Image();
+        img.onload = draw;
+        img.src = `/pose/${it.name}_${sign(o)}.png`;
+        return img;
+      });
+      const rec = labels[it.id];
+      pending = { head: null, flags: rec ? [...rec.flags] : [] };
+      // preload the next crop
+      const nx = items[idx + 1];
+      if (nx) offsets.forEach((o) => { new Image().src = `/pose/${nx.name}_${sign(o)}.png`; });
+      render();
+    }
+
+    function dot(x: number, y: number, color: string) {
+      const v = view();
+      ctx.beginPath();
+      ctx.arc((x - v.x0) * v.k, (y - v.y0) * v.k, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#fff";
+      ctx.stroke();
+    }
+
+    function draw() {
+      const v = view();
+      const img = images[frame];
+      ctx.imageSmoothingEnabled = !pixel;
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const side = canvas.width / v.k;  // visible crop size in crop px
+      if (img?.complete && img.naturalWidth) ctx.drawImage(img, v.x0, v.y0, side, side, 0, 0, canvas.width, canvas.height);
+      const it = items[idx];
+      ctx.beginPath();
+      ctx.arc((it.px - v.x0) * v.k, (it.py - v.y0) * v.k, 26 * v.k, 0, 2 * Math.PI);  // 26 crop px: around a whole bee
+      ctx.strokeStyle = "rgba(255,255,255,.35)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      const rec = labels[it.id];
+      const head = pending.head ?? rec?.head;
+      const tail = pending.head ? null : rec?.tail;
+      if (head && tail) {
+        ctx.beginPath();
+        ctx.moveTo((tail[0] - v.x0) * v.k, (tail[1] - v.y0) * v.k);
+        ctx.lineTo((head[0] - v.x0) * v.k, (head[1] - v.y0) * v.k);
+        ctx.strokeStyle = "rgba(255,255,255,.8)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      if (tail) dot(tail[0], tail[1], "#3d93c9");
+      if (head) dot(head[0], head[1], "#e0662a");
+      ctx.fillStyle = "rgba(255,255,255,.8)";
+      ctx.font = "13px system-ui";
+      ctx.fillText(frame === 1 ? "Bild" : `${sign(offsets[frame])} Frames`, 10, 20);
+    }
+
+    function render() {
+      const it = items[idx];
+      const done = items.filter((i) => labels[i.id]).length;
+      $("pos").textContent = `${idx + 1} / ${items.length}`;
+      $("progress").textContent = `${done} beschriftet`;
+      ($("bar") as HTMLElement).style.width = `${(100 * done) / items.length}%`;
+      const rec = labels[it.id];
+      $("state").textContent = pending.head ? "Kopf gesetzt, jetzt das Ende des Hinterleibs"
+        : rec?.flags.includes("unklar") ? "als unklar markiert"
+        : rec ? "gespeichert" + (rec.flags.includes("richtung_unsicher") ? " · Richtung unsicher" : "")
+        : pending.flags.includes("richtung_unsicher") ? "Kopf anklicken · Richtung unsicher" : "Kopf anklicken";
+      $("unsure").classList.toggle("on", pending.flags.includes("richtung_unsicher"));
+      $("unclear").classList.toggle("on", !!rec?.flags.includes("unklar"));
+      document.querySelectorAll<HTMLButtonElement>("[data-f]").forEach((b) => b.classList.toggle("on", Number(b.dataset.f) + 1 === frame));
+      $("flicker").classList.toggle("on", flicker !== null);
+      $("zoom").classList.toggle("on", zoomed);
+      $("smooth").classList.toggle("on", pixel);
+      draw();
+    }
+
+    async function save(rec: Rec) {
+      const res = await fetch("/api/pose", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) });
+      if (!res.ok) { $("state").textContent = `Fehler: ${(await res.json()).error}`; return false; }
+      labels[rec.id] = rec;
+      return true;
+    }
+
+    function go(k: number) {
+      idx = Math.min(Math.max(0, k), items.length - 1);
+      frame = 1;
+      load();
+    }
+    const nextOpen = () => {
+      const k = items.findIndex((i, j) => j > idx && !labels[i.id]);
+      go(k >= 0 ? k : items.findIndex((i) => !labels[i.id]) >= 0 ? items.findIndex((i) => !labels[i.id]) : idx);
+    };
+
+    canvas.addEventListener("click", async (e) => {
+      const r = canvas.getBoundingClientRect();
+      const v = view();
+      const p: [number, number] = [
+        +(v.x0 + ((e.clientX - r.left) * (canvas.width / r.width)) / v.k).toFixed(1),
+        +(v.y0 + ((e.clientY - r.top) * (canvas.height / r.height)) / v.k).toFixed(1),
+      ];
+      if (!pending.head) {
+        pending.head = p;
+        render();
+        return;
+      }
+      const it = items[idx];
+      const ok = await save({ id: it.id, head: pending.head, tail: p, flags: pending.flags.filter((f) => f !== "unklar") });
+      pending.head = null;
+      render();
+      if (ok) setTimeout(() => { if (items[idx].id === it.id) nextOpen(); }, 350);
+    });
+
+    async function toggleUnsure() {
+      const f = "richtung_unsicher";
+      pending.flags = pending.flags.includes(f) ? pending.flags.filter((x) => x !== f) : [...pending.flags.filter((x) => x !== "unklar"), f];
+      const rec = labels[items[idx].id];
+      if (rec?.head && !pending.head) await save({ ...rec, flags: pending.flags });
+      render();
+    }
+    async function unclear() {
+      const it = items[idx];
+      if (await save({ id: it.id, head: null, tail: null, flags: ["unklar"] })) { pending.head = null; nextOpen(); }
+    }
+    async function clear() {
+      const it = items[idx];
+      await fetch("/api/pose", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: it.id }) });
+      delete labels[it.id];
+      pending = { head: null, flags: [] };
+      render();
+    }
+    function toggleFlicker() {
+      if (flicker !== null) { clearInterval(flicker); flicker = null; frame = 1; }
+      else flicker = window.setInterval(() => { frame = (frame + 1) % 3; render(); }, 300);
+      render();
+    }
+
+    document.querySelectorAll<HTMLButtonElement>("[data-f]").forEach((b) =>
+      b.addEventListener("click", () => { frame = Number(b.dataset.f) + 1; render(); }));
+    $("flicker").addEventListener("click", toggleFlicker);
+    $("zoom").addEventListener("click", () => { zoomed = !zoomed; render(); });
+    $("smooth").addEventListener("click", () => { pixel = !pixel; render(); });
+    $("unsure").addEventListener("click", toggleUnsure);
+    $("unclear").addEventListener("click", unclear);
+    $("prev").addEventListener("click", () => go(idx - 1));
+    $("next").addEventListener("click", () => go(idx + 1));
+    $("open").addEventListener("click", nextOpen);
+    $("clear").addEventListener("click", clear);
+    document.addEventListener("keydown", (e) => {
+      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "q" || k === "w" || k === "e") { frame = { q: 0, w: 1, e: 2 }[k]; render(); }
+      else if (k === "f") toggleFlicker();
+      else if (k === "z") { zoomed = !zoomed; render(); }
+      else if (k === "p") { pixel = !pixel; render(); }
+      else if (k === "u") toggleUnsure();
+      else if (k === "x") unclear();
+      else if (k === "n") nextOpen();
+      else if (e.key === "ArrowLeft") go(idx - 1);
+      else if (e.key === "ArrowRight") go(idx + 1);
+      else if (e.key === "Backspace") { e.preventDefault(); clear(); }
+      else if (e.key === "Escape") { pending.head = null; render(); }
+      else return;
+      e.preventDefault();
+    });
+    load();
+  }
+</script>
+
+<style>
+  main { max-width: 1060px; margin: 0 auto; padding: 24px 16px 48px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 12px; }
+  h1 { font-size: 28px; margin: 4px 0 8px; letter-spacing: -.02em; }
+  header p { color: var(--muted); max-width: 80ch; margin: 0 0 20px; }
+  .warn { background: #fff4e5; border: 1px solid #f0c27a; border-radius: 8px; padding: 10px 14px; }
+  .layout { display: grid; grid-template-columns: 576px 1fr; gap: 28px; align-items: start; }
+  .layout[hidden] { display: none; }
+  canvas { width: 576px; height: 576px; border-radius: 8px; cursor: crosshair; display: block; background: #000; }
+  .frames { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 6px 10px; cursor: pointer; color: var(--ink); }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  button.on kbd { color: #ddd; background: transparent; border-color: #888; }
+  kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; background: var(--panel); }
+  .pos { font-size: 15px; }
+  .bar { height: 6px; background: var(--panel); border-radius: 3px; overflow: hidden; margin: 6px 0 12px; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 0; }
+  .state { min-height: 1.4em; font-weight: 600; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  dl { font-size: 14px; color: var(--muted); }
+  dt { font-weight: 600; color: var(--ink); margin-top: 8px; }
+  dd { margin: 2px 0 0; }
+</style>

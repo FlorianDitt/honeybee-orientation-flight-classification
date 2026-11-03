@@ -6,6 +6,15 @@ export const FPS = 60000 / 1001;
 export const W = 1080, H = 1920;
 export const CLASSES = ["orientierung", "sammelabflug", "anflug", "artefakt"] as const;
 export const FLAGS = ["fragment", "unsicher"] as const;
+/** Why a track is an artefact; asked right after choosing `artefakt` (keys 1–6). Keep in sync with store.ts. */
+export const REASONS = [
+  { key: "gras", name: "Gras, Blatt, Schatten, Licht" },
+  { key: "bienenwechsel", name: "Bienenwechsel" },
+  { key: "vorbeiflug", name: "Vorbeiflug ohne Bezug zum Stock" },
+  { key: "krabbeln", name: "Krabbelnde Biene" },
+  { key: "zu_kurz", name: "Zu kurz zum Beurteilen" },
+  { key: "sonstiges", name: "Sonstiges (Wespe, Fliege …)" },
+] as const;
 const COLORS: Record<string, string> = { orientierung: "#e0662a", sammelabflug: "#3d93c9", anflug: "#3f9d6b", artefakt: "#8a8f98" };
 const PAD_FRAMES = 20;
 
@@ -22,7 +31,7 @@ export interface Media {
   k: number;          // video pixels per original pixel
   overview?: string;  // still of the full frame; without it the overview draws the video itself
 }
-export interface Label { label: string; flags: string[]; note: string }
+export interface Label { label: string; flags: string[]; note: string; reason?: string }
 export interface Backend {
   save(track: Track, label: Label): Promise<void>;  // throws with a readable message on failure
   clear(track: Track): Promise<void>;
@@ -35,6 +44,8 @@ export interface Options {
   /** practice mode: a message shown after saving instead of moving on */
   feedback?(track: Track, label: Label): string | null;
   onDone?(): void;
+  /** called whenever another track is shown */
+  onTrack?(track: Track, index: number): void;
   /** id of the track to open first; default: the first unlabeled one */
   start?: string;
 }
@@ -64,6 +75,7 @@ export function startLabeler(opt: Options) {
   const note = $<HTMLInputElement>("note");
   const flagEls = { fragment: $<HTMLInputElement>("flag-fragment"), unsicher: $<HTMLInputElement>("flag-unsicher") };
   const still = new Image();
+  const reasonsEl = $<HTMLDivElement>("reasons");
 
   const startAt = opt.start ? tracks.findIndex((t) => t.id === opt.start) : -1;
   let idx = startAt >= 0 ? startAt : Math.max(0, tracks.findIndex((t) => !labels[t.id]));
@@ -103,7 +115,9 @@ export function startLabeler(opt: Options) {
     flagEls.fragment.checked = !!l?.flags.includes("fragment");
     flagEls.unsicher.checked = !!l?.flags.includes("unsicher");
     note.value = l?.note ?? "";
+    reasonsEl.hidden = true;
     renderUi();
+    opt.onTrack?.(tr, idx);
   }
 
   /** Scale and shift the video so that the view box fills the viewport. */
@@ -229,6 +243,9 @@ export function startLabeler(opt: Options) {
     for (const b of document.querySelectorAll<HTMLButtonElement>(".cls")) {
       b.classList.toggle("active", labels[tr.id]?.label === b.dataset.class);
     }
+    for (const b of document.querySelectorAll<HTMLButtonElement>("[data-reason]")) {
+      b.classList.toggle("active", labels[tr.id]?.reason === b.dataset.reason);
+    }
     for (const b of document.querySelectorAll<HTMLButtonElement>("[data-rate]")) {
       b.classList.toggle("active", Number(b.dataset.rate) === rate);
     }
@@ -242,10 +259,13 @@ export function startLabeler(opt: Options) {
   }
   function hideStatus() { $("status").hidden = true; }
 
-  async function save(cls: string) {
+  async function save(cls: string, reason?: string) {
     if (busy) return;
+    if (cls === "artefakt" && !reason) { reasonsEl.hidden = false; return; }  // ask why first
+    reasonsEl.hidden = true;
     const tr = tracks[idx];
-    const label = { label: cls, flags: FLAGS.filter((f) => flagEls[f].checked), note: note.value };
+    const label: Label = { label: cls, flags: FLAGS.filter((f) => flagEls[f].checked), note: note.value };
+    if (reason) label.reason = reason;
     busy = true;
     try {
       await opt.backend.save(tr, label);
@@ -287,6 +307,8 @@ export function startLabeler(opt: Options) {
   const toggleWide = () => { wide = !wide; box = fitBox(tracks[idx].pts, wide, media.region); place(); };
 
   for (const b of document.querySelectorAll<HTMLButtonElement>(".cls")) b.onclick = () => save(b.dataset.class!);
+  for (const b of document.querySelectorAll<HTMLButtonElement>("[data-reason]")) b.onclick = () => save("artefakt", b.dataset.reason);
+  $("reasons-cancel").onclick = () => { reasonsEl.hidden = true; };
   for (const b of document.querySelectorAll<HTMLButtonElement>("[data-rate]")) b.onclick = () => setRate(Number(b.dataset.rate));
   $("play").onclick = togglePlay;
   $("restart").onclick = restart;
@@ -303,6 +325,11 @@ export function startLabeler(opt: Options) {
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const n = Number(e.key);
+    if (!reasonsEl.hidden) {  // the artefact picker takes the number keys until a reason is chosen
+      if (n >= 1 && n <= REASONS.length) save("artefakt", REASONS[n - 1].key);
+      else if (e.key === "Escape") reasonsEl.hidden = true;
+      return;
+    }
     if (n >= 1 && n <= CLASSES.length) return void save(CLASSES[n - 1]);
     switch (e.key.toLowerCase()) {
       case " ": e.preventDefault(); togglePlay(); break;

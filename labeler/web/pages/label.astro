@@ -7,7 +7,15 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 
 <Layout title="Labeln · Bienenflug">
   <LabelView back={base} name="" total="–">
-    <p slot="aside" class="guide">Unsicher, was gemeint ist? <a href={`${base}leitfaden/`} target="_blank">Leitfaden</a></p>
+    <div slot="aside" class="aside-extra">
+      <section id="explain" class="explain" hidden>
+        <div class="tag" id="explain-class"></div>
+        <h3 id="explain-title"></h3>
+        <p id="explain-text"></p>
+        <button id="explain-next" class="next">Nächstes Beispiel →</button>
+      </section>
+      <p class="guide">Unsicher, was gemeint ist? <a href={`${base}leitfaden/`} target="_blank">Leitfaden</a></p>
+    </div>
   </LabelView>
 </Layout>
 
@@ -16,9 +24,12 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
   import { BASE, load, site, store, type Rec } from "../../src/lib/webstore";
 
   const pkgId = new URLSearchParams(location.search).get("p") ?? "";
+  // tutorial: example tracks with the owner's class and why, nothing is saved; replaces the practice round
+  const tutorialMode = pkgId === "tutorial";
   const practiceMode = pkgId === "practice";
   const state = load();
   if (!state.name) location.href = BASE;
+  if (tutorialMode) document.body.classList.add("tutorial");
 
   if (state.name) main().catch((e) => {
     const s = document.getElementById("status")!;
@@ -27,25 +38,41 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     s.hidden = false;
   });
 
+  const NAMES: Record<string, string> = { orientierung: "Orientierungsflug", sammelabflug: "Sammelabflug", anflug: "Anflug", artefakt: "Artefakt" };
+  const $ = (id: string) => document.getElementById(id)!;
+
   async function main() {
     const data = await site();
-    const pkg = practiceMode
-      ? { name: "Übungsrunde", split: "train", items: data.practice.map((p) => p.id) }
-      : data.packages.find((p) => p.id === pkgId);
-    if (!pkg) { location.href = BASE; return; }
+    const examples = data.tutorial ?? [];
+    const pkg = tutorialMode
+      ? { name: "Tutorial", split: "train", items: examples.map((e) => e.id) }
+      : practiceMode
+        ? { name: "Übungsrunde", split: "train", items: data.practice.map((p) => p.id) }
+        : data.packages.find((p) => p.id === pkgId);
+    if (!pkg || !pkg.items.length) { location.href = BASE; return; }
     const answers = Object.fromEntries(data.practice.map((p) => [p.id, p.answer]));
     const target = practiceMode ? state.practice : state.labels;
 
     const items = pkg.items.map((id) => data.items[id]);
     const tracks: Track[] = items.map((it) => ({ id: it.id, t0: it.t0, t1: it.t1, t: it.t, pts: it.pts }));
     const labels: Record<string, Label> = {};
-    for (const id of pkg.items) if (target[id]) labels[id] = target[id];
+    if (!tutorialMode) for (const id of pkg.items) if (target[id]) labels[id] = target[id];
 
-    document.getElementById("split")!.textContent = pkg.name;
-    document.getElementById("total")!.textContent = String(tracks.length);
+    $("split").textContent = pkg.name;
+    $("total").textContent = String(tracks.length);
     document.title = `${pkg.name} · Bienenflug`;
 
-    const NAMES: Record<string, string> = { orientierung: "Orientierungsflug", sammelabflug: "Sammelabflug", anflug: "Anflug", artefakt: "Artefakt" };
+    const done = (html: string) => {
+      const s = $("status");
+      s.innerHTML = html;
+      s.dataset.kind = "feedback";
+      s.hidden = false;
+    };
+
+    if (tutorialMode) {
+      $("explain").hidden = false;
+      $("explain-next").onclick = () => $("next").click();
+    }
 
     startLabeler({
       tracks,
@@ -57,15 +84,36 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
       },
       backend: {
         async save(t, l) {
+          if (tutorialMode) return;
           const rec: Rec = { ...l, split: data.items[t.id].split, labeled_at: new Date().toISOString() };
           target[t.id] = rec;
           store(state);
         },
         async clear(t) {
+          if (tutorialMode) return;
           delete target[t.id];
           store(state);
         },
       },
+      onTrack: tutorialMode
+        ? (t, i) => {
+            const e = examples[i];
+            $("explain-class").textContent = `${i + 1} / ${examples.length} · ${NAMES[e.label]}`;
+            $("explain").style.setProperty("--c", `var(--c-${e.label})`);
+            $("explain-title").textContent = e.title;
+            $("explain-text").textContent = e.text;
+            const last = i === examples.length - 1;
+            $("explain-next").textContent = last ? "Tutorial abschließen ✓" : "Nächstes Beispiel →";
+            $("explain-next").onclick = last
+              ? () => {
+                  state.tutorial_seen = true;
+                  store(state);
+                  done(`Geschafft! Die Pakete sind jetzt freigeschaltet. <a href="${BASE}">Zur Übersicht</a>`);
+                }
+              : () => $("next").click();
+            $("pos").textContent = `Beispiel ${i + 1} / ${examples.length}`;
+          }
+        : undefined,
       feedback: practiceMode
         ? (t, l) => {
             const a = answers[t.id];
@@ -73,14 +121,9 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
             return `${verdict}\nNochmal ansehen oder weiter mit N`;
           }
         : undefined,
-      onDone: () => {
-        const s = document.getElementById("status")!;
-        s.innerHTML = practiceMode
-          ? `Übungsrunde fertig. <a href="${BASE}">Zur Übersicht</a>, dort geht es mit einem Paket weiter.`
-          : `Paket fertig, danke! <a href="${BASE}">Zur Übersicht</a> und die Labels exportieren.`;
-        s.dataset.kind = "feedback";
-        s.hidden = false;
-      },
+      onDone: () => done(practiceMode
+        ? `Übungsrunde fertig. <a href="${BASE}">Zur Übersicht</a>, dort geht es mit einem Paket weiter.`
+        : `Paket fertig, danke! <a href="${BASE}">Zur Übersicht</a> und die Ergebnisse senden.`),
     });
   }
 </script>
@@ -88,4 +131,18 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 <style>
   .guide { font-size: 13px; color: var(--muted); margin: 0; }
   :global(.status a) { color: #fff; font-weight: 600; }
+  .aside-extra { display: flex; flex-direction: column; gap: 12px; }
+  .explain { border-left: 5px solid var(--c, var(--accent)); background: var(--panel); border-radius: 8px; padding: 12px 14px; }
+  .explain[hidden] { display: none; }
+  .explain h3 { margin: 4px 0 6px; font-size: 17px; }
+  .explain p { margin: 0 0 10px; font-size: 15px; line-height: 1.45; }
+  .tag { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .next { width: 100%; padding: 10px; font-weight: 600; background: var(--ink); color: #fff; border-color: var(--ink); }
+  /* the tutorial only shows: no class buttons, flags, note or label buttons */
+  :global(body.tutorial .classes), :global(body.tutorial .flags), :global(body.tutorial #note),
+  :global(body.tutorial #clear), :global(body.tutorial #next-open), :global(body.tutorial .done) { display: none; }
+  @media (max-width: 900px) {
+    /* phone: the explanation right under the playback buttons */
+    .aside-extra { order: 2; }
+  }
 </style>

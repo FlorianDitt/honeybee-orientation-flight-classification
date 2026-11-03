@@ -28,8 +28,10 @@ beeflight-sample = "beeflight.sample:main"
 beeflight-clips = "beeflight.clips:main"
 beeflight-vote = "beeflight.vote:main"
 beeflight-detector = "beeflight.detector:main"
+beeflight-sledevic = "beeflight.sledevic:main"
 beeflight-sort = "beeflight.sort:main"
 beeflight-chiron = "beeflight.chiron:main"
+beeflight-pose = "beeflight.pose:main"
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

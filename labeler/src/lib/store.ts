@@ -11,6 +11,8 @@ export const SPLITS = ["train", "val", "recheck", "test_same_hive", "test_other_
 export type Split = (typeof SPLITS)[number];
 export const CLASSES = ["orientierung", "sammelabflug", "anflug", "artefakt"] as const;
 export const FLAGS = ["fragment", "unsicher"] as const;
+// artefact reasons, same keys as REASONS in labeler.ts
+export const REASONS = ["gras", "bienenwechsel", "vorbeiflug", "krabbeln", "zu_kurz", "sonstiges"] as const;
 // fallback for queues from before the tracker name was stored; the queue file says which tracker made its tracks
 export const TRACKER = "background-v3";
 export const VOTES_DIR = resolve(LABELS_DIR, "votes");
@@ -32,6 +34,7 @@ export interface Label {
   label: (typeof CLASSES)[number];
   flags: string[];
   note: string;
+  reason?: (typeof REASONS)[number];
   labeled_at: string;
 }
 
@@ -128,6 +131,8 @@ export interface VoteFile {
   practice: number;
   splits: Record<string, number>;
   modified: string;
+  /** tracker of the tracks the votes were made on (exports before the tracker was stored: v3) */
+  tracker: string;
 }
 
 /** Exports of the web labeler in labels/votes/, as read by `beeflight-vote`. */
@@ -147,6 +152,7 @@ export function readVoteFiles(): VoteFile[] {
         practice: recs.filter((r) => r.practice).length,
         splits,
         modified: statSync(path).mtime.toISOString(),
+        tracker: recs.find((r) => !r.practice)?.tracker ?? TRACKER,
       };
     })
     .sort((a, b) => a.annotator.localeCompare(b.annotator) || a.file.localeCompare(b.file));

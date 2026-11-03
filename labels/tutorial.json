@@ -1,0 +1,29 @@
+{
+ "note": "Examples for the online tutorial, from the owner's labels. Texts are drafts by Claude from the track line only; the owner checks them against the video before deploying.",
+ "items": [
+  {"id": "rec2123_seq055:461", "label": "orientierung",
+   "title": "Bögen vor dem Eingang",
+   "text": "Die Biene startet am Flugbrett, fliegt erst ein Stück nach links, kehrt um und zieht dann in einem zweiten Bogen nach rechts. Sie bleibt dabei nah am Eingang: Sie schaut sich den Stock an, statt wegzufliegen."},
+  {"id": "rec2123_seq057:150", "label": "orientierung",
+   "title": "Hin und her, nah am Stock",
+   "text": "Start am Brett, dann ein weiter Schwenk nach links und wieder zurück nach rechts, quer vor dem Flugloch. Dieses Pendeln vor dem Eingang ist typisch für einen Orientierungsflug."},
+  {"id": "rec2123_seq055:898", "label": "sammelabflug",
+   "title": "Kurvig, aber trotzdem Sammelabflug",
+   "text": "Die Bahn macht einen großen Bogen, ist aber kein Orientierungsflug: Die Biene startet am Brett und fliegt danach zügig aus dem Bild, ohne umzukehren oder sich dem Stock wieder zuzuwenden. Kurvig allein reicht nicht."},
+  {"id": "rec2123_seq028:1739", "label": "sammelabflug",
+   "title": "Der klare Fall",
+   "text": "Start am Brett und dann fast gerade aus dem Bild. Kurz und schnell: So sieht ein typischer Sammelabflug aus."},
+  {"id": "rec2123_seq063:646", "label": "anflug",
+   "title": "Kommt von außen, landet",
+   "text": "Die Bahn beginnt nicht am Brett, sondern weiter weg, und endet am Flugbrett. Entscheidend für den Anflug ist das Ziel Flugloch, auch wenn die Biene unterwegs kurvt."},
+  {"id": "rec2123_seq043:1586", "label": "anflug",
+   "title": "Suchender Anflug",
+   "text": "Die Biene kommt von der Seite, fliegt quer vor dem Eingang entlang und biegt dann zum Brett ab. Suchen und Kurven vor der Landung gehören zum Anflug."},
+  {"id": "rec2123_seq071:1472", "label": "artefakt", "reason": "bienenwechsel",
+   "title": "Artefakt: Bienenwechsel",
+   "text": "Achte auf den weißen Kreis: Er springt unterwegs auf eine andere Biene über, sogar zweimal. Die Linie beschreibt dann keinen Flug einer einzelnen Biene mehr. Wähle Artefakt und als Grund Bienenwechsel."},
+  {"id": "rec2123_seq074:1619", "label": "artefakt", "reason": "vorbeiflug",
+   "title": "Artefakt: Vorbeiflug",
+   "text": "Eine echte Biene, aber sie fliegt nur weit unten durchs Bild und hat nichts mit dem Stock zu tun: Sie kommt nicht vom Brett und fliegt nicht hin. Wähle Artefakt und als Grund Vorbeiflug."}
+ ]
+}

@@ -36,9 +36,10 @@ npm run dev:web               # Test: http://127.0.0.1:4322/BeeHive/
 npm run deploy:web            # baut und pusht nach gh-pages -> https://florianditt.github.io/BeeHive/
 ```
 
-**Ablauf für die Helfenden:** Name eingeben → Leitfaden lesen → Übungsrunde (10 Bahnen, die du sicher gelabelt hast;
-nach jeder Bahn erscheint deine Antwort) → das Paket labeln, das du ihnen nennst (≈ 50 Bahnen) → „Labels
-exportieren“ und die `.jsonl`-Datei an dich schicken. Die Pakete sind erst nach der Übungsrunde freigeschaltet.
+**Ablauf für die Helfenden:** Name eingeben → Tutorial (8 Beispielbahnen aus `labels/tutorial.json`, je Klasse
+mit Erklärung, nur anschauen) → das Paket labeln, das du ihnen nennst (≈ 50 Bahnen) → „Ergebnisse senden“ öffnet
+das Teilen-Menü des Handys (WhatsApp, Signal, Mail) mit der `.jsonl`-Datei; ohne Teilen-Funktion wird sie
+heruntergeladen. Die Pakete sind erst nach dem Tutorial freigeschaltet (oder nach der früheren Übungsrunde).
 
 **Pakete verteilen:** Training hat 6 Pakete, Validierung 2. Für drei Stimmen pro Bahn braucht jedes Paket zwei
 Helfende plus dich. Bei 4 Helfenden mit je 4 Paketen ist alles doppelt abgedeckt.
@@ -46,7 +47,8 @@ Helfende plus dich. Bei 4 Helfenden mit je 4 Paketen ist alles doppelt abgedeckt
 **Auswerten:** Exportdateien auf der lokalen Startseite über **Exporte hochladen** einspielen (oder von Hand nach `labels/votes/` legen), dann `uv run beeflight-vote`
 (Mehrheitsregel und Ausgabe siehe [docs/labeling.md](../docs/labeling.md#mehrere-labelnde)).
 
-Die Übungsbahnen stehen fest in `labels/practice.json` und kommen in keinem Paket vor. Die Pages-Seite ist öffentlich,
+Die früheren Übungsbahnen (`labels/practice.json`) und die Tutorial-Bahnen kommen in keinem Paket vor; eine
+Tutorial-Bahn wird nachträglich aus ihrem Paket genommen, die anderen Bahnen bleiben in ihrem Paket. Die Pages-Seite ist öffentlich,
 auch wenn das Repository privat ist: Den Link nur direkt weitergeben. Die Clips landen nur im Branch `gh-pages`
 (ein einziger Commit, wird bei jedem Deploy ersetzt), nicht in der Historie von `main`.
 
@@ -90,7 +92,7 @@ src/pages/label/[split].astro    lokal: Label-Ansicht mit Originalvideo
 src/pages/api/[split]/labels.ts  lokal: GET/POST/DELETE Labels
 src/pages/video/[seq].ts         lokal: Video-Streaming mit HTTP-Range (Springen in 100-MB-Dateien)
 src/lib/webstore.ts              online: localStorage, Export/Import
-web/pages/index.astro            online: Name, Übungsrunde, Pakete, Export
+web/pages/index.astro            online: Name, Tutorial, Pakete, Senden
 web/pages/label.astro            online: Label-Ansicht mit Clips (?p=<paket>|practice)
 web/pages/leitfaden.astro        online: Kurzfassung von docs/labeling.md für Laien
 scripts/deploy-pages.sh          Build + Push nach gh-pages

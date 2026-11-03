@@ -18,13 +18,15 @@ const classes = [
   },
   {
     key: "4", id: "artefakt", name: "Artefakt",
-    text: "Keine echte Flugbahn: Gras, Blätter, Schatten, eine krabbelnde Biene, oder die Linie springt zwischen zwei Bienen hin und her.",
+    text: "Keine echte Flugbahn: Gras, Blätter, Schatten, eine krabbelnde Biene, oder die Linie springt zwischen zwei Bienen hin und her. Auch eine Biene, die nur vorbeifliegt, weit weg vom Flugloch und ohne sich ihm zuzuwenden, selbst wenn sie dabei Schleifen fliegt. Nach dem Tippen auf Artefakt fragt die Seite kurz nach dem Grund.",
   },
 ];
 const cases = [
   ["Startet, fliegt eine Schleife, landet wieder", "Orientierungsflug"],
   ["Kommt von außen, kreist vor dem Flugloch, landet", "Anflug"],
-  ["Kommt von außen, kreist, fliegt wieder weg", "Orientierungsflug + unsicher"],
+  ["Kommt von außen, kreist vor dem Flugloch (wendet sich ihm zu), fliegt wieder weg", "Orientierungsflug + unsicher"],
+  ["Fliegt eine Schleife durchs Bild, weit weg vom Flugloch, ohne Bezug zum Stock", "Artefakt (Vorbeiflug)"],
+  ["Linie springt auf eine andere Biene über", "Artefakt"],
   ["Gerader Abflug mit einem Bogen am Bildrand", "Sammelabflug"],
   ["Wespe oder Fliege", "Artefakt"],
 ];
@@ -52,7 +54,7 @@ const cases = [
       <li><i class="ring"></i> Kreis: wo die Biene gerade ist</li>
       <li><i class="square"></i> Quadrat: Startpunkt der Bahn</li>
     </ul>
-    <p>Das Video läuft in Zeitlupe (¼) in Schleife, mit etwas Vor- und Nachlauf. Rechts oben siehst du das ganze Bild;
+    <p>Das Video läuft in Zeitlupe (¼) in Schleife, mit etwas Vor- und Nachlauf. Rechts oben (am Handy weiter unten) siehst du das ganze Bild;
       das Flugbrett vor dem Eingang liegt ungefähr in der Bildmitte. Mit <kbd>Z</kbd> zoomst du heraus, wenn die Umgebung hilft.</p>
 
     <h2>Die vier Klassen</h2>

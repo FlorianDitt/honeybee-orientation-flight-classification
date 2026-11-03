@@ -36,6 +36,11 @@ dem 02.11.2026 auch prominent auf der Online-Seite, weil Zweitlabelnde kurvige B
 - Zwei Bienen, die der Tracker zu einer Bahn vertauscht hat (ID-Wechsel), wenn die Bahn dadurch ihren Charakter
   ändert.
 - Krabbelnde Bienen am Brettrand.
+- **Vorbeiflug** (seit 03.11.2026): eine Biene fliegt durchs Bild, weit weg vom Flugloch und ohne sich ihm
+  zuzuwenden, auch wenn sie dabei Schleifen fliegt. Streng genommen eine echte Bahn, aber ohne Bezug zum Stock;
+  lokal mit Notiz „Vorbeiflug“, damit sie sich später von Gras und Schatten trennen lässt.
+
+Notizen für Artefakte: „Vorbeiflug“, „Bienenwechsel“ (mit Anzahl, z. B. „2× Bienenwechsel“), „zu kurz“.
 
 Zusatzflag `fragment`: Bahn ist echt, aber Anfang oder Ende fehlen. Die Klasse wird trotzdem vergeben, wenn sie
 erkennbar ist.
@@ -46,7 +51,10 @@ erkennbar ist.
 |---|---|
 | Biene startet, fliegt eine Schleife, landet wieder | `orientierung` |
 | Biene kommt von außen, kreist vor dem Flugloch, landet | `anflug` |
-| Biene kommt von außen, kreist, fliegt wieder weg | `orientierung`, Flag `unsicher` |
+| Biene kommt von außen, kreist **vor dem Flugloch** (wendet sich ihm zu), fliegt wieder weg | `orientierung`, Flag `unsicher` |
+| Biene fliegt eine Schleife durchs Bild, weit weg vom Flugloch, ohne Bezug zum Stock | `artefakt`, Notiz „Vorbeiflug“ |
+| Bahn springt zwischen mehreren Bienen (Bienenwechsel), Flug nicht mehr einer Biene zuzuordnen | `artefakt`, Notiz „Bienenwechsel“ |
+| Wechsel nur in den letzten Frames, Rest klar eine Biene | Klasse der Biene, Flag `fragment` |
 | Gerader Abflug mit einem einzelnen Bogen am Bildrand | `sammelabflug` |
 | Wespe, Hornisse | `artefakt` (Wespen-Erkennung ist ein anderes Thema) |
 | Biene pendelt von außen kommend zickzack vor dem Eingang (mögliche Räuberin) | `anflug`, Flag `unsicher` |
@@ -75,8 +83,9 @@ erkennbar ist.
 
 Damit die Labels nicht nur an einer Person hängen, labeln Freundinnen und Freunde dieselben Bahnen in der
 Online-Version ([labeler/README.md](../labeler/README.md#online-version-für-freunde-github-pages)). Sie sehen den
-Leitfaden in Kurzform und machen zuerst eine **Übungsrunde** mit 10 Bahnen, die ich ohne Flag gelabelt habe
-(`labels/practice.json`); danach erscheint jeweils meine Antwort. Übungsbahnen zählen für die Helfenden nicht.
+Leitfaden in Kurzform und sehen zuerst ein **Tutorial** (seit 03.11.2026): 8 Beispielbahnen aus meinen sicheren
+Labels, je zwei pro Klasse, mit kurzer Begründung (`labels/tutorial.json`). Es wird nur gezeigt, nicht geprüft:
+Die frühere Übungsrunde verglich die Helfenden mit meiner Meinung, das passt nicht zu unabhängigen Stimmen.
 
 Die Bahnen sind in Pakete zu etwa 50 aufgeteilt (gleiche gemischte Reihenfolge wie die Warteschlange). Jedes Paket
 bekommt zwei Helfende, zusammen mit meinen Labels sind das **drei Stimmen pro Bahn**.

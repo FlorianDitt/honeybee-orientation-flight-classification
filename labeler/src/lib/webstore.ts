@@ -9,6 +9,8 @@ interface State {
   name: string; labels: Record<string, Rec>; practice: Record<string, Rec>; exported_at: string | null;
   /** tracker of the tracks the labels refer to; missing = from before it was stored */
   tracker?: string;
+  /** went through the tutorial (unlocks the packages, like a finished practice round did before) */
+  tutorial_seen?: boolean;
 }
 // the tracker of the online tracks before the name was stored in site.json
 const FIRST_TRACKER = "background-v3";
@@ -21,6 +23,8 @@ export interface Site {
   items: Record<string, SiteItem>;
   packages: { id: string; split: string; name: string; items: string[] }[];
   practice: { id: string; answer: string }[];
+  /** example tracks with the owner's class and why; shown, not tested */
+  tutorial?: { id: string; label: string; reason?: string; title: string; text: string }[];
 }
 export interface SiteItem {
   id: string; split: string; seq: string; t0: number; t1: number; t: number[]; pts: [number, number][];

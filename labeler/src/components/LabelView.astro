@@ -1,6 +1,6 @@
 ---
 // Shared markup of the labeling view; the behaviour lives in src/lib/labeler.ts.
-import { CLASSES } from "../lib/labeler";
+import { CLASSES, REASONS } from "../lib/labeler";
 
 interface Props {
   back: string;
@@ -15,7 +15,7 @@ const HELP: Record<string, string> = {
   orientierung: "startet am Brett, Schleifen und Bögen vor dem Flugloch",
   sammelabflug: "startet am Brett, verlässt die Zone zügig ohne Schleife",
   anflug: "Ziel ist das Flugbrett, darf kurven und suchen",
-  artefakt: "Gras, Schatten, ID-Wechsel, krabbelnde Biene",
+  artefakt: "keine echte Flugbahn: Gras, Schatten, Bienenwechsel, Vorbeiflug … (Grund folgt)",
 };
 ---
 
@@ -62,6 +62,14 @@ const HELP: Record<string, string> = {
             <span><b>{c}</b><small>{HELP[c]}</small></span>
           </button>
         ))}
+      </div>
+
+      <div id="reasons" class="reasons" hidden>
+        <p>Warum ein Artefakt?</p>
+        {REASONS.map((r, i) => (
+          <button data-reason={r.key}><kbd>{i + 1}</kbd> {r.name}</button>
+        ))}
+        <button id="reasons-cancel" class="cancel"><kbd>Esc</kbd> abbrechen</button>
       </div>
 
       <div class="flags">
@@ -125,6 +133,12 @@ const HELP: Record<string, string> = {
   .cls.active { background: var(--c); border-color: var(--c); color: #fff; }
   .cls.active small { color: rgba(255, 255, 255, .85); }
 
+  .reasons { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 2px solid var(--c-artefakt);
+    border-radius: 8px; background: var(--panel); }
+  .reasons[hidden] { display: none; }
+  .reasons p { margin: 0 0 2px; font-size: 13px; font-weight: 600; }
+  .reasons button { text-align: left; font-size: 14px; }
+  .reasons .cancel { color: var(--muted); font-size: 13px; }
   .flags { display: flex; gap: 16px; font-size: 14px; }
   .flags label { display: flex; align-items: center; gap: 6px; }
   #note { font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
@@ -133,7 +147,31 @@ const HELP: Record<string, string> = {
   .keys { font-size: 12px; color: var(--muted); margin: 0; line-height: 2; }
 
   @media (max-width: 900px) {
-    main { grid-template-columns: 1fr; }
+    /* phone: the page scrolls as a whole; the class buttons follow right under the video */
+    .app { height: auto; min-height: 100vh; }
+    header { gap: 10px; padding: 8px 12px; flex-wrap: wrap; }
+    .tracker { display: none; }
+    .progress { order: 5; flex-basis: 100%; }
+    main { grid-template-columns: 1fr; gap: 10px; padding: 10px 12px 24px; }
     .viewport { width: 100%; }
+    aside { overflow: visible; }
+    .playback { order: 1; justify-content: center; }
+    .classes { order: 2; }
+    .flags { order: 3; justify-content: center; }
+    .flags label { padding: 6px 0; }
+    #note { order: 4; }
+    .nav { order: 5; }
+    #overview { order: 6; }
+    .keys { display: none; }
+    .cls { padding: 12px; }
+    /* the artefact reasons as a sheet at the bottom of the screen, so they cannot open out of sight */
+    .reasons { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; border-radius: 14px 14px 0 0;
+      border-width: 2px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); background: #fff;
+      box-shadow: 0 -6px 24px rgba(0, 0, 0, .25); max-height: 80vh; overflow-y: auto; }
+    .reasons button { padding: 12px; }
+  }
+  /* touch screens have no keyboard: hide the key hints */
+  @media (hover: none) {
+    .cls kbd, .reasons kbd, .flags kbd, .nav kbd { display: none; }
   }
 </style>

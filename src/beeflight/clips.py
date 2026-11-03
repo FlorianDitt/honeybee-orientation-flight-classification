@@ -12,7 +12,11 @@ The tutorial (labels/tutorial.json: example tracks per class with an explanation
 round on the site; its tracks get clips too and are taken out of their package afterwards, so the other
 tracks keep their package.
 
+With --skip-voted, tracks that a helper already labeled (labels/votes/*.jsonl, moved to the current
+tracks through the id maps) stay out of the packages, so the packages hold only tracks they have not seen.
+
 Usage: beeflight-clips                 # train + val
+       beeflight-clips --skip-voted
        beeflight-clips --split val --force
 """
 import argparse
@@ -154,6 +158,21 @@ def practice_ids(queue_train):
     return items
 
 
+def voted_ids(tracker, id_map):
+    """Ids of the current tracks that some helper already labeled or saw in the practice round (labels/votes/)."""
+    out = set()
+    for path in sorted((LABELS / "votes").glob("*.jsonl")):
+        for line in path.read_text().splitlines():
+            if not line.strip():
+                continue
+            r = json.loads(line)  # practice tracks count too: they have been seen
+            made_on = r.get("tracker") or "background-v3"
+            out.add(r["id"] if made_on == tracker else id_map.get(made_on, {}).get(r["id"]))
+    out.discard(None)
+    print(f"skip-voted: {len(out)} tracks already labeled by helpers")
+    return out
+
+
 def packages(split, queue, skip):
     ids = [i["id"] for i in queue if i["id"] not in skip]
     n = math.ceil(len(ids) / PACKAGE)
@@ -167,6 +186,7 @@ def main():
     ap.add_argument("--split", action="append", choices=list(NAMES), help="default: train and val")
     ap.add_argument("--force", action="store_true", help="re-encode existing clips")
     ap.add_argument("--workers", type=int, default=3, help="parallel videos (about 1 GB RAM each)")
+    ap.add_argument("--skip-voted", action="store_true", help="leave tracks that helpers already labeled out of the packages")
     args = ap.parse_args()
     splits = args.split or list(NAMES)
     (WEB / "clips").mkdir(parents=True, exist_ok=True)
@@ -188,11 +208,12 @@ def main():
     practice = practice_ids(queues["train"])
     skip = {p["id"] for p in practice}
     tutorial = json.loads((LABELS / "tutorial.json").read_text())["items"]
+    voted = voted_ids(tracker, id_map) if args.skip_voted else set()
     items, pkgs = {}, []
     for s in NAMES:
         for i in queues[s]:
             items[i["id"]] = {**plan(i), "split": s}
-        pkgs += packages(s, queues[s], skip)
+        pkgs += packages(s, queues[s], skip | voted)
     shown = {t["id"] for t in tutorial}
     for p in pkgs:  # the answer of a tutorial track is shown, so nobody labels it
         p["items"] = [i for i in p["items"] if i not in shown]

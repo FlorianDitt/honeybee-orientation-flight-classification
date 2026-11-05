@@ -101,7 +101,7 @@ ul.d li { margin-bottom: 7px; }
   <ul class="d">
     <li><strong>Labels überleben Tracker-Updates:</strong> jedes Label speichert die Bahn und die Tracker-Version; nach v2 und v3 wurden die Labels automatisch auf dieselben Flüge übertragen</li>
     <li><strong>Mehrere Labelnde:</strong> Freunde labeln online kurze Clips (GitHub Pages), nach einer Übungsrunde mit Rückmeldung; Übereinstimmung als Krippendorffs α</li>
-    <li><strong>Kein Leck:</strong> Split nach Zeitblöcken mit Puffer, Schwellen nur auf Validierung, Testsets erst nach dem Einfrieren gelabelt</li>
+    <li><strong>Kein Leck:</strong> Split nach Zeitblöcken mit Puffer, Schwellen nur auf Validierung, eigene Testlabels und Auswertung erst nach dem Einfrieren</li>
   </ul>
 </div>
 <div class="shot">

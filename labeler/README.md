@@ -30,7 +30,11 @@ mit ungenauerer Synchronisation).
 ## Online-Version für Freunde (GitHub Pages)
 
 ```bash
-uv run beeflight-clips        # Clips + public-web/data/site.json (train + val, ~200 MB, ~25 min)
+# einmalig: Zufallsstichproben der Testsets ziehen
+uv run beeflight-sample --split test_same_hive --n 100 --flights outputs/flights_chiron_linked
+uv run beeflight-sample --split test_other_hive --n 100 --flights outputs/flights_chiron_linked
+
+uv run beeflight-clips        # Clips + public-web/data/site.json (Testsets, mit --split train --split val die alten Pakete)
 cd labeler
 npm run dev:web               # Test: http://127.0.0.1:4322/BeeHive/
 npm run deploy:web            # baut und pusht nach gh-pages -> https://florianditt.github.io/BeeHive/
@@ -41,10 +45,11 @@ mit Erklärung, nur anschauen) → das Paket labeln, das du ihnen nennst (≈ 50
 das Teilen-Menü des Handys (WhatsApp, Signal, Mail) mit der `.jsonl`-Datei; ohne Teilen-Funktion wird sie
 heruntergeladen. Die Pakete sind erst nach dem Tutorial freigeschaltet (oder nach der früheren Übungsrunde).
 
-**Pakete verteilen:** Training hat 6 Pakete, Validierung 2. Für drei Stimmen pro Bahn braucht jedes Paket zwei
-Helfende plus dich. Bei 4 Helfenden mit je 4 Paketen ist alles doppelt abgedeckt.
+**Pakete verteilen:** Paket 1–2 sind Test A, Paket 3–4 Test B; die Seite zeigt nur die Nummern. Für drei Stimmen
+pro Bahn braucht jedes Paket zwei Helfende plus dich. Bei 4 Helfenden mit je 2 Paketen (eins aus A, eins aus B) ist
+alles doppelt abgedeckt.
 
-**Auswerten:** Exportdateien auf der lokalen Startseite über **Exporte hochladen** einspielen (oder von Hand nach `labels/votes/` legen), dann `uv run beeflight-vote`
+**Auswerten:** Exportdateien auf der lokalen Startseite über **Exporte hochladen** einspielen (oder von Hand nach `labels/votes/` legen), dann `uv run beeflight-vote` (Test-Stimmen erst nach dem Einfrieren mit `--test`)
 (Mehrheitsregel und Ausgabe siehe [docs/labeling.md](../docs/labeling.md#mehrere-labelnde)).
 
 Die früheren Übungsbahnen (`labels/practice.json`) und die Tutorial-Bahnen kommen in keinem Paket vor; eine

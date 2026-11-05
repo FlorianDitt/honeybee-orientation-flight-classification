@@ -77,7 +77,7 @@ erkennbar ist.
 3. **Zweitlabeln** nach ≥ 1 Woche: `uv run beeflight-sample --recheck 50`, in der App „Zweitlabeln (blind)“.
    Daraus Cohen's κ berichten.
 4. Labels liegen in `labels/<split>.jsonl`, je Zeile Klasse, Flags, Notiz und die komplette Bahn.
-   Test-Bahnen erst nach dem Einfrieren des Modells labeln.
+   Test-Bahnen erst nach dem Einfrieren des Modells selbst labeln und auswerten (siehe unten).
 
 ## Mehrere Labelnde
 
@@ -89,6 +89,13 @@ Die frühere Übungsrunde verglich die Helfenden mit meiner Meinung, das passt n
 
 Die Bahnen sind in Pakete zu etwa 50 aufgeteilt (gleiche gemischte Reihenfolge wie die Warteschlange). Jedes Paket
 bekommt zwei Helfende, zusammen mit meinen Labels sind das **drei Stimmen pro Bahn**.
+
+**Online gelabelt werden seit dem 05.11.2026 die Testsets** (je 100 Bahnen als reine Zufallsstichprobe, Test A =
+Pakete 1–2, Test B = Pakete 3–4): Ihre Labels bestimmen das berichtete Ergebnis, Training und Validierung labele ich
+selbst weiter. Die Helfenden sehen nur „Paket 1–4“. Sie können schon vor dem Einfrieren labeln, weil weder ich noch
+das Modell ihre Stimmen sehen; `beeflight-vote` wertet Test-Stimmen erst mit `--test` aus, nach dem Einfrieren.
+Weil zwei Helfende mich überstimmen können und Zweitlabelnde `orientierung` häufiger vergeben, wird der Test dreifach
+berichtet: gegen die Mehrheit, gegen meine Labels und nur auf einstimmigen Bahnen.
 
 `uv run beeflight-vote` führt `labels/<split>.jsonl` (meine Labels) und alle Exporte in `labels/votes/` zusammen:
 

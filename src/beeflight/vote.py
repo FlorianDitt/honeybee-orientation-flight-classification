@@ -11,10 +11,13 @@ Votes come from labels/<split>.jsonl (the owner, local labeler) and every file i
 After a tracker change (beeflight-sample --carry), labels/id_map_<split>.json moves votes made on the old
 tracks to the new ones; votes on old tracks without a match are dropped and counted.
 
+Test votes stay out unless --test is given: nobody should see them (classes, alpha) before the model is frozen.
+
 Writes labels/final_<split>.jsonl with the geometry from the queue and prints agreement
 (Krippendorff's alpha, nominal) plus per-annotator practice score and agreement with the majority.
 
 Usage: beeflight-vote [--min-votes 3] [--owner florian]
+       beeflight-vote --test     # after freezing: also writes labels/final_test_*.jsonl
 """
 import argparse
 import json
@@ -25,6 +28,7 @@ from .splits import ROOT
 LABELS = ROOT / "labels"
 VOTES = LABELS / "votes"
 SPLITS = ["train", "val"]
+TEST_SPLITS = ["test_same_hive", "test_other_hive"]
 FLAGS = ["fragment", "unsicher"]
 
 
@@ -54,15 +58,15 @@ def new_id(r, maps):
     return r["id"]
 
 
-def collect(owner, maps=None):
+def collect(owner, maps=None, splits=SPLITS):
     """-> votes[split][id][annotator] = record, practice[annotator][id] = label
 
     Friends' votes on old tracks are moved to the new id via `maps`; the owner's labels are already carried.
     """
     maps = maps or {}
-    votes = {s: defaultdict(dict) for s in SPLITS}
+    votes = {s: defaultdict(dict) for s in splits}
     practice = defaultdict(dict)
-    for s in SPLITS:
+    for s in splits:
         path = LABELS / f"{s}.jsonl"
         if path.exists():
             for r in read_jsonl(path):
@@ -120,17 +124,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--owner", default="florian", help="annotator name of the local labels")
     ap.add_argument("--min-votes", type=int, default=3, help="tracks with fewer votes are reported, not written")
+    ap.add_argument("--test", action="store_true", help="include the test sets; only after the model is frozen")
     args = ap.parse_args()
     owner = args.owner.lower()
     maps = id_maps()
-    votes, practice = collect(owner, maps)
+    splits = SPLITS + TEST_SPLITS if args.test else SPLITS
+    votes, practice = collect(owner, maps, splits)
     answers = {p["id"]: p["answer"] for p in json.loads((LABELS / "practice.json").read_text())["items"]} \
         if (LABELS / "practice.json").exists() else {}
     # practice ids may still be old ones; to recognise practice tracks in the queue, map them too
     practice_tracks = set(answers) | {maps["train"][1].get(i) for i in answers} - {None}
 
     agree = defaultdict(lambda: [0, 0])
-    for s in SPLITS:
+    for s in splits:
         queue = {i["id"]: i for i in json.loads((LABELS / f"queue_{s}.json").read_text())["items"]}
         out, status, short = [], Counter(), 0
         for tid, by in votes[s].items():

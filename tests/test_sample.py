@@ -1,6 +1,6 @@
 import random
 
-from beeflight.sample import QUOTA, carry, draw, id_map, match, stratum, track_id
+from beeflight.sample import QUOTA, carry, draw, draw_uniform, id_map, match, stratum, track_id
 
 
 def row(start, end, straight=0.9, dur=1.0):
@@ -30,6 +30,14 @@ def test_draw_is_shuffled_and_reproducible():
     b, _ = draw(items, 100, random.Random(1))
     assert [i["id"] for i in a] == [i["id"] for i in b]
     assert len({i["stratum"] for i in a[:10]}) > 1
+
+
+def test_draw_uniform_keeps_the_real_mix():
+    items = [{"id": f"{k}{i}", "stratum": k} for k, n in (("dep_curvy", 100), ("other", 900)) for i in range(n)]
+    queue, take = draw_uniform(items, 200, random.Random(0))
+    assert len({i["id"] for i in queue}) == 200 and sum(take.values()) == 200
+    assert take["dep_curvy"] < 40  # 10 % of the tracks, not the 30 % quota of draw()
+    assert len(draw_uniform(items[:5], 200, random.Random(0))[0]) == 5
 
 
 def test_track_ids_are_unique_when_tracks_start_together():

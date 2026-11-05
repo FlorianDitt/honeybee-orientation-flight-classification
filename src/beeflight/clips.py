@@ -1,6 +1,6 @@
 """Export the label queues as short cropped clips for the static labeler on GitHub Pages.
 
-The full videos (about 100 MB each) cannot be hosted on Pages, so every track of the stratified sample
+The full videos (about 100 MB each) cannot be hosted on Pages, so every track of the sample
 (the first `core` items of a queue) becomes a clip of
 its own: the track plus 20 frames before and after, cropped to the wide view box of the local labeler
 and scaled down to at most 720 px. A still of the full frame serves as the overview. The clips go to
@@ -12,12 +12,16 @@ The tutorial (labels/tutorial.json: example tracks per class with an explanation
 round on the site; its tracks get clips too and are taken out of their package afterwards, so the other
 tracks keep their package.
 
+Only the chosen splits become packages, by default the two test sets: their labels decide the reported result, so
+that is where independent votes count most. Packages are just called "Paket 1", "Paket 2", ... because helpers need
+not know which set they work on; the train queue is still read for the tutorial and practice tracks.
+
 With --skip-voted, tracks that a helper already labeled (labels/votes/*.jsonl, moved to the current
 tracks through the id maps) stay out of the packages, so the packages hold only tracks they have not seen.
 
-Usage: beeflight-clips                 # train + val
-       beeflight-clips --skip-voted
-       beeflight-clips --split val --force
+Usage: beeflight-clips                 # test_same_hive + test_other_hive
+       beeflight-clips --split train --split val --skip-voted
+       beeflight-clips --force
 """
 import argparse
 import json
@@ -42,7 +46,7 @@ MARGIN_WIDE, MIN_BOX = 260, 240
 OVERVIEW = (216, 384)
 PACKAGE = 50
 PRACTICE = {"orientierung": 3, "sammelabflug": 3, "anflug": 2, "artefakt": 2}
-NAMES = {"train": "Training", "val": "Validierung"}
+TEST = ["test_same_hive", "test_other_hive"]
 
 
 def full_res(item):
@@ -173,27 +177,30 @@ def voted_ids(tracker, id_map):
     return out
 
 
-def packages(split, queue, skip):
+def packages(split, queue, skip, first=1):
     ids = [i["id"] for i in queue if i["id"] not in skip]
     n = math.ceil(len(ids) / PACKAGE)
     bounds = [round(k * len(ids) / n) for k in range(n + 1)]
-    return [{"id": f"{split}-{k + 1}", "split": split, "name": f"{NAMES[split]} {k + 1}",
+    return [{"id": f"paket-{first + k}", "split": split, "name": f"Paket {first + k}",
              "items": ids[bounds[k]:bounds[k + 1]]} for k in range(n)]
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", action="append", choices=list(NAMES), help="default: train and val")
+    ap.add_argument("--split", action="append", choices=["train", "val", *TEST], help="splits that become packages (default: both test sets)")
     ap.add_argument("--force", action="store_true", help="re-encode existing clips")
     ap.add_argument("--workers", type=int, default=3, help="parallel videos (about 1 GB RAM each)")
     ap.add_argument("--skip-voted", action="store_true", help="leave tracks that helpers already labeled out of the packages")
     args = ap.parse_args()
-    splits = args.split or list(NAMES)
+    splits = args.split or TEST
+    known = list(dict.fromkeys(["train", "val", *splits]))
     (WEB / "clips").mkdir(parents=True, exist_ok=True)
     (WEB / "data").mkdir(exist_ok=True)
 
     queues, trackers, id_map = {}, set(), {}
-    for s in NAMES:
+    for s in known:
+        if not (LABELS / f"queue_{s}.json").exists():
+            raise SystemExit(f"labels/queue_{s}.json missing (beeflight-sample --split {s} ...)")
         q = json.loads((LABELS / f"queue_{s}.json").read_text())
         queues[s] = q["items"][:q.get("core", len(q["items"]))]  # online only the stratified sample
         trackers.add(q.get("tracker", "background-v3"))
@@ -203,24 +210,24 @@ def main():
             d = json.loads(path.read_text())
             id_map.setdefault(d["from"], {}).update(d["map"])
     if len(trackers) > 1:
-        raise SystemExit(f"train and val queues come from different trackers: {sorted(trackers)}")
+        raise SystemExit(f"queues come from different trackers: {sorted(trackers)}")
     tracker = trackers.pop()
     practice = practice_ids(queues["train"])
     skip = {p["id"] for p in practice}
     tutorial = json.loads((LABELS / "tutorial.json").read_text())["items"]
     voted = voted_ids(tracker, id_map) if args.skip_voted else set()
     items, pkgs = {}, []
-    for s in NAMES:
+    for s in splits:
         for i in queues[s]:
             items[i["id"]] = {**plan(i), "split": s}
-        pkgs += packages(s, queues[s], skip | voted)
+        pkgs += packages(s, queues[s], skip | voted, first=len(pkgs) + 1)
     shown = {t["id"] for t in tutorial}
     for p in pkgs:  # the answer of a tutorial track is shown, so nobody labels it
         p["items"] = [i for i in p["items"] if i not in shown]
-    for s in NAMES:  # tutorial tracks may lie outside the online sample
+    for s in known:  # tutorial and practice tracks may lie outside the packaged splits
         full = json.loads((LABELS / f"queue_{s}.json").read_text())["items"]
         for i in full:
-            if i["id"] in shown and i["id"] not in items:
+            if i["id"] in shown | skip and i["id"] not in items:
                 items[i["id"]] = {**plan(i), "split": s}
     if missing_tut := shown - set(items):
         raise SystemExit(f"tutorial tracks not in any queue: {sorted(missing_tut)}")
@@ -228,8 +235,7 @@ def main():
 
     by_seq = {}
     for e in items.values():
-        if e["split"] in splits or e["id"] in skip:
-            by_seq.setdefault(e["seq"], []).append(e)
+        by_seq.setdefault(e["seq"], []).append(e)
     missing = [s for s in by_seq if not video_path(s).exists()]
     if missing:
         raise SystemExit(f"videos missing: {', '.join(missing)} (beeflight-splits --download ...)")
@@ -242,11 +248,11 @@ def main():
     site = {"version": 1, "tracker": tracker, "id_map": id_map, "fps": [FPS.numerator, FPS.denominator],
             "frame": [W, H], "items": items, "packages": pkgs, "practice": practice, "tutorial": tutorial}
     (WEB / "data" / "site.json").write_text(json.dumps(site, separators=(",", ":")))
-    size = sum(p.stat().st_size for p in (WEB / "clips").iterdir()) / 1e6
     used = {e["clip"].split("/")[1] for e in items.values()} | {e["still"].split("/")[1] for e in items.values()}
     stale = [p for p in (WEB / "clips").iterdir() if p.name not in used]
     for p in stale:  # clips of an earlier queue; their names may come back for other flights
         p.unlink()
+    size = sum(p.stat().st_size for p in (WEB / "clips").iterdir()) / 1e6
     print(f"{len(items)} tracks ({tracker}), {len(pkgs)} packages, {len(practice)} practice -> labeler/public-web ({size:.0f} MB)")
 
 

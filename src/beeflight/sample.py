@@ -5,6 +5,8 @@ curvy departures (orientation candidates) are over-represented, then shuffles th
 labeler cannot infer the stratum from the order. Each queue item carries the full geometry,
 so labels stay valid even if the tracker changes later.
 
+Test splits are drawn uniformly instead: the test result has to reflect the real mix of tracks.
+
 With --all the remaining tracks of the split follow the sample in random order, so the local labeler
 can go through everything; the first `core` items are the stratified sample (online packages, models).
 With --carry, labels made on an earlier tracker version are moved to the matching new tracks; those
@@ -18,11 +20,13 @@ Usage:
   beeflight-sample --split val --n 80 --all
   beeflight-sample --split train --n 300 --all --flights outputs/flights_chiron_linked \
       --carry labels/archive/background-v3/train.jsonl
+  beeflight-sample --split test_same_hive --n 100 --flights outputs/flights_chiron_linked
   beeflight-sample --recheck 50          # second pass on already labeled train tracks (Cohen's kappa)
 """
 import argparse
 import json
 import random
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -89,6 +93,12 @@ def draw(items, n, rng, forced=frozenset()):
     queue = fixed + [i for k in QUOTA for i in by[k][:take[k]]]
     rng.shuffle(queue)
     return queue, {k: take[k] + have[k] for k in QUOTA}
+
+
+def draw_uniform(items, n, rng):
+    """Plain random sample of n items, without any over-representation (test sets)."""
+    queue = rng.sample(items, min(n, len(items)))
+    return queue, dict(Counter(i["stratum"] for i in queue))
 
 
 def match(old, items, min_overlap=0.6, max_dist=6.0, max_growth=1.3):
@@ -185,7 +195,10 @@ def main():
         else:
             mapping = id_map(old_labels, items)
         carried = carry(old_labels, items, mapping, tracker)
-    queue, take = draw(items, args.n, rng, forced=set(carried))
+    if args.split.startswith("test"):
+        queue, take = draw_uniform(items, args.n, rng)
+    else:
+        queue, take = draw(items, args.n, rng, forced=set(carried))
     core = len(queue)
     if args.all:
         chosen = {i["id"] for i in queue}

@@ -28,8 +28,9 @@ const missing = rows.filter((r) => !r.ready);
 const tracker = readQueueTracker("train");
 const votes = readVoteFiles();
 
-// what to do next: the first split whose stratified sample is not done yet
-const next = ready.find((r) => r.split !== "recheck" && r.coreDone < r.core);
+// what to do next: the first split whose sample is not done yet; test only on purpose, after freezing the model
+const isTest = (split: string) => split.startsWith("test");
+const next = ready.find((r) => r.split !== "recheck" && !isTest(r.split) && r.coreDone < r.core);
 const pct = (a: number, n: number) => (n ? Math.round((100 * a) / n) : 0);
 
 // tools, with their state where it is cheap to read
@@ -113,6 +114,7 @@ uv run beeflight-sample --split val --n 80 --all --flights outputs/flights_chiro
             </div>
             <div class="big">{r.coreDone}<span> / {r.core} Stichprobe</span></div>
             <div class="bar"><div style={`width:${pct(r.coreDone, r.core)}%`} /></div>
+            {isTest(r.split) && <div class="rest"><b>Erst nach dem Einfrieren des Modells labeln</b></div>}
             <div class="rest">{r.total > r.core ? `${r.done} von allen ${r.total} Bahnen gelabelt` : `${r.done} gelabelt`}</div>
 
             {r.split !== "recheck" && labeled > 0 && (

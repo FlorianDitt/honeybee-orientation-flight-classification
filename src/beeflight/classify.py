@@ -21,14 +21,19 @@ track, since the zones are defined by the first and last point. So every pretrai
 Augmentation (training only, docs/methode.md): horizontal mirror, rotation +-10 deg, scale 0.9-1.1, random crop
 of start and end (simulates fragments).
 
-Learning curve: 25 / 50 / 100 / all hand labels, each with several seeds (stratified subsets).
-Every run is written to outputs/runs/<group>/<model>_n<size>_s<seed>.json (config, seed, git hash, metrics);
-the summary with 95 % cluster-bootstrap intervals over validation sequences goes to outputs/runs/<group>/summary.md.
+Learning curve: 25 / 50 / 100 / 200 / all hand labels, each with several seeds (stratified subsets).
+Every run is written to outputs/runs/<group>/<model>_n<size>_s<seed>.json (config, seed, git hash, labels hash,
+metrics); the summary with 95 % cluster-bootstrap intervals over validation sequences goes to
+outputs/runs/<group>/summary.md. Pretrained encoders only depend on the frozen tracks and the settings, so all groups
+share them in outputs/runs/pretrained/.
 
-Usage: beeflight-classify [--seeds 5] [--sizes 25 50 100 0] [--labels own|final] [--models rule gbm gru ...]
-       (size 0 = all labels)
+Restarting with the same --group continues an aborted experiment: runs already written with the same labels are kept.
+
+Usage: beeflight-classify [--seeds 5] [--sizes 25 50 100 200 0] [--labels own|final] [--models rule gbm gru ...]
+       (size 0 = all labels; also started from the local labeler, page /training)
 """
 import argparse
+import hashlib
 import json
 import subprocess
 import time
@@ -296,7 +301,7 @@ def subset(train, size, seed):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, default=5)
-    ap.add_argument("--sizes", type=int, nargs="+", default=[25, 50, 100, 0])
+    ap.add_argument("--sizes", type=int, nargs="+", default=[25, 50, 100, 200, 0])
     ap.add_argument("--labels", choices=["own", "final"], default="own")
     ap.add_argument("--models", nargs="+", choices=MODELS, default=MODELS)
     ap.add_argument("--pre-epochs", type=int, default=30)
@@ -325,10 +330,24 @@ def main():
     log(f"git {githash}, labels {args.labels}: train {len(train)} {dict(Counter(CLASSES[t['y']] for t in train))}, "
         f"val {len(val)} {dict(Counter(CLASSES[t['y']] for t in val))}")
     results = []
+    labels_hash = hashlib.sha256(json.dumps(sorted((t["id"], t["y"]) for t in train + val)).encode()).hexdigest()[:12]
+
+    def cached(model, size, seed):
+        """Keep a run of an earlier, aborted start if it used the same labels."""
+        path = group / f"{model}_n{size}_s{seed}.json"
+        if not path.exists():
+            return False
+        res = json.loads(path.read_text())
+        if res.get("labels_hash") != labels_hash:
+            return False
+        results.append(res)
+        log(f"  {model:12s} size {size or 'all'} seed {seed}: already done")
+        return True
 
     def record(model, size, seed, pred, extra=None):
         m = metrics(yv, pred)
         res = {"model": model, "size": size, "seed": seed, "n_train": n_train, "labels": args.labels, "git": githash,
+               "labels_hash": labels_hash,
                "config": {**vars(args), **(extra or {})}, "val": m,
                "predictions": {t["id"]: CLASSES[int(q)] for t, q in zip(val, pred)}}
         (group / f"{model}_n{size}_s{seed}.json").write_text(json.dumps(res, indent=1))
@@ -339,7 +358,7 @@ def main():
 
     # rule baseline: no learning curve for the fixed one, the tuned one is fitted on each training subset
     n_train = len(train)
-    if "rule_fixed" in args.models:
+    if "rule_fixed" in args.models and not cached("rule_fixed", 0, 0):
         record("rule_fixed", 0, 0, np.array([rule_predict(t) for t in val]), {"straight": 0.5, "dur": 0.4})
     grid = [(s, d) for s in np.arange(0.2, 0.95, 0.05) for d in np.arange(0.1, 1.6, 0.1)]
 
@@ -357,7 +376,7 @@ def main():
             for kind, cols in (("full", cols_of["gru"]), ("shape", cols_of["gru_shape"])):
                 if (kind == "full" and "gru" not in gru_models) or (kind == "shape" and "gru_shape" not in gru_models):
                     continue
-                path = group / f"pretrained_{kind}_s{seed}.pt"
+                path = RUNS / "pretrained" / f"{kind}_s{seed}_e{args.pre_epochs}.pt"
                 torch.manual_seed(seed)
                 net = Net(len(cols), len(SELF))
                 if path.exists():
@@ -366,6 +385,7 @@ def main():
                     t0 = time.time()
                     log(f"pretrain {kind} seed {seed}")
                     fit_gru(net, unlabeled, cols, scaler, seed, args.pre_epochs, 2e-3, (0.5, 1.0), batch=64, log=log)
+                    path.parent.mkdir(exist_ok=True)
                     torch.save(net.state_dict(), path)
                     log(f"  done in {time.time() - t0:.0f} s")
                 pre[kind, seed] = net.state_dict()
@@ -376,24 +396,27 @@ def main():
             n_train = len(tr)
             ys = np.array([t["y"] for t in tr])
             log(f"size {size or 'all'} (n={n_train}) seed {seed}")
-            if "rule" in args.models:
+            if "rule" in args.models and not cached("rule", size, seed):
                 acc = [(metrics(ys, [rule_predict(t, s, d) for t in tr])["macro_f1"], s, d) for s, d in grid]
                 _, s, d = max(acc)
                 record("rule", size, seed, np.array([rule_predict(t, s, d) for t in val]),
                        {"straight": float(s), "dur": float(d)})
-            if {"logreg", "gbm"} & set(args.models):
+            todo = {m for m in ("logreg", "gbm") if m in args.models and not cached(m, size, seed)}
+            if todo:
                 X = np.array([feature_vector(t) for t in tr], float)
                 Xv = np.array([feature_vector(t) for t in val], float)
                 cnt = np.bincount(ys, minlength=4).clip(1, None)
                 sw = (len(ys) / (4 * cnt))[ys]
-                if "logreg" in args.models:
+                if "logreg" in todo:
                     lr = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=2000, class_weight="balanced"))
                     record("logreg", size, seed, lr.fit(X, ys).predict(Xv))
-                if "gbm" in args.models:
+                if "gbm" in todo:
                     gb = GradientBoostingClassifier(n_estimators=200, max_depth=2, learning_rate=0.05, subsample=0.8,
                                                     random_state=seed)
                     record("gbm", size, seed, gb.fit(X, ys, sample_weight=sw).predict(Xv))
             for model in gru_models:
+                if cached(model, size, seed):
+                    continue
                 cols = cols_of[model]
                 torch.manual_seed(seed)
                 net = Net(len(cols), len(SELF))

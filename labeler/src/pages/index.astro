@@ -38,6 +38,7 @@ const evalTotal = EVAL_TRACKERS.length * PER_TRACKER;
 const poseQueue = readPoseQueue();
 const poseDone = poseQueue ? [...readPose().keys()].filter((id) => poseQueue.items.some((i) => i.id === id)).length : 0;
 const tools = [
+  { href: "/training", name: "Klassifikator trainieren", text: "Training starten und die Ergebnisse auf Validierung live verfolgen" },
   { href: "/compare", name: "Labels vergleichen", text: "Deine Labels und die Exporte der Helfenden nebeneinander, mit Mehrheitsergebnis" },
   { href: "/tracker", name: "Tracker vergleichen", text: "Dasselbe Video zweimal, links und rechts je ein Tracker" },
   { href: "/bewertung", name: "Tracker bewerten", text: "Blind: korrekt, Bruchstück, Bienenwechsel, keine Biene",

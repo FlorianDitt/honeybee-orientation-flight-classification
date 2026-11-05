@@ -91,6 +91,8 @@ src/pages/index.astro            lokal: Übersicht, Fortschritt pro Split
 src/pages/label/[split].astro    lokal: Label-Ansicht mit Originalvideo
 src/pages/api/[split]/labels.ts  lokal: GET/POST/DELETE Labels
 src/pages/video/[seq].ts         lokal: Video-Streaming mit HTTP-Range (Springen in 100-MB-Dateien)
+src/pages/training.astro         lokal: beeflight-classify starten, stoppen, fortsetzen, Ergebnisse live
+src/lib/training.ts              lokal: Trainingsprozess und Auswertung der Läufe in outputs/runs/
 src/lib/webstore.ts              online: localStorage, Export/Import
 web/pages/index.astro            online: Name, Tutorial, Pakete, Senden
 web/pages/label.astro            online: Label-Ansicht mit Clips (?p=<paket>|practice)

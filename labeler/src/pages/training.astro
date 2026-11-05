@@ -1,0 +1,208 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { CLASSES, readLabels } from "../lib/store";
+
+const count = (split: "train" | "val") => {
+  const c = Object.fromEntries(CLASSES.map((k) => [k, 0]));
+  const labels = readLabels(split);
+  for (const l of labels.values()) c[l.label] += 1;
+  return { n: labels.size, c };
+};
+const train = count("train");
+const val = count("val");
+---
+
+<Layout title="Training · Bienenflug">
+  <main>
+    <a class="back" href="/">← Übersicht</a>
+    <h1>Klassifikator trainieren</h1>
+    <p class="sub">Trainiert alle Modelle auf Training und misst sie auf Validierung. Die Testsets bleiben unberührt.</p>
+
+    <section class="panel">
+      <div class="facts">
+        <div><b>{train.n}</b><span>Training</span><small>{CLASSES.map((k) => `${k} ${train.c[k]}`).join(" · ")}</small></div>
+        <div><b>{val.n}</b><span>Validierung</span><small>{CLASSES.map((k) => `${k} ${val.c[k]}`).join(" · ")}</small></div>
+      </div>
+      <div class="form">
+        <label>Umfang
+          <select id="preset">
+            <option value="full">Hauptlauf: 25 / 50 / 100 / 200 / alle Labels, 5 Seeds (einige Stunden)</option>
+            <option value="quick">Kurztest: 25 Labels, 1 Seed (ein paar Minuten)</option>
+            <option value="light">Nur Baselines: ohne GRU, 25 Labels, 1 Seed (etwa 1 Minute)</option>
+          </select>
+        </label>
+        <label>Labels
+          <select id="labels">
+            <option value="own">Meine Labels</option>
+            <option value="final" id="final-option" disabled>Mehrheitslabels (noch nicht vorhanden)</option>
+          </select>
+        </label>
+        <button id="start" class="primary">Training starten</button>
+        <button id="stop" class="danger" hidden>Stoppen</button>
+      </div>
+      <p id="notes" class="notes"></p>
+      <p id="error" class="error" hidden></p>
+    </section>
+
+    <section id="current" hidden>
+      <div class="head">
+        <label class="pick">Lauf <select id="group"></select></label>
+        <span id="state" class="state"></span>
+        <button id="resume" hidden>Fortsetzen</button>
+      </div>
+      <div class="bar"><div id="bar" /></div>
+      <p id="count" class="count"></p>
+      <div class="scroll"><table id="table"></table></div>
+      <p class="legend">Macro-F1, darunter Recall Orientierung, Mittel über die fertigen Seeds. Fett: bestes Modell je Spalte.
+        Abstände unter etwa 0,08 sind bei 104 Val-Bahnen nicht belastbar.</p>
+      <details id="summary-box" hidden><summary>Zusammenfassung mit Konfidenzintervallen</summary><pre id="summary"></pre></details>
+      <details open><summary>Log</summary><pre id="log"></pre></details>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const NAMES: Record<string, string> = { rule_fixed: "Regel (Vorstudie)", rule: "Regel (auf Train gewählt)", logreg: "Logistische Regression",
+    gbm: "Gradient Boosting", gru: "GRU, vortrainiert", gru_scratch: "GRU ohne Vortraining", gru_shape: "GRU nur Form" };
+  const STATES: Record<string, string> = { running: "läuft", done: "fertig", aborted: "abgebrochen" };
+  const fmt = (x: number) => x.toFixed(3).replace(".", ",");
+  let selected: string | undefined;
+  let timer: number | undefined;
+
+  function error(text = "") {
+    $("error").textContent = text;
+    $("error").hidden = !text;
+  }
+
+  async function post(body: object) {
+    error();
+    const res = await fetch("/api/training", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const r = await res.json();
+    if (!res.ok) error(r.error);
+    return r;
+  }
+
+  function renderTable(t: any) {
+    const best = Object.fromEntries(t.sizes.map((n: number) => [n, Math.max(...t.rows.map((r: any) => r.cells[n]?.f1 ?? -1))]));
+    const el = $("table");
+    el.replaceChildren();
+    const head = el.appendChild(document.createElement("tr"));
+    for (const h of ["Modell", ...t.sizes.map((n: number) => `${n} Labels`)]) head.appendChild(document.createElement("th")).textContent = h;
+    for (const r of t.rows) {
+      const tr = el.appendChild(document.createElement("tr"));
+      tr.appendChild(document.createElement("td")).textContent = NAMES[r.model] ?? r.model;
+      for (const n of t.sizes) {
+        const td = tr.appendChild(document.createElement("td"));
+        const c = r.model === "rule_fixed" ? (r.fixed && { f1: r.fixed.macro_f1, recall: r.fixed.recall_orientierung, seeds: 0 }) : r.cells[n];
+        if (!c) { td.textContent = "–"; td.className = "none"; continue; }
+        const f = td.appendChild(document.createElement("b"));
+        f.textContent = fmt(c.f1);
+        if (r.model !== "rule_fixed" && c.f1 === best[n]) td.className = "best";
+        td.appendChild(document.createElement("small")).textContent = fmt(c.recall) + (c.seeds ? ` · ${c.seeds} Seed${c.seeds > 1 ? "s" : ""}` : " · feste Schwellen");
+      }
+    }
+  }
+
+  async function refresh() {
+    const s = await (await fetch(`/api/training${selected ? `?group=${encodeURIComponent(selected)}` : ""}`)).json();
+    $("start").hidden = !!s.active;
+    $("stop").hidden = !s.active;
+    const finalOpt = $<HTMLOptionElement>("final-option");
+    finalOpt.disabled = !s.hasFinal;
+    finalOpt.textContent = s.hasFinal ? "Mehrheitslabels (beeflight-vote)" : "Mehrheitslabels (noch nicht vorhanden)";
+    const notes = [`Vortraining: ${s.pretrained} von 10 Modellen gespeichert${s.pretrained < 10 ? ", der Rest kostet beim GRU je etwa 15 Minuten" : ", wird nicht wiederholt"}.`];
+    if (s.memGb !== null) notes.push(`Freier Arbeitsspeicher: ${s.memGb.toFixed(1).replace(".", ",")} GB${s.memGb < 4 ? ". Knapp: Vor einem langen Lauf besser Browser-Tabs und PyCharm schließen." : "."}`);
+    notes.push("Das Training läuft als eigener Prozess weiter, auch wenn du diese Seite oder den Server schließt.");
+    $("notes").textContent = notes.join(" ");
+
+    const box = $<HTMLSelectElement>("group");
+    const options = s.groups.join("|");
+    if (box.dataset.options !== options) {
+      box.dataset.options = options;
+      box.replaceChildren(...s.groups.map((g: string) => new Option(g, g)));
+    }
+    $("current").hidden = !s.group;
+    if (!s.group) return;
+    box.value = s.group;
+    $("state").textContent = STATES[s.state];
+    $("state").dataset.state = s.state;
+    $("resume").hidden = !s.canResume;
+    const pct = s.total ? Math.min(100, (100 * s.done) / s.total) : 0;
+    $("bar").style.width = `${pct}%`;
+    $("count").textContent = s.state === "running" && s.total && s.done >= s.total
+      ? "Alle Einzelläufe fertig, die Konfidenzintervalle werden berechnet (ein paar Minuten)."
+      : s.total ? `${s.done} von ${s.total} Einzelläufen fertig` : `${s.done} Einzelläufe fertig`;
+    renderTable(s.table);
+    $("summary-box").hidden = !s.summary;
+    $("summary").textContent = s.summary ?? "";
+    $("log").textContent = s.log;
+  }
+
+  $("start").addEventListener("click", async () => {
+    const preset = $<HTMLSelectElement>("preset").value;
+    if (preset === "full" && !confirm("Hauptlauf starten? Die CPU ist dann einige Stunden ausgelastet.")) return;
+    const r = await post({ action: "start", preset, labels: $<HTMLSelectElement>("labels").value });
+    if (r.ok) selected = r.group;
+    refresh();
+  });
+  $("stop").addEventListener("click", async () => {
+    if (!confirm("Training wirklich stoppen? Fertige Einzelläufe bleiben erhalten.")) return;
+    await post({ action: "stop" });
+    setTimeout(refresh, 800);
+  });
+  $("resume").addEventListener("click", async () => {
+    await post({ action: "start", resume: selected ?? $<HTMLSelectElement>("group").value });
+    refresh();
+  });
+  $("group").addEventListener("change", () => {
+    selected = $<HTMLSelectElement>("group").value;
+    refresh();
+  });
+  refresh();
+  timer = window.setInterval(refresh, 5000);
+  window.addEventListener("beforeunload", () => clearInterval(timer));
+</script>
+
+<style>
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 20px 64px; }
+  .back { color: var(--muted); text-decoration: none; font-size: 14px; }
+  h1 { font-size: 30px; margin: 10px 0 4px; letter-spacing: -.02em; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  section { margin-top: 20px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; }
+  .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .facts div { display: flex; flex-direction: column; }
+  .facts b { font-size: 30px; line-height: 1.1; }
+  .facts span { font-weight: 600; font-size: 14px; }
+  .facts small { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 18px; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  select { font: inherit; font-size: 14px; font-weight: 400; color: var(--ink); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; max-width: 100%; }
+  button { font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  button[hidden] { display: none; }
+  .primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .danger { border-color: #e4a8a2; color: #b42318; }
+  .notes { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 14px 0 0; }
+  .error { color: #b42318; font-size: 14px; margin: 10px 0 0; }
+  .head { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .state { font-size: 13px; font-weight: 600; border-radius: 999px; padding: 5px 12px; background: var(--panel); }
+  .state[data-state="running"] { background: #fff4e5; color: #8a5a00; }
+  .state[data-state="done"] { background: #e9f4ee; color: #1f6b43; }
+  .state[data-state="aborted"] { background: #fef3f2; color: #b42318; }
+  .bar { height: 8px; background: var(--panel); border-radius: 4px; overflow: hidden; margin-top: 14px; }
+  .bar div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+  .count { font-size: 13px; color: var(--muted); margin: 6px 0 14px; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  :global(#table th) { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  :global(#table td) { padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  :global(#table td b) { display: block; font-weight: 500; }
+  :global(#table td.best b) { font-weight: 800; }
+  :global(#table td.none) { color: var(--muted); }
+  :global(#table small) { color: var(--muted); font-size: 11.5px; }
+  .legend { color: var(--muted); font-size: 12.5px; margin: 10px 0 16px; }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+  pre { background: var(--panel); padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 12px; font-family: ui-monospace, monospace; margin: 8px 0 0; }
+</style>

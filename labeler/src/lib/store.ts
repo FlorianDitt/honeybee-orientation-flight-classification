@@ -7,7 +7,8 @@ export const ROOT = resolve(process.env.BEEHIVE_ROOT ?? resolve(process.cwd(), "
 export const LABELS_DIR = resolve(ROOT, "labels");
 export const VIDEO_DIR = resolve(ROOT, "data", "thehiveisreal", "videos");
 
-export const SPLITS = ["train", "val", "recheck", "test_same_hive", "test_other_hive"] as const;
+// recheck / recheck_val: blind second pass on labeled train / val tracks, only their own labels are read
+export const SPLITS = ["train", "val", "recheck", "recheck_val", "test_same_hive", "test_other_hive"] as const;
 export type Split = (typeof SPLITS)[number];
 export const CLASSES = ["orientierung", "sammelabflug", "anflug", "artefakt"] as const;
 export const FLAGS = ["fragment", "unsicher"] as const;

@@ -22,6 +22,9 @@ Usage:
       --carry labels/archive/background-v3/train.jsonl
   beeflight-sample --split test_same_hive --n 100 --flights outputs/flights_chiron_linked
   beeflight-sample --recheck 50          # second pass on already labeled train tracks (Cohen's kappa)
+  beeflight-sample --recheck 50 --recheck-split val --force ids.json --seed 1107
+      # blind second pass on val -> split recheck_val; the ids in ids.json (JSON list) are always in,
+      # mixed with random other labeled val tracks. The queue does not say which ones were forced.
 """
 import argparse
 import json
@@ -95,6 +98,18 @@ def draw(items, n, rng, forced=frozenset()):
     return queue, {k: take[k] + have[k] for k in QUOTA}
 
 
+def draw_recheck(done, n, rng, forced=()):
+    """n labeled ids for a blind second pass: all `forced` ids plus random others, shuffled together."""
+    forced = list(dict.fromkeys(forced))
+    missing = set(forced) - set(done)
+    if missing:
+        raise SystemExit(f"forced ids are not labeled: {sorted(missing)}")
+    others = [i for i in done if i not in set(forced)]
+    ids = forced + rng.sample(others, max(0, min(n - len(forced), len(others))))
+    rng.shuffle(ids)
+    return ids
+
+
 def draw_uniform(items, n, rng):
     """Plain random sample of n items, without any over-representation (test sets)."""
     queue = rng.sample(items, min(n, len(items)))
@@ -153,7 +168,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--split", choices=["train", "val", "test_same_hive", "test_other_hive"])
     ap.add_argument("--n", type=int, default=300)
-    ap.add_argument("--recheck", type=int, help="draw N labeled train tracks for a blind second pass")
+    ap.add_argument("--recheck", type=int, help="draw N labeled tracks for a blind second pass")
+    ap.add_argument("--recheck-split", choices=["train", "val"], default="train",
+                    help="labels to recheck; val goes to the split recheck_val")
+    ap.add_argument("--force", type=Path, help="JSON list of ids that are always in the recheck sample")
     ap.add_argument("--all", action="store_true", help="append all remaining tracks after the sample")
     ap.add_argument("--carry", type=Path, help="labels of an earlier tracker version to move to the new tracks")
     ap.add_argument("--flights", type=Path, default=FLIGHTS, help="tracker output to draw from")
@@ -163,14 +181,20 @@ def main():
     LABELS.mkdir(exist_ok=True)
 
     if args.recheck:
-        done = [json.loads(line)["id"] for line in (LABELS / "train.jsonl").read_text().splitlines() if line]
-        train = json.loads((LABELS / "queue_train.json").read_text())
-        queue_train = {i["id"]: i for i in train["items"]}
-        ids = rng.sample(done, min(args.recheck, len(done)))
-        out = {"split": "recheck", "seed": args.seed, "tracker": train.get("tracker", TRACKER),
-               "items": [queue_train[i] for i in ids]}
-        (LABELS / "queue_recheck.json").write_text(json.dumps(out))
-        print(f"recheck queue: {len(ids)} tracks -> labels/queue_recheck.json")
+        src = args.recheck_split
+        name = "recheck" if src == "train" else f"recheck_{src}"
+        target = LABELS / f"queue_{name}.json"
+        if target.exists() or (LABELS / f"{name}.jsonl").exists():
+            raise SystemExit(f"{target} or labels/{name}.jsonl exists; move it away on purpose to draw a new sample")
+        done = [json.loads(line)["id"] for line in (LABELS / f"{src}.jsonl").read_text().splitlines() if line]
+        queue = json.loads((LABELS / f"queue_{src}.json").read_text())
+        by_id = {i["id"]: i for i in queue["items"]}
+        forced = json.loads(args.force.read_text()) if args.force else []
+        ids = draw_recheck(done, args.recheck, rng, forced)
+        out = {"split": name, "seed": args.seed, "tracker": queue.get("tracker", TRACKER),
+               "items": [by_id[i] for i in ids]}
+        target.write_text(json.dumps(out))
+        print(f"recheck queue: {len(ids)} {src} tracks -> labels/{target.name}")
         return
 
     target = LABELS / f"queue_{args.split}.json"

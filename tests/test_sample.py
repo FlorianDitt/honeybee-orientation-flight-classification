@@ -1,6 +1,8 @@
 import random
 
-from beeflight.sample import QUOTA, carry, draw, draw_uniform, id_map, match, stratum, track_id
+import pytest
+
+from beeflight.sample import QUOTA, carry, draw, draw_recheck, draw_uniform, id_map, match, stratum, track_id
 
 
 def row(start, end, straight=0.9, dur=1.0):
@@ -79,3 +81,18 @@ def test_id_map_gives_each_new_track_to_one_old_track_and_carry_follows_it():
     out = carry([label], [new], mapping, "new")
     assert list(out) == [new["id"]] and out[new["id"]]["label"] == "anflug"
     assert out[new["id"]]["tracker"] == "new" and out[new["id"]]["carried_from"]["id"] == b["id"]
+
+
+def test_draw_recheck_keeps_forced_ids_hidden_among_others():
+    done = [f"v{i}" for i in range(100)]
+    forced = ["v3", "v50", "v99"]
+    ids = draw_recheck(done, 20, random.Random(0), forced)
+    assert len(ids) == 20 and len(set(ids)) == 20 and set(forced) <= set(ids) <= set(done)
+    assert ids[:3] != forced  # shuffled together, the order does not give them away
+    assert ids == draw_recheck(done, 20, random.Random(0), forced)
+    assert len(draw_recheck(done, 20, random.Random(0))) == 20
+
+
+def test_draw_recheck_rejects_unlabeled_forced_ids():
+    with pytest.raises(SystemExit):
+        draw_recheck(["a", "b"], 2, random.Random(0), ["c"])

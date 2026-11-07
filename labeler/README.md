@@ -84,7 +84,8 @@ weißes Quadrat der Startpunkt. Rechts oben das Gesamtbild mit dem Ausschnitt. A
 Weil jedes Label die Bahn selbst enthält, bleiben die Labels gültig, auch wenn der Tracker später ausgetauscht wird
 (z. B. durch den gelernten Detektor). Speichern schreibt die Datei atomar neu; `labels/` gehört ins Git.
 
-Der Split `recheck` (blindes Zweitlabeln für Cohen's κ) sieht die Labels aus `train` nicht.
+Der Split `recheck` (blindes Zweitlabeln für Cohen's κ) sieht die Labels aus `train` nicht, ebenso `recheck_val`
+(`beeflight-sample --recheck 50 --recheck-split val`) die aus `val`.
 
 ## Aufbau
 
@@ -96,8 +97,6 @@ src/pages/index.astro            lokal: Übersicht, Fortschritt pro Split
 src/pages/label/[split].astro    lokal: Label-Ansicht mit Originalvideo
 src/pages/api/[split]/labels.ts  lokal: GET/POST/DELETE Labels
 src/pages/video/[seq].ts         lokal: Video-Streaming mit HTTP-Range (Springen in 100-MB-Dateien)
-src/pages/training.astro         lokal: beeflight-classify starten, stoppen, fortsetzen, Ergebnisse live
-src/lib/training.ts              lokal: Trainingsprozess und Auswertung der Läufe in outputs/runs/
 src/lib/webstore.ts              online: localStorage, Export/Import
 web/pages/index.astro            online: Name, Tutorial, Pakete, Senden
 web/pages/label.astro            online: Label-Ansicht mit Clips (?p=<paket>|practice)

@@ -91,7 +91,7 @@ ul.d li { margin-bottom: 7px; }
   <div class="step"><div class="n">1</div><b>Tracking</b><span>Hintergrundmodell, Hungarian-Zuordnung, Fragmente verbinden</span><code>beeflight-tracks</code></div>
   <div class="step"><div class="n">2</div><b>Selbst-Labels</b><span>Start/Ziel am Brett, Geradheit, Windung → stratifizierte Stichprobe</span><code>beeflight-sample</code></div>
   <div class="step"><div class="n">3</div><b>Handlabels</b><span>Web-App, 4 Klassen, 3 Stimmen pro Bahn, Mehrheit entscheidet</span><code>labeler/ · beeflight-vote</code></div>
-  <div class="step"><div class="n">4</div><b>Modell</b><span>GRU auf der Bahn vs. Krümmungs-Baseline, Macro-F1</span><code>PyTorch</code></div>
+  <div class="step"><div class="n">4</div><b>Modell</b><span>ResNet auf der Bahn vs. Krümmungs-Baseline, Balanced Accuracy</span><code>PyTorch</code></div>
   <div class="step"><div class="n">5</div><b>Indikator</b><span>Anteil Orientierungsflüge pro Sequenz über die Zeit</span><code>beeflight-run</code></div>
 </div>
 
@@ -152,7 +152,7 @@ ul li { margin-bottom: 6px; }
   <div class="card"><div class="k">Flugbahnen</div><div class="v">4923</div><div class="s">Training + Validierung, Stock A, 34,5 min</div></div>
   <div class="card"><div class="k">Kurvige Abflüge</div><div class="v">168</div><div class="s">plus 677 Brett → Brett (Schleifen oder kurze Hüpfer)</div></div>
   <div class="card"><div class="k">Handlabels</div><div class="v">165 <span style="font-size:16px;color:var(--muted);font-weight:400">/ 380</span></div><div class="s">Ziel: 3 Stimmen pro Bahn, Krippendorffs α</div></div>
-  <div class="card todo"><div class="k">Test A / B · Macro-F1</div><div class="v">– / –</div><div class="s">GRU vs. Krümmungs-Baseline</div></div>
+  <div class="card todo"><div class="k">Test A / B · Balanced Accuracy</div><div class="v">– / –</div><div class="s">ResNet vs. Krümmungs-Baseline</div></div>
 </div>
 </div>
 
@@ -169,7 +169,7 @@ ul li { margin-bottom: 6px; }
   <h3>Nächste Schritte</h3>
   <ul>
     <li>380 Bahnen mit je 3 Stimmen labeln, α berichten</li>
-    <li>GRU gegen Baseline auf Test A und B, Indikator über die Zeit</li>
+    <li>ResNet gegen Baseline auf Test A und B, Indikator über die Zeit</li>
     <li>Gelernter Detektor gegen die restlichen Abrisse, wenn Zeit bleibt</li>
   </ul>
   <div class="ask"><strong>Offene Frage:</strong> Reicht die Bahnform, oder braucht es den Startpunkt?</div>

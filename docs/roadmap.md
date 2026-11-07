@@ -9,8 +9,8 @@ Am Ende stehen drei Dinge:
 
 1. **Ein lauffähiges System**: Video rein, pro Sequenz die klassifizierten Flugbahnen und der Anteil
    Orientierungsflüge raus (`beeflight-run <seq>`), reproduzierbar aus diesem Repository.
-2. **Eine ehrliche Auswertung**: Macro-F1 und Recall „Orientierung“ auf Test A und Test B mit
-   Konfidenzintervallen, Vergleich gegen die Regel-Baseline, Lernkurve, Domain-Shift-Analyse.
+2. **Eine ehrliche Auswertung**: Balanced Accuracy, Recall und Precision „Orientierung“ auf Test A und Test B mit
+   Konfidenzintervallen, Vergleich gegen die Regel-Baseline, Domain-Shift-Analyse.
 3. **Die Präsentation**: drei Folien, 15 min plus Fragen, mit echten Zahlen statt Platzhaltern.
 
 ```
@@ -18,7 +18,7 @@ Am Ende stehen drei Dinge:
  28.10.–03.11.    04.11.–10.11.     11.11.–17.11.      18.11.–24.11.      25.11.
  ─────────────────────────────────────────────────────────────────────────────────
  Bahnen für alle  Detektor          Modelle            Test einmal        Vortrag
- Label-Tool       Labels 300+80     Lernkurve          Folien, Proben
+ Label-Tool       Labels 300+80     Vergleich auf Val  Folien, Proben
  erste 100 Labels ▲ Gate 1          ▲ Gate 2           ▲ Freeze
 ```
 
@@ -161,19 +161,20 @@ Fragmente als eigene Kategorie mitzählen.
 
 ## Phase 4: Modelle (Woche 3)
 
-- [ ] **Datensatz-Modul**: Bahn → Tensor `(x, y, Δx, Δy, |v|, Δθ)`, normiert auf die Brettbreite,
-      Augmentierung (Spiegeln, Rotation, Abschneiden)
-- [ ] **Regel-Baseline** (Geradheit, Dauer, Startzone): Schwellen nur auf Validierung wählen
-- [ ] **Merkmals-Modell** (Gradient Boosting auf den Bahnmerkmalen)
-- [ ] **GRU**: Vortraining auf Selbst-Labels aller Bahnen, Feintuning auf Handlabels
-- [ ] **Ablation GRU nur Form** (ohne Position, Hypothese H2)
-- [ ] **Lernkurve**: 25 / 50 / 100 / 200 / 300 Handlabels, je 5 Seeds
+Modelle und Begründung in [methode.md](methode.md#5-modelle).
+
+- [x] **Baselines** (`beeflight-baselines`): Regel mit Schwellen auf Train, feste Regel, immer eine Klasse, Zufall
+- [x] **Kandidat 1: ResNet auf der Bahn** (`beeflight-resnet`)
+- [x] **Kandidat 2: DINOv2 auf Ausschnitten** (`beeflight-dinov2`)
+- [x] **Kandidaten 3 und 4: Fusion und G-Blend** (`beeflight-fusion`)
+- [x] Vergleich auf Validierung: **ResNet gewählt**, aber nicht klar besser als die Regel
+- [ ] Details des ResNet am Volltext von Fawaz et al. 2019 prüfen (arXiv 1809.04356), bevor sie zitiert werden
 - [ ] Experimente als JSON in `outputs/runs/` (Konfiguration, Seed, Git-Hash, Metriken), damit jede Zahl auf den
       Folien reproduzierbar ist
 - [ ] Zweitlabeln der 50 Bahnen, κ berechnen
 
-> **Gate 2 (Ende Woche 3):** Schlägt die GRU die Baseline auf Validierung nicht, wird trotzdem eingefroren. Dann
-> lautet das Ergebnis: Handmerkmale reichen, und die Diskussion erklärt, warum.
+> **Gate 2 (Ende Woche 3):** Schlägt das Modell die Baseline auf Validierung nicht klar, wird trotzdem eingefroren. Dann
+> lautet das Ergebnis: Die einfache Regel reicht fast, und die Diskussion erklärt, warum.
 
 ## Phase 5: Einfrieren und Test (Anfang Woche 4)
 
@@ -181,16 +182,18 @@ Fragmente als eigene Kategorie mitzählen.
 - [ ] Testsets herunterladen (`beeflight-splits --download test_same_hive`, `… test_other_hive`)
 - [ ] Zonen für Stock B aus einem einzelnen Frame setzen, nicht anhand von Ergebnissen
 - [ ] Testbahnen erzeugen und **erst jetzt** labeln (Test A: 4 Sequenzen, Test B: 21 Sequenzen)
-- [ ] **Genau eine Auswertung** pro Testset: Macro-F1, Recall Orientierung, Konfusionsmatrix,
-      95-%-KI per Cluster-Bootstrap über Sequenzen
-- [ ] **Indikator**: Anteil Orientierungsflüge pro Sequenz über die 37 min, Modell gegen Handzählung
+- [ ] **Genau eine Auswertung** pro Testset mit `beeflight-evaluate --test`: Balanced Accuracy, Recall und Precision
+      Orientierung, Konfusionsmatrix, Intervalle nach [methode.md](methode.md#6-metriken)
+      (Test B Cluster-Bootstrap, Test A Wilson und Weglassen je einer Sequenz)
+- [ ] **Indikator**: vorhergesagter gegen wahren Anteil auf der gelabelten Stichprobe, Verlauf über die 37 min aus den
+      Vorhersagen (beschreibend)
 - [ ] **Domain Shift / Monitoring** (Kursteil VIII): Verteilung der Bahnmerkmale A gegen B vergleichen
       (Geschwindigkeit, Länge, Fragmentanteil). Lässt sich der Leistungsabfall *ohne Labels* vorab erkennen?
 
 ## Phase 6: Präsentation (Woche 4)
 
 - [ ] Folie 3 mit echten Zahlen füllen: Test A, Test B, Domain Shift, Baseline-Vergleich
-- [ ] Neue Abbildungen: Konfusionsmatrix, Lernkurve, Indikator über die Zeit
+- [ ] Neue Abbildungen: Konfusionsmatrix, Indikator über die Zeit
 - [ ] Kurzer Clip: ein Orientierungsflug und ein Sammelabflug nebeneinander, langsam (als Einstieg oder für Fragen)
 - [ ] `beeflight-run` als Ein-Befehl-Demo
 - [ ] PDF exportieren, auf einem fremden Rechner testen
@@ -205,9 +208,6 @@ Fragmente als eigene Kategorie mitzählen.
 In dieser Reihenfolge:
 
 1. Bewegungskanal im Detektor
-2. Merkmals-Modell (Baseline und GRU reichen)
-3. Ablation „nur Form“
-4. Lernkurve mit 5 Seeds → 1 Seed
-5. Detektor komplett (Gate 1), dann bleibt das Hintergrundmodell
+2. Detektor komplett (Gate 1), dann bleibt das Hintergrundmodell
 
 **Nie gestrichen:** sauberer Split, einmalige Testauswertung, Konfidenzintervalle, Baseline-Vergleich.

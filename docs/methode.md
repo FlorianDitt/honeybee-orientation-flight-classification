@@ -93,30 +93,112 @@ wenn das Modell eingefroren ist.
 
 ## 5. Modelle
 
-| Modell | Eingabe | Zweck |
-|---|---|---|
-| **Regel-Baseline** | Geradheit, Dauer, Startzone | untere Schranke, das „10-Minuten-Modell“ |
-| **Merkmals-Modell** | Merkmalsvektor (Tabelle oben) → Gradient Boosting / logistische Regression | zeigt, wie weit Handmerkmale tragen |
-| **GRU** | Sequenz `(x, y, Δx, Δy, |v|, Δθ)` relativ zum Flugloch, normiert auf die Brettbreite | eigentliches Modell |
-| **GRU nur Form** | wie oben, aber ohne absolute Position (nur Δx, Δy, \|v\|, Δθ) | Ablation zu H2 |
+Die Modellwahl stützt sich nur auf drei Paper; alles andere ist unten als eigene Entscheidung markiert. Alle Kandidaten
+trainieren nur auf `labels/train.jsonl` und schreiben Vorhersagen für `beeflight-evaluate`.
 
-**Training:** Vortraining auf allen Bahnen mit Selbst-Labels (Abflug / Anflug / Kurzflug), dann Feintuning auf
-den Handlabels. Lernkurve über 25 / 50 / 100 / 200 / 300 Handlabels (Forschungsfrage 3).
+| Kandidat | Eingabe | Quelle | Befehl |
+|---|---|---|---|
+| **Regel-Baseline** | Geradheit, Dauer, Start- und Zielzone | Vergleichswert, Schwellen auf Train | `beeflight-baselines` |
+| **1. Nur Bahn: ResNet** | Sequenz `(x, y, Δx, Δy, |v|, Δθ)` relativ zum Flugloch, normiert auf die Brettbreite | Fawaz et al. 2019 | `beeflight-resnet` |
+| **2. Nur Bild: DINOv2** | 8 gleichmäßig verteilte Ausschnitte um die Biene, eingefrorenes ViT-S/14, linearer Klassifikator | Oquab et al. 2023 | `beeflight-dinov2` |
+| **3. Fusion einfach** | Merkmale aus 1 und 2 verkettet, zwei FC-Schichten | Wang et al. 2020 | `beeflight-fusion --mode concat` |
+| **4. Fusion G-Blend** | wie 3, mit Offline Gradient-Blending | Wang et al. 2020 | `beeflight-fusion --mode gblend` |
 
-**Augmentierung:** horizontale Spiegelung, kleine Rotation und Skalierung, zufälliges Abschneiden von Anfang und
-Ende (simuliert Fragmente).
+**ResNet:** drei Blöcke mit je drei Faltungen (Längen 8, 5, 3; 64 Filter), Batch-Normalisierung vor ReLU, Global Average
+Pooling. Adam mit Lernrate 0,001, Batch 16, 1500 Epochen; Lernrate halbiert nach 50 Epochen ohne besseren Trainingsverlust;
+Checkpoint nach Trainingsverlust. Jede Bahn wird auf die längste Trainingsbahn interpoliert.
+
+**DINOv2:** Rastersuche nach Anhang B.3 (13 Lernraten, 1 oder 4 Ausgabeschichten, Klassen-Token allein oder mit gemittelten
+Patch-Token), dazu Mitteln oder Verketten der Frames. SGD über 12500 Iterationen. Die Gewichte stammen nicht von Stockvideos.
+
+**G-Blend:** Gewichte `w_i = G_i / O_i² / Z` einmal berechnet, mit Genauigkeit statt Verlust gemessen (laut Paper gleich
+wirksam), auf einem Hold-out aus den Trainingslabels. Ergebnis: Bahn 0,05, Bild 0,33, Fusion 0,62.
+
+**Eigene Entscheidungen, nicht aus den Papern:**
+
+- Kanäle der Bahn (aus dem Projekt, nicht von Fawaz) und ihre Standardisierung.
+- Ausschnittgröße 64, 128 oder 224 px (auf Val gewählt: 224 px); kein Paper behandelt 30-px-Objekte.
+- Full-Batch-SGD (B.3 nennt keine Batchgröße), keine Bild-Augmentierung, ViT-S wegen CPU.
+- Fusion: Bildzweig bleibt eingefroren (Wang trainiert alle Zweige), Abbildung auf 64 Dimensionen, Optimierer des ResNet.
+- G-Blend: Hold-out aus ganzen Sequenzen (20 %), `T'` so groß wie `V`, Endmodell auf allen Trainingslabels, Vorhersage aus
+  dem Fusionskopf, `G ≤ 0` ergibt Gewicht 0, `O` nach unten begrenzt.
+
+**Nicht mehr im Modell:** GRU, Vortraining auf Selbst-Labels, Lernkurve und Augmentierung der Bahnen. Selbst-Labels dienen nur
+noch der Stichprobenziehung. Die Bahn-Interpolation verbirgt die Dauer einer Bahn; das ist eine bekannte Schwäche.
+
+**Auswahl auf Validierung (104 Bahnen, 14 Sequenzen, je 5 Seeds, Stand 06.11.2026):**
+
+| Modell | Balanced Acc. | Intervall | Recall Orient. | Precision Orient. | Anteilsfehler (PP) |
+|---|---|---|---|---|---|
+| **ResNet (gewählt)** | **0,708** | 0,66–0,76 | 0,648 | 0,506 | +1,7 |
+| DINOv2 | 0,647 | 0,54–0,74 | 0,562 | 0,514 | 0,0 |
+| Regel | 0,640 | 0,54–0,72 | 0,667 | 0,452 | +10,1 |
+| Fusion G-Blend | 0,629 | 0,53–0,71 | 0,467 | 0,458 | −4,1 |
+| Fusion einfach | 0,615 | 0,51–0,70 | 0,429 | 0,448 | −6,2 |
+
+Gewählt wird nach höchster Balanced Accuracy; eine Fusion nur, wenn sie den besten Einzelzweig schlägt. Das ResNet ist damit
+**nicht klar** besser: Gegen die Regel beträgt die Differenz +0,068 (−0,04 bis +0,19), und auf den 83 vollständigen Bahnen
+liegen beide gleichauf (0,705 gegen 0,717). Der Vorsprung kommt aus nur 21 Fragmenten. DINOv2 ist durch die Auswahl aus 312
+Einstellungen auf Val zusätzlich begünstigt. Auf dem Hold-out der Gewichtsschätzung (64 Bahnen, ein Seed, Genauigkeit) lag die
+Rangfolge umgekehrt (Bahn 0,58, Bild 0,70, Fusion 0,73), die Reihenfolge der Kandidaten ist also nicht stabil belegt.
 
 ## 6. Metriken
 
-- **Macro-F1** über die vier Klassen (Klassen sind unbalanciert: Orientierungsflüge sind selten).
-- **Recall Orientierungsflug** separat, denn das ist die Klasse, die der Indikator braucht.
-- **Konfusionsmatrix**, besonders Orientierung vs. suchender Anflug.
-- **Indikator:** geschätzter Anteil Orientierungsflüge pro Sequenz, Fehler gegen den von Hand gezählten Anteil.
-- **Tracking-Qualität:** Anteil vollständiger Bahnen (Start und Ende in `board` oder `edge`) vor und nach dem
-  gelernten Detektor.
+Festgelegt am 05.11.2026, vor jedem Blick auf Testergebnisse; Validierungsergebnisse mit Macro-F1 kannte ich da
+schon. Umgesetzt in `beeflight.metrics` und `beeflight-evaluate`. Grundlagen: Opitz (2024) für Definitionen und
+Eigenschaften der Metriken, Metrics Reloaded (Maier-Hein et al. 2024) für Empfehlungen. Metrics Reloaded ist für
+Bildanalyse geschrieben; die Übertragung auf Bahnen ist meine Entscheidung. Alles ohne Quelle ist eigene Festlegung.
 
-Alle Kennzahlen mit 95-%-Konfidenzintervall per **Cluster-Bootstrap über Sequenzen** (Bahnen derselben
-Sequenz sind nicht unabhängig).
+| Kennzahl | Rolle |
+|---|---|
+| **Balanced Accuracy** (Mittel der Klassen-Recalls, Opitz Eq. 7; Zufall = 1/4) | Hauptmetrik, auch für die Modellauswahl auf Validierung |
+| **Recall und Precision `orientierung`**, immer mit Zählwerten wie `3/4` | Schlüsselklasse. Beide nötig: Der Indikator hängt auch an den Falsch-Positiven |
+| **Accuracy** | Ergänzung, die Testsets sind Zufallsstichproben |
+| **Macro-F1** (Mittel der Klassen-F1, Opitz Eq. 10) | nachrangig, zum Vergleich mit früheren Werten |
+| **Recall und Precision aller Klassen, Konfusionsmatrix** | zeigt die schwache Klasse, besonders Orientierung vs. suchender Anflug |
+| **AUROC `orientierung` gegen Rest** | nur für Modelle mit Wahrscheinlichkeiten, nicht für die Regel; fällt als Erstes weg |
+
+**Warum nicht mehr Macro-F1:** Balanced Accuracy hängt bei gleichen Fehlerraten innerhalb der Klassen nicht von den
+Klassenanteilen ab; Train und Validierung sind geschichtet, die Testsets reine Zufallsstichproben, und der Anteil der
+Orientierungsflüge ist genau die Größe, die variieren soll. Das schützt nicht vor anderen Verschiebungen, etwa
+kurvigen Abflügen im Training oder dem Wechsel zu Stock B.
+
+**Seltene Klassen:** Eine Klasse ohne Beispiele fällt aus Balanced Accuracy und Macro-F1 heraus und wird markiert
+(Zufall dann 1/k), sie zählt nie als Recall 0. Bei weniger als 5 Beispielen bleibt der Wert drin, wird aber als „zu
+wenige Beispiele“ markiert. Dieselbe Regel gilt in jeder Bootstrap-Stichprobe, ihr Anteil mit fehlender Klasse wird
+berichtet. `orientierung` kann in den Testsets selten sein; die Intervalle werden dann breit.
+
+**Unsicherheit:** 95-%-Cluster-Bootstrap über Sequenzen (Perzentile, 2000 Wiederholungen) ab 10 Sequenzen, also für
+Validierung und Test B, weil Bahnen einer Sequenz nicht unabhängig sind. Test A hat nur 4 Sequenzen und damit nur 35
+verschiedene Stichproben: dort Wilson-Intervalle auf Klassenwerte (ignorieren die Abhängigkeit, also zu eng) und die
+Spanne beim Weglassen je einer Sequenz.
+
+**Seeds und Modellvergleich:** Alle Seeds werden ausgewertet, Mittel und Standardabweichung, keine Auswahl des besten
+Seeds. Intervalle nutzen das Seed-Mittel pro Stichprobe. Vergleiche sind Differenzen auf denselben gezogenen Bahnen.
+Hauptvergleich ist das ausgewählte Modell gegen die auf Train abgestimmte Regel, die feste Regel der Vorstudie steht
+daneben. Alles ist beschreibend, ohne p-Werte oder Signifikanzaussagen, daher ohne Korrektur für Mehrfachvergleiche.
+Die Vergleichswerte (beide Regeln, Zufall gleichverteilt und nach Trainingshäufigkeit, immer dieselbe Klasse) schreibt
+`beeflight-baselines --split <split>` nach `outputs/baselines/<split>/`; es liest als Labels nur `labels/train.jsonl`.
+
+**Indikator:** Anteil = `orientierung` / alle Bahnen außer `artefakt`, getrennt aus Labels und aus Vorhersagen.
+Berichtet werden wahrer Anteil, vorhergesagter Anteil und der vorzeichenbehaftete Fehler in Prozentpunkten pro Testset.
+Fehler pro Sequenz nur, wenn jede Sequenz mindestens 10 gelabelte Bahnen hat (Test A; in Test B sind es 1–12). Referenz
+ist die gelabelte Zufallsstichprobe, es gibt keine separate Handzählung. Die Zählwerte werden nicht korrigiert, dafür
+reicht die Falsch-Positiv-Rate aus 104 Validierungsbahnen einer Person nicht. Der Verlauf über die Aufnahme kommt aus
+den Vorhersagen auf allen Bahnen und ist rein beschreibend.
+
+**Label-Varianten im Test:** Mehrheit ist primär; gegen meine Labels und nur auf einstimmigen Bahnen sind
+Gegenproben, einstimmige Bahnen sind dabei die leichtere Teilmenge. Validierung (nur ich) und Test (Mehrheit) sind
+deshalb nicht sauber vergleichbar; der Vergleich für den Domain Shift ist A gegen B.
+
+**Fragmente (H3):** vollständig gegen Fragment nach den Zonen (`lost` an Start oder Ende), nicht nach den Flags der
+Labelnden; beschreibend.
+
+**Tracking-Qualität:** Anteil vollständiger Bahnen (Start und Ende in `board` oder `edge`), getrennt von den
+Klassifikationsmetriken.
+
+**Grenzen:** Alle Kennzahlen gelten nur für Flüge, die der Tracker gefunden hat. Test B ist ein einzelner anderer
+Stock unter anderen Bedingungen, Stock, Wetter und Kamera lassen sich nicht trennen.
 
 ## Split und Evaluationsprotokoll
 

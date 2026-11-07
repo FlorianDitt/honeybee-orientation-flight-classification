@@ -47,8 +47,8 @@ feste Kamera sie zuverlässig sieht, und genau den zeigt der Datensatz.
    *(Vorstudie: ja, mit Einschränkungen, siehe [vorstudie.md](vorstudie.md).)*
 2. **Klassifikation:** Unterscheidet ein gelerntes Trajektorien-Modell Orientierungsflüge von Sammelabflügen und
    suchenden Landeanflügen besser als eine einfache Krümmungsschwelle?
-3. **Selbst-Labels:** Wie viel leisten automatisch abgeleitete Labels (Start/Ziel auf dem Flugbrett), und wie
-   viele Handlabels braucht man zusätzlich (Lernkurve)?
+3. **Bild und Bahn:** Bringen eingefrorene Bildmerkmale (DINOv2) zusätzlich zur Bahn etwas, einzeln oder in einer
+   Fusion?
 4. **Generalisierung:** Wie stark fällt die Leistung vom selben Stock (Test A) zum fremden Stock (Test B) ab,
    und liegt das an der Bahnform oder am Tracking (anderes Holz, Licht, Abstand)?
 5. **Indikator:** Wie verändert sich der Anteil der Orientierungsflüge über die 37 min Aufnahme? (Beschreibend:
@@ -61,7 +61,7 @@ feste Kamera sie zuverlässig sieht, und genau den zeigt der Datensatz.
 - **H2:** Die Bahnform allein reicht nicht, um Orientierungsflüge von suchenden Landungen zu trennen; Start- und
   Zielpunkt sind entscheidend. Ein Modell mit Zugriff auf die Position relativ zum Flugloch schlägt ein Modell
   nur auf der Form.
-- **H3:** Ein sequenzielles Modell (GRU) schlägt die Krümmungs-Baseline vor allem bei fragmentierten Bahnen, weil
+- **H3:** Ein sequenzielles Modell (ResNet auf der Bahn) schlägt die Krümmungs-Baseline vor allem bei fragmentierten Bahnen, weil
   es Geschwindigkeits- und Richtungsverläufe nutzt und nicht nur eine Summe.
 - **H4:** Der Abfall von Test A zu Test B entsteht hauptsächlich beim Tracking (andere Bildstatistik), weniger
   beim Klassifikator (Bahnen in normierten Koordinaten).
@@ -73,8 +73,8 @@ feste Kamera sie zuverlässig sieht, und genau den zeigt der Datensatz.
   zu bekommen.
 - **Klassifikation von Sequenzen:** variable Länge, Rauschen, Lücken, Klassen, die sich nur im Verlauf
   unterscheiden.
-- **Labels ohne Handarbeit:** Start- und Zielzone liefern schwache Labels; ein kleiner Satz Handlabels deckt die
-  schwierigen Fälle ab. Das ist ein realistischer ML-System-Aufbau mit wenig Annotationsbudget.
+- **Wenig Labels:** Start- und Zielzone helfen beim Ziehen der Stichprobe; das Modell lernt aus rund 300 Handlabels.
+  Das ist ein realistischer ML-System-Aufbau mit wenig Annotationsbudget.
 - **Domain Shift:** zwei Stöcke, zwei Lichtsituationen, zwei Kamera-Abstände.
 
 ## Abgrenzung zu anderen Themen im Kurs

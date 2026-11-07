@@ -7,8 +7,7 @@ Studienarbeit WDS224 *Machine Learning System Design and Operations* (DHBW Raven
 
 Bevor junge Honigbienen Nektar und Pollen sammeln, lernen sie in **Orientierungsflügen** die Lage ihres Stocks:
 Sie fliegen Schleifen und Bögen vor dem Flugloch, statt direkt abzufliegen. Dieses Projekt erzeugt aus
-ungelabelten Flugloch-Videos automatisch Flugbahnen, leitet daraus Selbst-Labels ab (Start und Ziel der Bahn)
-und trainiert einen Trajektorien-Klassifikator, der **Orientierungsflüge**, **direkte Sammelabflüge** und
+ungelabelten Flugloch-Videos automatisch Flugbahnen und trainiert auf Handlabels einen Trajektorien-Klassifikator, der **Orientierungsflüge**, **direkte Sammelabflüge** und
 **suchende Landeanflüge** unterscheidet. Der Anteil der Orientierungsflüge über die Zeit ist ein
 nicht-invasiver Indikator für den Nachschub an neuen Sammlerinnen und damit für die Vitalität des Volkes.
 
@@ -74,6 +73,12 @@ src/beeflight/
   sample.py      stratifizierte Label-Warteschlangen
   clips.py       zugeschnittene Clips und Pakete für die Online-Version
   vote.py        Mehrheitsentscheid über alle Labelnden, Krippendorffs α
+  metrics.py     Metriken, Cluster-Bootstrap, Wilson-Intervalle
+  evaluate.py    Auswertung von Vorhersagedateien, Test nur mit --test
+  baselines.py   Regel, immer eine Klasse, Zufall
+  resnet.py      Kandidat 1: ResNet auf der Bahn (gewählt)
+  image_features.py  Kandidat 2: DINOv2 auf Ausschnitten
+  fusion.py      Kandidaten 3 und 4: Fusion und G-Blend
 labeler/         Astro-Web-App zum Handlabeln (lokal und als GitHub-Pages-Seite)
 labels/          Warteschlangen, Handlabels, votes/ (Exporte der Helfenden), final_*.jsonl
 tests/           Split-Invarianten, Bahnmerkmale, Tracker, Stichprobe, Mehrheitsentscheid

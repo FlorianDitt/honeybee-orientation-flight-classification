@@ -35,7 +35,11 @@ beeflight-sledevic = "beeflight.sledevic:main"
 beeflight-sort = "beeflight.sort:main"
 beeflight-chiron = "beeflight.chiron:main"
 beeflight-pose = "beeflight.pose:main"
-beeflight-classify = "beeflight.classify:main"
+beeflight-evaluate = "beeflight.evaluate:main"
+beeflight-baselines = "beeflight.baselines:main"
+beeflight-resnet = "beeflight.resnet:main"
+beeflight-dinov2 = "beeflight.image_features:main"
+beeflight-fusion = "beeflight.fusion:main"
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

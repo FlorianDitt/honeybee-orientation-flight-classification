@@ -106,10 +106,11 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 </Layout>
 
 <script>
-  import { BASE, exportFile, importText, load, persistent, site, store, unexported, type Site } from "../../src/lib/webstore";
+  import { BASE, exportFile, importText, load, ownMode, persistent, site, store, unexported, type Site } from "../../src/lib/webstore";
 
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   const state = load();
+  const own = ownMode();
   const nameInput = $<HTMLInputElement>("name");
   nameInput.value = state.name;
   if (!persistent) $("storage-warning").hidden = false;
@@ -192,11 +193,12 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     $("tutorial-total").textContent = String(data.tutorial?.length ?? 0);
     $("tutorial-state").textContent = state.tutorial_seen ? "✓ angesehen" : "\u00a0";
     $("tutorial").setAttribute("aria-disabled", String(!named));
-    const unlocked = named && (!!state.tutorial_seen || practiceDone);
+    const unlocked = named && (own || !!state.tutorial_seen || practiceDone);
     $("locked").hidden = unlocked;
 
     $("packages").innerHTML = "";
-    for (const p of data.packages) {
+    // owner mode shows only the own train / val packages, so no test vote comes from the owner by mistake
+    for (const p of data.packages.filter((p) => !!p.own === own)) {
       const n = p.items.filter((id) => state.labels[id]).length;
       const a = document.createElement("a");
       a.className = "card";

@@ -52,6 +52,13 @@ alles doppelt abgedeckt.
 **Auswerten:** Exportdateien auf der lokalen Startseite über **Exporte hochladen** einspielen (oder von Hand nach `labels/votes/` legen), dann `uv run beeflight-vote` (Test-Stimmen erst nach dem Einfrieren mit `--test`)
 (Mehrheitsregel und Ausgabe siehe [docs/labeling.md](../docs/labeling.md#mehrere-labelnde)).
 
+**Selbst online labeln (langsame Verbindung):** `uv run beeflight-clips --own 200 100` legt zusätzlich Pakete
+„Eigene Train 1–4“ und „Eigene Validierung 1–2“ an: die nächsten ungelabelten Bahnen der vollen Train- und
+Val-Warteschlange, in derselben Reihenfolge wie lokal. Sie erscheinen nur mit `?own` in der URL (bleibt im Browser
+gespeichert, `?own=0` beendet es); in diesem Modus sind die Testpakete ausgeblendet. Den Export **nicht** nach
+`labels/votes/` legen, sondern `uv run beeflight-own <datei.jsonl>`: schreibt die Labels mit Geometrie nach
+`labels/<split>.jsonl`, wie die lokale App, mit `"source": "online"`.
+
 Die früheren Übungsbahnen (`labels/practice.json`) und die Tutorial-Bahnen kommen in keinem Paket vor; eine
 Tutorial-Bahn wird nachträglich aus ihrem Paket genommen, die anderen Bahnen bleiben in ihrem Paket. Die Pages-Seite ist öffentlich,
 auch wenn das Repository privat ist: Den Link nur direkt weitergeben. Die Clips landen nur im Branch `gh-pages`

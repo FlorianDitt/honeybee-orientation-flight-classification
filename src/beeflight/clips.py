@@ -19,7 +19,13 @@ not know which set they work on; the train queue is still read for the tutorial 
 With --skip-voted, tracks that a helper already labeled (labels/votes/*.jsonl, moved to the current
 tracks through the id maps) stay out of the packages, so the packages hold only tracks they have not seen.
 
+With --own TRAIN VAL, the owner gets packages of their own ("Eigene Train 1", ...): the next TRAIN / VAL
+tracks of the full train / val queues that are not in labels/<split>.jsonl yet, in queue order, as the local labeler
+would serve them. They are hidden on the site unless it is opened with ?own, and `beeflight-own` writes their
+export into labels/<split>.jsonl as if they had been labeled locally (for labeling from a slow remote connection).
+
 Usage: beeflight-clips                 # test_same_hive + test_other_hive
+       beeflight-clips --own 200 100   # plus 200 train / 100 val tracks for the owner
        beeflight-clips --split train --split val --skip-voted
        beeflight-clips --force
 """
@@ -185,12 +191,25 @@ def packages(split, queue, skip, first=1):
              "items": ids[bounds[k]:bounds[k + 1]]} for k in range(n)]
 
 
+def own_packages(split, full, n, skip, first):
+    """The next n tracks the owner has not labeled yet, in queue order, as packages for the owner only."""
+    path = LABELS / f"{split}.jsonl"
+    done = {json.loads(line)["id"] for line in path.read_text().splitlines() if line.strip()} if path.exists() else set()
+    picks = [i for i in full if i["id"] not in done and i["id"] not in skip][:n]
+    pkgs = packages(split, picks, set())
+    name = {"train": "Train", "val": "Validierung"}[split]
+    for k, p in enumerate(pkgs, first):
+        p.update(id=f"own-{split}-{k - first + 1}", name=f"Eigene {name} {k - first + 1}", own=True)
+    return picks, pkgs
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--split", action="append", choices=["train", "val", *TEST], help="splits that become packages (default: both test sets)")
     ap.add_argument("--force", action="store_true", help="re-encode existing clips")
     ap.add_argument("--workers", type=int, default=3, help="parallel videos (about 1 GB RAM each)")
     ap.add_argument("--skip-voted", action="store_true", help="leave tracks that helpers already labeled out of the packages")
+    ap.add_argument("--own", nargs=2, type=int, metavar=("TRAIN", "VAL"), help="owner-only packages of the next unlabeled train / val tracks")
     args = ap.parse_args()
     splits = args.split or TEST
     known = list(dict.fromkeys(["train", "val", *splits]))
@@ -222,6 +241,16 @@ def main():
             items[i["id"]] = {**plan(i), "split": s}
         pkgs += packages(s, queues[s], skip | voted, first=len(pkgs) + 1)
     shown = {t["id"] for t in tutorial}
+    if args.own:
+        for s, n in zip(["train", "val"], args.own):
+            if n <= 0:
+                continue
+            full = json.loads((LABELS / f"queue_{s}.json").read_text())["items"]
+            picks, own = own_packages(s, full, n, skip | {t["id"] for t in tutorial}, len(pkgs) + 1)
+            for i in picks:
+                items.setdefault(i["id"], {**plan(i), "split": s})
+            pkgs += own
+            print(f"own {s}: {len(picks)} tracks in {len(own)} packages")
     for p in pkgs:  # the answer of a tutorial track is shown, so nobody labels it
         p["items"] = [i for i in p["items"] if i not in shown]
     for s in known:  # tutorial and practice tracks may lie outside the packaged splits

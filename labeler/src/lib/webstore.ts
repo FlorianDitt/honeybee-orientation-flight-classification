@@ -21,7 +21,8 @@ export interface Site {
   id_map?: Record<string, Record<string, string>>;
   fps: [number, number];
   items: Record<string, SiteItem>;
-  packages: { id: string; split: string; name: string; items: string[] }[];
+  /** own: packages of the owner (train / val, beeflight-clips --own), only shown with ?own */
+  packages: { id: string; split: string; name: string; items: string[]; own?: boolean }[];
   practice: { id: string; answer: string }[];
   /** example tracks with the owner's class and why; shown, not tested */
   tutorial?: { id: string; label: string; reason?: string; title: string; text: string }[];
@@ -91,6 +92,17 @@ function migrate(s: State, data: Site) {
   s.tracker = now;
   s.exported_at = null;  // everything counts as new, so the next export carries the new ids
   store(s);
+}
+
+/** Owner mode: opened once with ?own (?own=0 ends it), remembered in this browser. Shows only the own packages. */
+export function ownMode(): boolean {
+  const q = new URLSearchParams(location.search).get("own");
+  try {
+    if (q !== null) localStorage.setItem(`${KEY}:own`, q === "0" ? "" : "1");
+    return !!localStorage.getItem(`${KEY}:own`);
+  } catch {
+    return q !== null && q !== "0";
+  }
 }
 
 export function unexported(s: State) {

@@ -26,6 +26,8 @@ export into labels/<split>.jsonl as if they had been labeled locally (for labeli
 
 Usage: beeflight-clips                 # test_same_hive + test_other_hive
        beeflight-clips --own 200 100   # plus 200 train / 100 val tracks for the owner
+       beeflight-clips --own-queue recheck_val   # the blind second pass on val as owner packages
+       beeflight-clips --rest          # all test tracks: Paket 1-4 = the random samples, Paket 5+ = the rest
        beeflight-clips --split train --split val --skip-voted
        beeflight-clips --force
 """
@@ -208,20 +210,24 @@ def main():
     ap.add_argument("--split", action="append", choices=["train", "val", *TEST], help="splits that become packages (default: both test sets)")
     ap.add_argument("--force", action="store_true", help="re-encode existing clips")
     ap.add_argument("--workers", type=int, default=3, help="parallel videos (about 1 GB RAM each)")
+    ap.add_argument("--rest", action="store_true", help="also package the queue after the sample (e.g. all test tracks), numbered after the sample packages")
     ap.add_argument("--skip-voted", action="store_true", help="leave tracks that helpers already labeled out of the packages")
     ap.add_argument("--own", nargs=2, type=int, metavar=("TRAIN", "VAL"), help="owner-only packages of the next unlabeled train / val tracks")
+    ap.add_argument("--own-queue", action="append", default=[], choices=["recheck", "recheck_val"],
+                    help="a whole queue (blind second pass) as owner packages; labels keep that split")
     args = ap.parse_args()
     splits = args.split or TEST
     known = list(dict.fromkeys(["train", "val", *splits]))
     (WEB / "clips").mkdir(parents=True, exist_ok=True)
     (WEB / "data").mkdir(exist_ok=True)
 
-    queues, trackers, id_map = {}, set(), {}
+    queues, rests, trackers, id_map = {}, {}, set(), {}
     for s in known:
         if not (LABELS / f"queue_{s}.json").exists():
             raise SystemExit(f"labels/queue_{s}.json missing (beeflight-sample --split {s} ...)")
         q = json.loads((LABELS / f"queue_{s}.json").read_text())
         queues[s] = q["items"][:q.get("core", len(q["items"]))]  # online only the stratified sample
+        rests[s] = q["items"][q.get("core", len(q["items"])):]  # with --rest: the rest of the queue as well
         trackers.add(q.get("tracker", "background-v3"))
         # after a tracker change the browsers of friends rename their labels with this map (webstore.ts)
         path = LABELS / f"id_map_{s}.json"
@@ -240,6 +246,11 @@ def main():
         for i in queues[s]:
             items[i["id"]] = {**plan(i), "split": s}
         pkgs += packages(s, queues[s], skip | voted, first=len(pkgs) + 1)
+    # after all sample packages, so Paket 1-4 keep their number and tracks
+    for s in splits if args.rest else []:
+        for i in rests[s]:
+            items[i["id"]] = {**plan(i), "split": s}
+        pkgs += packages(s, rests[s], skip | voted, first=len(pkgs) + 1)
     shown = {t["id"] for t in tutorial}
     if args.own:
         for s, n in zip(["train", "val"], args.own):
@@ -251,8 +262,19 @@ def main():
                 items.setdefault(i["id"], {**plan(i), "split": s})
             pkgs += own
             print(f"own {s}: {len(picks)} tracks in {len(own)} packages")
+    for s in args.own_queue:
+        full = json.loads((LABELS / f"queue_{s}.json").read_text())["items"]
+        for i in full:
+            items.setdefault(i["id"], {**plan(i), "split": s})
+        own = packages(s, full, set())
+        name = {"recheck": "Zweitlabeln Train", "recheck_val": "Zweitlabeln Validierung"}[s]
+        for k, p in enumerate(own, 1):
+            p.update(id=f"own-{s}-{k}", name=name if len(own) == 1 else f"{name} {k}", own=True)
+        pkgs += own
+        print(f"own {s}: {len(full)} tracks in {len(own)} packages")
     for p in pkgs:  # the answer of a tutorial track is shown, so nobody labels it
-        p["items"] = [i for i in p["items"] if i not in shown]
+        if p["split"] not in args.own_queue:  # a recheck keeps its fixed tracks (the owner labeled them anyway)
+            p["items"] = [i for i in p["items"] if i not in shown]
     for s in known:  # tutorial and practice tracks may lie outside the packaged splits
         full = json.loads((LABELS / f"queue_{s}.json").read_text())["items"]
         for i in full:
@@ -273,6 +295,13 @@ def main():
         for k, job in enumerate(jobs, 1):
             seq, n = job.result()
             print(f"[{k}/{len(jobs)}] {seq}: {n} clips")
+
+    # a clip without frames (only the mp4 header) shows "Video fehlt" on the site; re-encode it once
+    empty = [e for e in items.values() if (WEB / e["clip"]).stat().st_size < 1000]
+    for e in empty:
+        export_seq(e["seq"], [e], True)
+    if still := [e["id"] for e in empty if (WEB / e["clip"]).stat().st_size < 1000]:
+        raise SystemExit(f"clips without frames: {still}")
 
     site = {"version": 1, "tracker": tracker, "id_map": id_map, "fps": [FPS.numerator, FPS.denominator],
             "frame": [W, H], "items": items, "packages": pkgs, "practice": practice, "tutorial": tutorial}

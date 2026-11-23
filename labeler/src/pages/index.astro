@@ -1,8 +1,9 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import { CLASSES, SPLITS, readCore, readLabels, readQueue, readQueueTracker, readSplits, readVoteFiles } from "../lib/store";
-import { EVAL_TRACKERS, PER_TRACKER, readEval } from "../lib/evaluation";
+import { EVAL_TOTAL, readEval } from "../lib/evaluation";
 import { readPose, readPoseQueue } from "../lib/pose";
+import { readBee, readBeeQueue } from "../lib/biene";
 
 const NAMES: Record<string, string> = {
   train: "Training",
@@ -37,16 +38,25 @@ const pct = (a: number, n: number) => (n ? Math.round((100 * a) / n) : 0);
 
 // tools, with their state where it is cheap to read
 const evalDone = readEval().size;
-const evalTotal = EVAL_TRACKERS.length * PER_TRACKER;
+const evalTotal = EVAL_TOTAL;
 const poseQueue = readPoseQueue();
 const poseDone = poseQueue ? [...readPose().keys()].filter((id) => poseQueue.items.some((i) => i.id === id)).length : 0;
+const beeQueue = readBeeQueue();
+const beeDone = beeQueue ? [...readBee().keys()].filter((id) => beeQueue.items.some((i) => i.id === id)).length : 0;
 const tools = [
+  { href: "/lernen", name: "Lernplattform", text: "Jeder Schritt jedes Modells: Formeln, Parameter, Begründung, Prüfungsfragen (13 Kapitel)" },
+  { href: "/erklaerung", name: "So funktioniert's", text: "Kurzfassung: die ganze Methode in neun Schritten, mit Bildern und wenig Text" },
   { href: "/compare", name: "Labels vergleichen", text: "Deine Labels und die Exporte der Helfenden nebeneinander, mit Mehrheitsergebnis" },
   { href: "/tracker", name: "Tracker vergleichen", text: "Dasselbe Video zweimal, links und rechts je ein Tracker" },
+  { href: "/tracker-zahlen", name: "Tracker in Zahlen", text: "Alle Tracker gegen den finalen: vollständige Bahnen, Konfidenzintervalle, gleiche Bienen" },
+  { href: "/modell-zahlen", name: "Modell in Zahlen", text: "Hyperparameter und Setups des Klassifikators auf Val, mit Orientierungsflügen im Detail" },
+  { href: "/praesentation/index.html", name: "Präsentation", text: "Folien zu Orientierungsflug oder Sammelflug (Marp, Taste F für Vollbild)" },
   { href: "/bewertung", name: "Tracker bewerten", text: "Blind: korrekt, Bruchstück, Bienenwechsel, keine Biene",
     status: `${evalDone} / ${evalTotal}` },
   { href: "/pose", name: "Kopf und Hinterleib", text: "Pilot Körperachse: Kopf und Hinterleib anklicken",
     status: poseQueue ? `${poseDone} / ${poseQueue.items.length}` : "keine Stichprobe" },
+  { href: "/biene", name: "Biene oder nicht", text: "Vorfilter: Ist auf der Artefakt-Bahn eine Honigbiene, ein anderes Insekt oder kein Tier?",
+    status: beeQueue ? `${beeDone} / ${beeQueue.items.length}` : "keine Stichprobe" },
 ];
 
 // data split as committed in src/beeflight/splits.py: time blocks, buffers in between, test used once

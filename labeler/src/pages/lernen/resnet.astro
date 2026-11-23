@@ -1,0 +1,124 @@
+---
+import Kapitel from "../../components/Kapitel.astro";
+---
+
+<Kapitel slug="resnet" satz="Drei Residual-Blöcke aus je drei 1D-Faltungen lernen lokale Muster entlang der Bahn; Global Average Pooling fasst sie über die ganze Bahn zusammen, eine lineare Schicht mit Softmax gibt vier Klassenwahrscheinlichkeiten.">
+
+  <p>Architektur nach <b>Fawaz et al. 2019</b> („Deep learning for time series classification: a review“, Abschnitt Residual Network), dort
+    ursprünglich von Wang et al. 2017. Eine Bahn ist eine <b>multivariate Zeitreihe</b>: 7 Kanäle × 128 Zeitpunkte.</p>
+
+  <h2>Architektur</h2>
+  <div class="fig">
+    <svg viewBox="0 0 860 260">
+      <rect x="10" y="100" width="80" height="60" rx="6" fill="#f1efe9" stroke="#e5e7eb" /><text x="50" y="126" class="c b">Eingabe</text><text x="50" y="144" class="c m">7 × 128</text>
+      {[0, 1, 2].map((b) => (
+        <g transform={`translate(${115 + b * 205},20)`}>
+          <rect width="185" height="220" rx="10" fill="#fff" stroke="#d99a1e" />
+          <text x="92" y="20" class="c b">Block {b + 1}</text>
+          {[["Conv k=8", "BN, ReLU"], ["Conv k=5", "BN, ReLU"], ["Conv k=3", "BN"]].map(([a, c], i) => (
+            <g transform={`translate(12,${32 + i * 46})`}><rect width="110" height="38" rx="5" fill="#f1efe9" /><text x="55" y="16" class="c b">{a}</text><text x="55" y="31" class="c m">{c}</text></g>
+          ))}
+          <rect x="132" y="70" width="42" height="56" rx="5" fill="#eef6fb" /><text x="153" y="94" class="c" style="font-size:10px">{b === 0 ? "1×1 Conv" : "nur"}</text><text x="153" y="108" class="c" style="font-size:10px">+ BN</text>
+          <text x="153" y="140" class="c m" style="font-size:10px">Shortcut</text>
+          <circle cx="92" cy="185" r="12" fill="#fbe9c6" stroke="#d99a1e" /><text x="92" y="190" class="c b">+</text>
+          <text x="92" y="214" class="c m">ReLU → 64 × 128</text>
+        </g>
+      ))}
+      <rect x="735" y="70" width="115" height="44" rx="6" fill="#f1efe9" /><text x="792" y="88" class="c b">GAP</text><text x="792" y="104" class="c m">64 × 128 → 64</text>
+      <rect x="735" y="130" width="115" height="44" rx="6" fill="#fdf6e8" stroke="#d99a1e" /><text x="792" y="148" class="c b">Linear 64→4</text><text x="792" y="164" class="c m">+ Softmax</text>
+    </svg>
+    <div class="cap">Alle Faltungen mit 64 Filtern und Padding „same“ (Länge bleibt 128). 170 308 lernbare Parameter (mit 7 Eingabekanälen).</div>
+  </div>
+
+  <h2>Die Bausteine einzeln</h2>
+  <h3>1D-Faltung</h3>
+  <div class="formel">
+    <math display="block"><msub><mi>y</mi><mrow><mi>f</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>=</mo><msub><mi>b</mi><mi>f</mi></msub><mo>+</mo><munder><mo>∑</mo><mi>c</mi></munder><munderover><mo>∑</mo><mrow><mi>τ</mi><mo>=</mo><mn>0</mn></mrow><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></munderover><msub><mi>w</mi><mrow><mi>f</mi><mo>,</mo><mi>c</mi><mo>,</mo><mi>τ</mi></mrow></msub><mspace width="0.2em"/><msub><mi>x</mi><mrow><mi>c</mi><mo>,</mo><mspace width="0.1em"/><mi>t</mi><mo>+</mo><mi>τ</mi><mo>−</mo><mi>k</mi><mo>/</mo><mn>2</mn></mrow></msub></math>
+    <div class="erk">Ein Filter f ist ein kleines Fenster über k Zeitpunkte und alle Kanäle c. Es wird entlang der Bahn geschoben und gibt dort einen großen Wert,
+      wo sein Muster vorkommt (z. B. „Tempo sinkt, Kurve nach links“). Die Fenster 8, 5, 3 sind von grob nach fein. Mit drei Blöcken à 3 Faltungen
+      sieht ein Wert am Ende ein rezeptives Feld von 3 · (7 + 4 + 2) + 1 = 40 Zeitpunkten, also rund ein Drittel der Bahn.</div>
+  </div>
+  <h3>Batch Normalization (BN)</h3>
+  <div class="formel">
+    <math display="block"><mover><mi>x</mi><mo>^</mo></mover><mo>=</mo><mfrac><mrow><mi>x</mi><mo>−</mo><msub><mi>μ</mi><mi>B</mi></msub></mrow><msqrt><mrow><msubsup><mi>σ</mi><mi>B</mi><mn>2</mn></msubsup><mo>+</mo><mi>ε</mi></mrow></msqrt></mfrac><mo>,</mo><mspace width="1.5em"/><mi>y</mi><mo>=</mo><mi>γ</mi><mover><mi>x</mi><mo>^</mo></mover><mo>+</mo><mi>β</mi></math>
+    <div class="erk">Pro Filter über Batch und Zeit normalisiert, γ und β werden gelernt. Stabilisiert und beschleunigt das Training. Beim Vorhersagen
+      (<code>net.eval()</code>) werden statt der Batch-Werte die laufenden Mittel aus dem Training benutzt.</div>
+  </div>
+  <h3>ReLU</h3>
+  <p>ReLU(z) = max(0, z): die Nichtlinearität. Ohne sie wären alle Schichten zusammen nur eine einzige lineare Abbildung.</p>
+  <h3>Residual-Verbindung (Shortcut)</h3>
+  <div class="formel">
+    <math display="block"><mi mathvariant="bold">h</mi><mo>=</mo><mi>ReLU</mi><mo>(</mo><mi mathvariant="script">F</mi><mo>(</mo><mi mathvariant="bold">x</mi><mo>)</mo><mo>+</mo><mi>S</mi><mo>(</mo><mi mathvariant="bold">x</mi><mo>)</mo><mo>)</mo></math>
+    <div class="erk">𝓕 = die drei Faltungen, S = Shortcut: im ersten Block 1×1-Faltung + BN (passt 7 Kanäle auf 64 an), in Block 2 und 3 nur BN. Der Block lernt
+      nur die <i>Änderung</i> zur Eingabe. Gradienten fließen über den Shortcut direkt zurück, das Netz lässt sich tiefer und stabiler trainieren (He et al. 2016).</div>
+  </div>
+  <h3>Global Average Pooling (GAP)</h3>
+  <p>Mittelwert jedes der 64 Filter über alle 128 Zeitpunkte → Vektor mit 64 Zahlen: „Wie stark kommt Muster f irgendwo in der Bahn vor?“ GAP hat
+    keine Parameter und macht das Netz unabhängig davon, <i>wo</i> in der Bahn ein Muster auftritt.</p>
+  <h3>Klassifikator und Softmax</h3>
+  <div class="formel">
+    <math display="block"><mi mathvariant="bold">z</mi><mo>=</mo><mi>W</mi><mi mathvariant="bold">g</mi><mo>+</mo><mi mathvariant="bold">b</mi><mo>,</mo><mspace width="1.5em"/><msub><mi>p</mi><mi>k</mi></msub><mo>=</mo><mfrac><msup><mi>e</mi><msub><mi>z</mi><mi>k</mi></msub></msup><mrow><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mn>4</mn></munderover><msup><mi>e</mi><msub><mi>z</mi><mi>j</mi></msub></msup></mrow></mfrac></math>
+    <div class="erk">W ist 4 × 64. Softmax macht aus den 4 Rohwerten (Logits) Wahrscheinlichkeiten, die sich zu 1 summieren. Vorhersage = Klasse mit dem größten p.</div>
+  </div>
+
+  <div class="rechnung"><b>Rechenweg mit echten Zahlen · Seed 0 des finalen Ensembles, eine Val-Bahn (wahr: Orientierung)</b>
+    <ol>
+      <li><b>Logits</b> aus der linearen Schicht: z = (O −0,685; S −4,878; A −2,030; Art −1,131).</li>
+      <li><b>e hoch z:</b> e<sup>−0,685</sup> = 0,504; e<sup>−4,878</sup> = 0,008; e<sup>−2,030</sup> = 0,131; e<sup>−1,131</sup> = 0,323. Summe <span class="eq">0,966</span>.</li>
+      <li><b>Softmax</b> = jeweils durch die Summe: <span class="eq">p = (0,522; 0,008; 0,136; 0,334)</span> → Vorhersage Orientierung (richtig).</li>
+      <li><b>Kreuzentropie</b> für diese Bahn: <span class="eq">L = −ln 0,522 = 0,650</span>. Wäre p<sub>O</sub> = 0,95, wäre L = 0,051; bei p<sub>O</sub> = 0,10 wäre L = 2,303. Sichere Fehler kosten viel.</li>
+    </ol>
+  </div>
+
+  <h2>Training</h2>
+  <ol class="steps">
+    <li><b>Verlust:</b> Kreuzentropie L = −ln p<sub>y</sub> (y = wahre Klasse), gemittelt über den Batch. Keine Klassengewichte, kein Label Smoothing.</li>
+    <li><b>Batches:</b> pro Epoche die 515 Train-Bahnen zufällig mischen und in ⌈515/16⌉ = 33 Batches à ~16 teilen.</li>
+    <li><b>Optimierer: Adam</b> (β₁ = 0,9, β₂ = 0,999). Lernrate Basis 0,001, <b>Kombi 0,0003</b>.</li>
+    <li><b>Lernraten-Plan:</b> ReduceLROnPlateau auf dem mittleren Train-Verlust der Epoche: 50 Epochen ohne Verbesserung → Lernrate halbieren.</li>
+    <li><b>1500 Epochen</b>; gespeichert wird der Stand mit dem <b>kleinsten Train-Verlust</b> (wie im Paper, kein Early Stopping auf Val).</li>
+    <li><b>Vorhersage:</b> <code>eval()</code>-Modus, Softmax-Wahrscheinlichkeiten pro Bahn.</li>
+  </ol>
+  <div class="formel">
+    <b>Adam</b> (pro Gewicht, Schritt t, Gradient g)
+    <math display="block"><msub><mi>m</mi><mi>t</mi></msub><mo>=</mo><msub><mi>β</mi><mn>1</mn></msub><msub><mi>m</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><msub><mi>β</mi><mn>1</mn></msub><mo>)</mo><mi>g</mi><mo>,</mo><mspace width="1em"/>
+      <msub><mi>v</mi><mi>t</mi></msub><mo>=</mo><msub><mi>β</mi><mn>2</mn></msub><msub><mi>v</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><msub><mi>β</mi><mn>2</mn></msub><mo>)</mo><msup><mi>g</mi><mn>2</mn></msup><mo>,</mo><mspace width="1em"/>
+      <mi>w</mi><mo>←</mo><mi>w</mi><mo>−</mo><mi>η</mi><mfrac><msub><mover><mi>m</mi><mo>^</mo></mover><mi>t</mi></msub><mrow><msqrt><msub><mover><mi>v</mi><mo>^</mo></mover><mi>t</mi></msub></msqrt><mo>+</mo><mi>ε</mi></mrow></mfrac></math>
+    <div class="erk">m = gleitender Mittelwert des Gradienten (Schwung), v = der quadrierten Gradienten (Skala); m̂, v̂ sind bias-korrigiert. Jedes Gewicht bekommt
+      so seine eigene effektive Schrittweite.</div>
+  </div>
+
+  <h2>Basis gegen Kombi</h2>
+  <table class="p">
+    <tr><th>Einstellung</th><th>Basis (Paper)</th><th>Kombi</th><th>Warum geändert</th></tr>
+    <tr><td>Länge</td><td class="n">238 (längste Train-Bahn)</td><td class="n">128</td><td>beste Einzeländerung auf Val (+0,019 BA)</td></tr>
+    <tr><td>Lernrate</td><td class="n">0,001</td><td class="n">0,0003</td><td>zweitbeste Einzeländerung (0,695)</td></tr>
+    <tr><td>Dauer-Kanal</td><td class="n">nein (6 Kanäle)</td><td class="n">ja (7 Kanäle)</td><td>drittbeste Einzeländerung (0,694); Strecken versteckt die Dauer</td></tr>
+    <tr><td>Rest</td><td colspan="3">gleich: 3 Blöcke, 64 Filter, Kerne 8/5/3, Batch 16, 1500 Epochen, Adam, Plateau-Halbierung, bester Train-Verlust</td></tr>
+  </table>
+  <p>Kombi entstand aus der Hyperparameter-Suche: 16 Varianten neben der Basis, jede ändert genau <b>eine</b> Sache (Klassengewichte, Epochen 300/750,
+    Lernrate 0,0003/0,003, Filter 32/128, Länge 128/256, nur Position, nur Bewegung, Dauer, Augmentierung, Label Smoothing, Dropout, Weight Decay), je 5 Seeds,
+    Vergleich auf Val. Die drei besten Einzeländerungen (Länge 128: 0,708, Lernrate 0,0003: 0,695, Dauer: 0,694; Basis 0,689) wurden kombiniert. Als
+    Paket erreicht Kombi 0,715. Nicht jede Teilkombination ist besser: Länge 128 + Lernrate allein ergab 0,695.</p>
+  <p class="src">Code: <code>build_net()</code>, <code>train()</code>, <code>predict()</code> in <code>src/beeflight/resnet.py</code>; Konfiguration <code>kombi</code> in
+    <code>outputs/experimente/modelle2.py</code>; finales Training <code>outputs/experimente/final_kombi.py</code>.</p>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum eine 1D- und keine 2D-Faltung?</summary><div>Die Bahn ist eine Zeitreihe: Nachbarschaft gibt es nur entlang der Zeit.
+      Die 7 Kanäle haben keine räumliche Ordnung untereinander; jeder Filter verrechnet alle Kanäle gleichzeitig und schiebt sich nur in der Zeit.</div></details>
+    <details><summary>Was bringt die Residual-Verbindung konkret?</summary><div>Der Block muss nur die Abweichung von der Identität lernen. Der Gradient
+      hat über den Shortcut einen direkten Weg zurück, deshalb verschwindet er in tieferen Netzen nicht. Ohne Shortcut trainieren tiefe CNNs schlechter.</div></details>
+    <details><summary>Warum Global Average Pooling statt Flatten?</summary><div>Flatten von 64 × 128 gäbe 8192 Eingänge für die letzte Schicht: viele
+      Parameter, Überanpassung bei 515 Bahnen, und das Netz würde lernen, <i>an welcher Stelle</i> ein Muster sitzt. GAP hat 0 Parameter und ist
+      positionsunabhängig.</div></details>
+    <details><summary>Warum wird der Checkpoint mit dem kleinsten Train-Verlust genommen und nicht der beste auf Val?</summary><div>So steht es im
+      Paper, und Val bleibt sauber für den Vergleich der Varianten. Nach Val-Verlust zu stoppen wäre eine weitere Auswahl auf Val.</div></details>
+    <details><summary>Wie groß ist das rezeptive Feld und warum ist das wichtig?</summary><div>Jede Faltung mit Kern k erweitert es um k − 1:
+      3 Blöcke × (7 + 4 + 2) + 1 = 40 Zeitpunkte von 128. Ein einzelner Wert „sieht“ also eine Teilstrecke, etwa einen Bogen. GAP fasst dann alle
+      Teilstrecken zusammen.</div></details>
+    <details><summary>Was ist der Unterschied zwischen Logits und Wahrscheinlichkeiten?</summary><div>Logits sind die rohen Ausgaben der linearen
+      Schicht (beliebige reelle Zahlen). Softmax macht daraus positive Zahlen mit Summe 1. Die Kreuzentropie wird auf den Wahrscheinlichkeiten der
+      wahren Klasse berechnet.</div></details>
+  </div>
+</Kapitel>

@@ -87,17 +87,20 @@ def _train(net, traj, image, y, seed, weights, epochs, batch=16, log=None, tag="
     from torch import nn
 
     rng = np.random.default_rng(seed)
+    dev = R.device()
+    net.to(dev)
     opt = torch.optim.Adam(net.parameters(), lr=0.001)
     sched = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.5, patience=50)
     loss_fn = nn.CrossEntropyLoss()
-    traj, image, y = torch.from_numpy(traj), torch.from_numpy(image), torch.as_tensor(y, dtype=torch.long)
+    traj, image = torch.from_numpy(traj).to(dev), torch.from_numpy(image).to(dev)
+    y = torch.as_tensor(y, dtype=torch.long, device=dev)
     best, best_state = float("inf"), None
     start = time.time()
     for epoch in range(epochs):
         net.train()
         total = 0.0
         for idx in np.array_split(rng.permutation(len(y)), max(1, int(np.ceil(len(y) / batch)))):
-            idx = torch.as_tensor(idx)
+            idx = torch.as_tensor(idx, device=dev)
             opt.zero_grad()
             loss = sum(w * loss_fn(out, y[idx]) for w, out in zip(weights, net(traj[idx], image[idx])) if w)
             loss.backward()
@@ -111,16 +114,17 @@ def _train(net, traj, image, y, seed, weights, epochs, batch=16, log=None, tag="
             log(f"  {tag} epoch {epoch + 1}/{epochs}: train loss {total:.4f}, best {best:.4f}, "
                 f"lr {opt.param_groups[0]['lr']:.2g}, {time.time() - start:.0f} s")
     net.load_state_dict(best_state)
-    return net
+    return net.cpu()
 
 
 def head_probabilities(net, traj, image, head=2, batch=64):
     import torch
 
+    dev = next(net.parameters()).device
     net.eval()
     with torch.no_grad():
-        return np.concatenate([net(torch.from_numpy(traj[i:i + batch]), torch.from_numpy(image[i:i + batch]))[head]
-                               .softmax(dim=1).numpy() for i in range(0, len(traj), batch)])
+        return np.concatenate([net(torch.from_numpy(traj[i:i + batch]).to(dev), torch.from_numpy(image[i:i + batch])
+                                   .to(dev))[head].softmax(dim=1).cpu().numpy() for i in range(0, len(traj), batch)])
 
 
 def _fresh(image_dim, seed):

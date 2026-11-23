@@ -1,0 +1,101 @@
+---
+import Kapitel from "../../components/Kapitel.astro";
+---
+
+<Kapitel slug="detektion" satz="Pro Frame wird ein Hintergrundbild abgezogen; was deutlich anders ist (absolute Bewegungsmaske) und sich gegenüber dem letzten Frame bewegt hat (relative Bewegungsmaske), wird eine Beobachtung: der Schwerpunkt der Region.">
+
+  <p>Verfahren nach <b>Chiron, Gomez-Krämer &amp; Ménard 2013</b> (EURASIP JIVP 2013:59), Abschnitt 3.1. Das Paper nutzt eine
+    Stereokamera; ohne Tiefe bleibt der Intensitätsteil, auf 2D reduziert. Es gibt <b>kein gelerntes Modell</b>: nur Bildverarbeitung.</p>
+
+  <h2>Ablauf</h2>
+  <div class="fig">
+    <svg viewBox="0 0 860 150">
+      {[["Frame I", "grau, halbe Aufl."], ["|I_BG − I|", "Differenz"], ["Dilatation 5×5", "→ Erosion 3×3"], ["Mittelwert 3×3", "> 25 → IAMM"],
+        ["∩ IRMM", "|I_t − I_t−1| > 10"], ["Regionen ≥ 20 px", "→ Schwerpunkt"]].map(([a, b], i) => (
+        <g transform={`translate(${10 + i * 142},30)`}>
+          <rect width="126" height="60" rx="8" fill={i === 5 ? "#fdf6e8" : "#f1efe9"} stroke={i === 5 ? "#d99a1e" : "#e5e7eb"} />
+          <text x="63" y="26" class="c b">{a}</text><text x="63" y="44" class="c m">{b}</text>
+          {i < 5 && <text x="134" y="36" class="c m">→</text>}
+        </g>
+      ))}
+      <text x="10" y="120" class="m">Danach: Hintergrund nur außerhalb der gefundenen Regionen nachführen (selektive Adaption).</text>
+    </svg>
+  </div>
+  <ol class="steps">
+    <li><b>Vorbereitung.</b> Jeder Frame wird in Graustufen auf halbe Auflösung verkleinert (540 × 960) und auf die Flugzone
+      zugeschnitten (ab Brett-Oberkante abwärts).</li>
+    <li><b>Hintergrund initialisieren</b> (Gl. 8): zeitlicher <b>Median</b> jedes Pixels über jeden 15. Frame der Sequenz
+      (120 Frames). Der Median ignoriert Bienen, weil sie an einem Pixel nur kurz vorbeifliegen.</li>
+    <li><b>Absolute Bewegungsmaske IAMM</b> (Gl. 6): Differenz |I<sub>BG</sub> − I|, dann <b>Dilatation</b> mit 5 × 5 (füllt Lücken
+      im Bienenkörper), <b>Erosion</b> mit 3 × 3 (S1 &gt; S2, Ränder schrumpfen wieder), <b>Mittelwertfilter</b> 3 × 3 (glättet), dann
+      Schwelle: Pixel &gt; <b>D<sub>M</sub> = 25</b> Graustufen gehört zum Vordergrund.</li>
+    <li><b>Relative Bewegungsmaske IRMM</b> (Gl. 9): Differenz zum vorigen Frame |I<sub>t</sub> − I<sub>t−1</sub>|, <b>Öffnung</b>
+      mit 3 × 3 (entfernt einzelne Rauschpixel), Schwelle <b>D<sub>RM</sub> = 10</b>. Im ersten Frame gilt alles als bewegt.</li>
+    <li><b>Kombinieren</b> (Gl. 10): Zusammenhängende Regionen der IAMM werden gesucht. Eine Region bleibt nur, wenn sie
+      <b>mindestens ein Pixel</b> der IRMM enthält (also wirklich bewegt ist) und mindestens <b>20 px</b> groß ist (sonst Pixelrauschen).
+      So fallen z. B. Schatten weg, die sich nicht bewegen, oder ein Blatt, das nur einmal verschoben wurde.</li>
+    <li><b>Beobachtung</b> (Abschnitt 3.2): pro Region ihr <b>Schwerpunkt</b> (x, y) und ihre Fläche.</li>
+    <li><b>Hintergrund nachführen</b> (Gl. 12, selektiv): nur Pixel <i>außerhalb</i> der Regionen bewegen sich zum aktuellen Bild hin.</li>
+  </ol>
+  <div class="formel">
+    <math display="block"><msubsup><mi>I</mi><mi>BG</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msubsup><mo>(</mo><mi>p</mi><mo>)</mo><mo>=</mo>
+      <mrow><mo>{</mo><mtable><mtr><mtd><msubsup><mi>I</mi><mi>BG</mi><mi>t</mi></msubsup><mo>(</mo><mi>p</mi><mo>)</mo></mtd><mtd><mtext>wenn </mtext><mi>p</mi><mtext> im Vordergrund</mtext></mtd></mtr>
+      <mtr><mtd><mi>δ</mi><mspace width="0.2em"/><msub><mi>I</mi><mi>t</mi></msub><mo>(</mo><mi>p</mi><mo>)</mo><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>δ</mi><mo>)</mo><msubsup><mi>I</mi><mi>BG</mi><mi>t</mi></msubsup><mo>(</mo><mi>p</mi><mo>)</mo></mtd><mtd><mtext>sonst</mtext></mtd></mtr></mtable></mrow></math>
+    <div class="erk">δ = 0,05: Lernrate. Ein Lichtwechsel ist nach etwa 1/δ = 20 Frames (0,3 s) zu ~64 % eingearbeitet. Unter einer Biene wird
+      der Hintergrund nicht verändert, sonst würde eine langsame oder sitzende Biene „eingebrannt“.</div>
+  </div>
+
+  <div class="rechnung"><b>Rechenweg · ein Pixel über drei Frames</b>
+    <p>Beispielpixel auf dem Boden: Hintergrund I<sub>BG</sub> = 120 Graustufen.</p>
+    <ol>
+      <li>Frame t: Biene darüber, I = 60. Differenz |120 − 60| = 60 &gt; D<sub>M</sub> = 25 → Vordergrund (sofern auch bewegt). Hintergrund bleibt <span class="eq">120</span>.</li>
+      <li>Frame t+1: Biene weg, aber eine Wolke dunkelt ab, I = 110. Differenz 10 &lt; 25 → Hintergrund wird nachgeführt:
+        <span class="eq">0,05 · 110 + 0,95 · 120 = 5,5 + 114 = 119,5</span></li>
+      <li>Frame t+2: weiter I = 110: <span class="eq">0,05 · 110 + 0,95 · 119,5 = 5,5 + 113,525 = 119,03</span>. Nach k Frames bleibt vom alten Abstand (120 − 110 = 10) noch 10 · 0,95<sup>k</sup>: nach 20 Frames 3,6, nach 60 Frames (1 s) 0,5 Graustufen.</li>
+    </ol>
+  </div>
+
+  <h2>Parameter</h2>
+  <table class="p">
+    <tr><th>Name</th><th>Wert</th><th>Bedeutung</th><th>Herkunft</th></tr>
+    <tr><td>δ (DELTA)</td><td class="n">0,05</td><td>Lernrate des Hintergrunds</td><td><span class="tag eigen">eigene Wahl</span> (Paper: Formel, kein Wert)</td></tr>
+    <tr><td>D<sub>M</sub>, D<sub>RM</sub></td><td class="n">25, 10</td><td>Schwellen der Masken (Graustufen)</td><td><span class="tag eigen">auf Val gewählt</span> (erste Version 15 / 8)</td></tr>
+    <tr><td>S1, S2, S3</td><td class="n">5, 3, 3</td><td>Strukturelemente (Quadrat, px)</td><td><span class="tag eigen">eigene Wahl</span>, Bedingung S1 &gt; S2 aus dem Paper</td></tr>
+    <tr><td>Mittelwertfilter</td><td class="n">3 × 3</td><td>glättet die Differenz</td><td><span class="tag paper">Paper</span> (Größe eigene Wahl)</td></tr>
+    <tr><td>MIN_AREA</td><td class="n">20 px</td><td>Mindestfläche (halbe Auflösung)</td><td><span class="tag eigen">nicht im Paper</span></td></tr>
+    <tr><td>Median-Stichprobe</td><td class="n">jeder 15. Frame</td><td>Initialer Hintergrund</td><td><span class="tag paper">Paper: Median</span>, Abstand eigene Wahl</td></tr>
+  </table>
+  <p class="src">Code: <code>detect()</code> in <code>src/beeflight/chiron.py</code>; Beobachtungen werden pro Schwellenpaar zwischengespeichert in <code>outputs/blobs_chiron_25_10/</code>.</p>
+
+  <h2>Morphologie in einem Bild</h2>
+  <div class="two">
+    <div class="merke"><b>Dilatation</b> (Maximum über die Nachbarschaft): helle Flecken wachsen, Lücken schließen sich. <b>Erosion</b>
+      (Minimum): helle Flecken schrumpfen, kleine verschwinden. Erst dilatieren, dann weniger erodieren = Lücken zu, Größe fast wie vorher.</div>
+    <div class="merke"><b>Öffnung</b> = Erosion, dann Dilatation: Objekte kleiner als das Strukturelement verschwinden (Rauschen), größere
+      bleiben in ihrer Form erhalten.</div>
+  </div>
+
+  <h2>Grenzen</h2>
+  <ul>
+    <li>Die Biene ist nur ein Fleck: Klasse, Art oder Ausrichtung kennt die Detektion nicht.</li>
+    <li>Zwei sich berührende Bienen werden <b>eine</b> Region (ein Schwerpunkt).</li>
+    <li>Wackelt die Kamera, wird kurz alles Vordergrund. In Train/Val wurde das geprüft: keine echte Kamerabewegung (globale Verschiebung 0 px).</li>
+    <li>Bewegtes Gras im Wind erzeugt Regionen, die sich bewegen → potenzielle Artefakt-Bahnen.</li>
+  </ul>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum braucht man zwei Masken, IAMM und IRMM?</summary><div>IAMM findet alles, was vom Hintergrund abweicht,
+      auch Schatten oder ein verschobenes Blatt, das jetzt still liegt. IRMM findet nur, was sich gerade bewegt. Nur Regionen, die
+      beides erfüllen, werden Beobachtungen: anders als der Hintergrund <i>und</i> in Bewegung.</div></details>
+    <details><summary>Warum der Median und nicht der Mittelwert für den Hintergrund?</summary><div>Der Median ist robust gegen
+      Ausreißer: Eine Biene, die in wenigen der 120 Frames an einem Pixel ist, verschiebt den Median nicht, den Mittelwert schon.</div></details>
+    <details><summary>Was passiert, wenn man den Hintergrund auch unter Bienen nachführt?</summary><div>Eine langsame oder kurz
+      schwebende Biene würde in den Hintergrund „eingelernt“ und verschwände aus der Differenz; danach entstünde beim Wegfliegen
+      ein Geisterfleck.</div></details>
+    <details><summary>Warum halbe Auflösung?</summary><div>Viermal weniger Pixel, damit schneller; eine Biene hat dann noch
+      ≈ 15 px Länge, mehr als genug für einen Schwerpunkt. Die Flächenschwelle (20 px) bezieht sich auf diese Auflösung.</div></details>
+    <details><summary>Wie wurden D<sub>M</sub> = 25 und D<sub>RM</sub> = 10 gewählt?</summary><div>Auf Val, im Vergleich zur ersten
+      Version 15 / 8: strenger, damit weniger Gras und Schatten; bewertet mit der Handbewertung der Bahnen (Kapitel 13).</div></details>
+  </div>
+</Kapitel>

@@ -82,31 +82,46 @@ Orientierungsflug-Kandidat. Diese Regel ist zugleich die **Baseline**, gegen die
 ## 4. Handlabels
 
 Etwa 300 Bahnen aus dem Trainingsblock, stratifiziert über Zeit und Selbst-Label, in vier Klassen nach
-[labeling.md](labeling.md). Jede Bahn bekommt **drei Stimmen**: meine und die von zwei Helfenden aus einer
-Online-Version des Label-Tools, nach einer Übungsrunde mit Rückmeldung. Das finale Label ist die Mehrheit; ohne
-Mehrheit entscheidet mein Label, markiert als `strittig`. Die Übereinstimmung zwischen den Labelnden
-(Krippendorffs α) quantifiziert, wie eindeutig die Klassen überhaupt sind, und begrenzt damit die erreichbare
-Modellgüte. Optional werden 50 Bahnen nach einer Woche von mir ein zweites Mal gelabelt (Cohen's κ).
+[labeling.md](labeling.md). Zusätzlich 104 Bahnen aus der Validierung für die Modellauswahl. Train und Validierung
+labele ich allein. **Drei Stimmen pro Bahn** (meine und die von zwei Helfenden aus der Online-Version) gibt es seit
+dem 05.11.2026 nur noch für die Testsets: Das finale Label ist die Mehrheit, ohne Mehrheit entscheidet mein Label,
+markiert als `strittig`. Krippendorffs α über die Labelnden zeigt, wie eindeutig die Klassen sind, und begrenzt
+damit die erreichbare Modellgüte. Testbahnen werte ich erst aus, wenn das Modell eingefroren ist.
 
-Zusätzlich 60–100 Bahnen aus der Validierung für die Modellauswahl. Testbahnen werden erst gelabelt,
-wenn das Modell eingefroren ist.
+Weil Train und Validierung nur eine Person labelt, wird meine eigene Konsistenz blind nachgemessen: je 50 Bahnen
+aus Train und Validierung ein zweites Mal, Ablauf und vorab festgelegte Auswertung in
+[labeling.md](labeling.md#zweitlabeln-recheck). Anlass ist die Fehleranalyse in
+[Abschnitt 7](#7-fehleranalyse-und-labelqualität).
 
 ## 5. Modelle
 
-Die Modellwahl stützt sich nur auf drei Paper; alles andere ist unten als eigene Entscheidung markiert. Alle Kandidaten
+Die Modellwahl stützt sich nur auf drei Paper; alles andere ist unten als eigene Entscheidung markiert. Vollständige
+Zitationen, Status der Volltextprüfung und wörtlich bestätigte Stellen: [literatur.md](literatur.md). Alle Kandidaten
 trainieren nur auf `labels/train.jsonl` und schreiben Vorhersagen für `beeflight-evaluate`.
 
 | Kandidat | Eingabe | Quelle | Befehl |
 |---|---|---|---|
 | **Regel-Baseline** | Geradheit, Dauer, Start- und Zielzone | Vergleichswert, Schwellen auf Train | `beeflight-baselines` |
 | **1. Nur Bahn: ResNet** | Sequenz `(x, y, Δx, Δy, |v|, Δθ)` relativ zum Flugloch, normiert auf die Brettbreite | Fawaz et al. 2019 | `beeflight-resnet` |
-| **2. Nur Bild: DINOv2** | 8 gleichmäßig verteilte Ausschnitte um die Biene, eingefrorenes ViT-S/14, linearer Klassifikator | Oquab et al. 2023 | `beeflight-dinov2` |
+| **2. Nur Bild: DINOv2** | 8 gleichmäßig verteilte Ausschnitte um die Biene, eingefrorenes ViT-S/14, linearer Klassifikator | Oquab et al. 2024 | `beeflight-dinov2` |
 | **3. Fusion einfach** | Merkmale aus 1 und 2 verkettet, zwei FC-Schichten | Wang et al. 2020 | `beeflight-fusion --mode concat` |
 | **4. Fusion G-Blend** | wie 3, mit Offline Gradient-Blending | Wang et al. 2020 | `beeflight-fusion --mode gblend` |
 
 **ResNet:** drei Blöcke mit je drei Faltungen (Längen 8, 5, 3; 64 Filter), Batch-Normalisierung vor ReLU, Global Average
 Pooling. Adam mit Lernrate 0,001, Batch 16, 1500 Epochen; Lernrate halbiert nach 50 Epochen ohne besseren Trainingsverlust;
 Checkpoint nach Trainingsverlust. Jede Bahn wird auf die längste Trainingsbahn interpoliert.
+
+**Was Fawaz et al. 2019 belegt und was nicht:** Das ResNet ist dort die stärkste von neun Deep-Learning-Architekturen
+auf dem UCR-Archiv. Gegen HIVE-COTE und COTE findet der Test keinen signifikanten Unterschied, HIVE-COTE bleibt am
+genauesten. Auf den 12 multivariaten Datensätzen, die unseren x/y-Bahnen am nächsten kommen, findet er keinen
+signifikanten Unterschied zwischen den neun Modellen (§5.1–5.3). Das ResNet ist damit eine begründete Wahl unter den
+DL-Modellen, kein belegter Sieger. Deshalb tritt es gegen die Regel-Baseline an.
+
+**DINOv2** (Oquab et al. 2024) begründet eingefrorene Merkmale mit linearer Probe. Zu Objekten von etwa 30 px sagt das
+Paper nichts; ob die Merkmale unsere unscharfen Bienen tragen, ist eine offene empirische Frage.
+
+**Fusion** (Wang et al. 2020): Die Befunde stammen aus End-to-End-Training auf großen Videodatensätzen. Ansätze mit
+getrennt vortrainierten Zweigen nennen die Autoren „not comparable“; unser eingefrorener Bildzweig fällt darunter.
 
 **DINOv2:** Rastersuche nach Anhang B.3 (13 Lernraten, 1 oder 4 Ausgabeschichten, Klassen-Token allein oder mit gemittelten
 Patch-Token), dazu Mitteln oder Verketten der Frames. SGD über 12500 Iterationen. Die Gewichte stammen nicht von Stockvideos.
@@ -125,6 +140,9 @@ wirksam), auf einem Hold-out aus den Trainingslabels. Ergebnis: Bahn 0,05, Bild 
 
 **Nicht mehr im Modell:** GRU, Vortraining auf Selbst-Labels, Lernkurve und Augmentierung der Bahnen. Selbst-Labels dienen nur
 noch der Stichprobenziehung. Die Bahn-Interpolation verbirgt die Dauer einer Bahn; das ist eine bekannte Schwäche.
+Wird Vortraining in der Arbeit als Ausblick genannt: **nicht mit Halilovic 2019 begründen** (dort lernte das
+Vorhersagemodell auf echten Bienendaten nichts Brauchbares) und BEAST (Wang, Yu et al. 2026) nur als Ausblick mit
+dessen Einschränkungen zitieren, siehe [literatur.md](literatur.md#modelle).
 
 **Auswahl auf Validierung (104 Bahnen, 14 Sequenzen, je 5 Seeds, Stand 06.11.2026):**
 
@@ -142,6 +160,9 @@ liegen beide gleichauf (0,705 gegen 0,717). Der Vorsprung kommt aus nur 21 Fragm
 Einstellungen auf Val zusätzlich begünstigt. Auf dem Hold-out der Gewichtsschätzung (64 Bahnen, ein Seed, Genauigkeit) lag die
 Rangfolge umgekehrt (Bahn 0,58, Bild 0,70, Fusion 0,73), die Reihenfolge der Kandidaten ist also nicht stabil belegt.
 
+> **Platzhalter: Läufe auf der GPU (DGX Spark), ab 07.11.2026.** Die Ergebnisse werden hier nachgetragen, sobald sie
+> vorliegen (Tabelle wie oben, mit Datum, Git-Hash und Seeds). Bis dahin gilt die Tabelle vom 06.11.2026.
+
 ## 6. Metriken
 
 Festgelegt am 05.11.2026, vor jedem Blick auf Testergebnisse; Validierungsergebnisse mit Macro-F1 kannte ich da
@@ -151,12 +172,28 @@ Bildanalyse geschrieben; die Übertragung auf Bahnen ist meine Entscheidung. All
 
 | Kennzahl | Rolle |
 |---|---|
-| **Balanced Accuracy** (Mittel der Klassen-Recalls, Opitz Eq. 7; Zufall = 1/4) | Hauptmetrik, auch für die Modellauswahl auf Validierung |
+| **Balanced Accuracy** = Macro-Recall, `BA = 1/K · Σ_k TP_k / (TP_k + FN_k)` (Opitz Eq. 7; Zufall = 1/4) | Hauptmetrik, auch für die Modellauswahl auf Validierung |
 | **Recall und Precision `orientierung`**, immer mit Zählwerten wie `3/4` | Schlüsselklasse. Beide nötig: Der Indikator hängt auch an den Falsch-Positiven |
 | **Accuracy** | Ergänzung, die Testsets sind Zufallsstichproben |
-| **Macro-F1** (Mittel der Klassen-F1, Opitz Eq. 10) | nachrangig, zum Vergleich mit früheren Werten |
+| **Macro-F1** als „averaged F1“ (Mittel der Klassen-F1, Opitz Eq. 10; Opitz & Burst) | nachrangig, zum Vergleich mit früheren Werten |
 | **Recall und Precision aller Klassen, Konfusionsmatrix** | zeigt die schwache Klasse, besonders Orientierung vs. suchender Anflug |
-| **AUROC `orientierung` gegen Rest** | nur für Modelle mit Wahrscheinlichkeiten, nicht für die Regel; fällt als Erstes weg |
+| **AUROC `orientierung` gegen Rest** | nur für Modelle mit Wahrscheinlichkeiten, nicht für die Regel |
+
+Zur Gleichsetzung in der ersten Zeile: Opitz begründet Macro-Recall als Metrik mit allen fünf geprüften Eigenschaften
+(§4.2). Dass Balanced Accuracy dasselbe ist, schreibt er nur in Fußnote 11 mit Verweis auf scikit-learn. Darum steht
+die Formel oben, und in der Arbeit wird sie mitgenannt.
+
+**Abgleich mit Metrics Reloaded** (Volltext geprüft 07.11.2026, [literatur.md](literatur.md#auswertung-und-metriken)):
+
+- Balanced Accuracy passt: Die Empfehlung EC gilt für ungleiche Fehlerkosten; bei gleichen Kosten nennen die Autoren
+  BA (oder MCC), ausdrücklich wenn die Klassenanteile nicht der Zielpopulation entsprechen.
+- Multi-Threshold-Metriken (Default AUROC, pro Klasse) sind dort **„always recommended“**. Der frühere Plan, AUROC
+  als Erstes zu streichen, wäre eine Abweichung von der Empfehlung und müsste in der Arbeit genannt werden.
+- Zählmetriken pro Klasse sind dort **optional**, die volle Konfusionsmatrix wird bei wenigen Klassen empfohlen. Dass
+  wir die Klassen-Recalls trotzdem immer berichten, folgt Opitz §8 („If the amount of classes n is low, consider
+  presenting class-wise recall scores …“).
+- Bei kleinem Testset: Konfidenzintervalle für alle Metriken (Table 1). Welche Methode, schreibt Metrics Reloaded nicht
+  vor; Cluster-Bootstrap und Wilson unten sind unsere Wahl.
 
 **Warum nicht mehr Macro-F1:** Balanced Accuracy hängt bei gleichen Fehlerraten innerhalb der Klassen nicht von den
 Klassenanteilen ab; Train und Validierung sind geschichtet, die Testsets reine Zufallsstichproben, und der Anteil der
@@ -175,6 +212,9 @@ Spanne beim Weglassen je einer Sequenz.
 
 **Seeds und Modellvergleich:** Alle Seeds werden ausgewertet, Mittel und Standardabweichung, keine Auswahl des besten
 Seeds. Intervalle nutzen das Seed-Mittel pro Stichprobe. Vergleiche sind Differenzen auf denselben gezogenen Bahnen.
+Das folgt Bouthillier et al. 2021: möglichst viele Zufallsquellen variieren, die Datenauswahl trägt mehr Varianz als
+die Initialisierung (§2.2). Die Paarung empfehlen sie nur im Anhang (C.2, „optional but highly recommended“); ihr
+Entscheidungskriterium P(A > B) nutzen wir nicht. Venue vor dem Zitieren prüfen ([literatur.md](literatur.md)).
 Hauptvergleich ist das ausgewählte Modell gegen die auf Train abgestimmte Regel, die feste Regel der Vorstudie steht
 daneben. Alles ist beschreibend, ohne p-Werte oder Signifikanzaussagen, daher ohne Korrektur für Mehrfachvergleiche.
 Die Vergleichswerte (beide Regeln, Zufall gleichverteilt und nach Trainingshäufigkeit, immer dieselbe Klasse) schreibt
@@ -218,3 +258,57 @@ Definiert in `src/beeflight/splits.py`, die einzige Quelle der Wahrheit.
 
 Für Test B müssen die Zonen (`BOARD`) neu gesetzt werden. Sie werden aus einem einzelnen Frame abgelesen, nicht
 anhand von Ergebnissen eingestellt.
+
+## 7. Fehleranalyse und Labelqualität
+
+Stand 07.11.2026. Untersucht wurden die Validierungsfehler der **alten, archivierten Modelle** (Lauf
+`2026-11-05_0117_full`: GBM, GRU, logistische Regression, GRU ohne Vortraining, je 5 Seeds), die inzwischen durch die
+Kandidaten aus [Abschnitt 5](#5-modelle) ersetzt sind. Frage: Liegen die Fehler an inkonsistenten Labels oder an
+Information, die in der Bahn fehlt? Testsets wurden nicht geöffnet. Alles ist beschreibend, die Zellen sind klein.
+
+**Befunde:**
+
+| Befund | Zahl |
+|---|---|
+| Bahnen, die alle 20 Vorhersagen (4 Modelle × 5 Seeds) falsch haben („Dauerfehler“) | 15 von 104 |
+| Übereinstimmung mit Labeler3 auf identischen v3-Bahnen | 101/168 = 0,60, **κ = 0,47** (Bootstrap 0,37–0,56) |
+| spezifische Übereinstimmung pro Klasse | anflug 0,83, sammelabflug 0,66, orientierung 0,54, artefakt 0,29 |
+| Dauerfehler mit Labeler3-Label, bei denen sie wie das Modell entscheidet | 7 von 9 (erwartet 3,0; p ≈ 0,003) |
+| sehr nahe Bahnpaare (21 Handmerkmale, engstes 0,5-%-Quantil) mit verschiedenem Label | 111 von 438 = **25 %**, vor allem ori–sam und art–ori |
+| eigene Wiederholungslabels über Tracker-Versionen gleich | 8 von 14 (κ 0,36); 4 der 6 Wechsel gehen von orientierung nach artefakt |
+| Artefakte in Train mit Notiz zur Art | 0 von 75 |
+| Artefakte in Train mit Flag `unsicher` | 1 von 75 |
+
+- **Unscharfe Klassengrenzen** statt einer schlechten Labelsitzung: Die Fehler hängen nicht am Labeldatum (Dauerfehler
+  15 % gegen 14 %, Out-of-fold über Train und Val flach). Sie liegen an drei Stellen, an denen die Bahn wie eine andere
+  Klasse aussieht: **kreisende Abflüge** (sammelabflug oder orientierung?), **gerade Rand-zu-Rand-Vorbeiflüge** (in
+  Train und Val 8 als sammelabflug, 9 als artefakt gelabelt) und **Brett-zu-Brett-Bahnen** (orientierung, anflug oder
+  artefakt; 23 Orientierungen in Train teilen die Signatur der Brett-zu-Brett-Artefakte).
+- Labeler3 vergibt im Zweifel `orientierung` (49 % ihrer Labels), ich `artefakt` oder `sammelabflug`. Ein Großteil
+  der Abweichung ist also **systematisch**, eine Definitionsfrage. Ob sie nach Video oder nach der eingezeichneten
+  Bahn entschieden hat, ist nicht bekannt.
+- **Bienenwechsel sind teils nur im Video sichtbar.** Die beiden notierten Wechsel haben einen Sprung in der Bahn
+  (größter Schritt > 6 × Median), andere hat der Tracker vermutlich glatt verbunden. Was nicht als Sprung auftaucht,
+  kann ein Bahnmodell nicht sehen. Wie groß dieser Anteil ist, lässt sich ohne Notizen in Train nicht sagen.
+- **Flags werden je Sitzung verschieden benutzt:** `unsicher` in Train 78 von 314, in Val 5 von 104, davon in der
+  Val-Sitzung vom 28.10. gar nicht. Weniger Flags in Val heißt also nicht sicherere Labels. Über Train und Val ist
+  `unsicher` informativ (höhere Out-of-fold-Fehler bei ori und sam), wird bei `artefakt` aber fast nie gesetzt.
+
+**Einschätzung (Vermutung, nicht belegt):** Der größere Teil der Fehler ist Regelunschärfe bzw. Drift in meiner
+Definition, ein kleinerer, unbekannter Teil fehlende Information in der Bahn (Bienenwechsel, verpasster Start). Beides
+hinterlässt in den vorhandenen Daten dieselbe Spur. Trennen lässt es sich nur mit einem blinden Zweitlabel, getrennt
+nach „nur Bahn“ und „mit Video“.
+
+**Folgen:**
+
+1. Regeln für die drei Grenzfälle und für Bienenwechsel schriftlich festlegen, **bevor** zweitgelabelt wird, sonst misst
+   das Recheck die Drift mit. Entwurf: [labeling.md](labeling.md#labelregeln-für-grenzfälle--entwurf-entscheidung-durch-florian).
+2. Blindes Zweitlabeln von je 50 Bahnen aus Train und Val, mit Pflichtnotiz zur Artefakt-Art:
+   [labeling.md](labeling.md#zweitlabeln-recheck). Die Val-Queue enthält die 15 Dauerfehler, gemischt unter 35
+   Zufallsbahnen. Welche das sind, steht absichtlich in keiner Doku.
+3. Die Selbstübereinstimmung ist eine grobe Obergrenze für die erreichbare Accuracy. Liegt sie bei etwa 0,8, sind
+   Modelle mit 0,7 bis 0,75 schon nahe an dem, was die Labels hergeben. Bei 50 Bahnen ist κ auf etwa ±0,15 bis ±0,18
+   genau (Simulation): κ ≈ 0,5 ist von κ ≈ 0,85 unterscheidbar, 0,7 von 0,8 nicht.
+
+Skripte und Ausgaben der Analyse liegen nicht im Repository (Scratchpad der Sitzung vom 07.11.2026); vor der Abgabe
+übernehmen, falls Zahlen daraus in die Arbeit gehen.

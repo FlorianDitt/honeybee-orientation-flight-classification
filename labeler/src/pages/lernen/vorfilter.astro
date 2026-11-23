@@ -1,0 +1,112 @@
+---
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import Kapitel from "../../components/Kapitel.astro";
+import { ROOT } from "../../lib/store";
+
+const p = resolve(ROOT, "outputs", "final", "vorfilter", "auswahl.json");
+const vf = existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : null;
+const bee: Record<string, Record<string, number>> = { train: {}, val: {} };
+const bq = resolve(ROOT, "labels", "biene_queue.json"), bl = resolve(ROOT, "labels", "biene.jsonl");
+if (existsSync(bq) && existsSync(bl)) {
+  const split = Object.fromEntries(JSON.parse(readFileSync(bq, "utf8")).items.map((i: any) => [i.id, i.split]));
+  for (const l of readFileSync(bl, "utf8").split("\n")) if (l.trim()) { const r = JSON.parse(l); const s = split[r.id]; if (s) bee[s][r.answer] = (bee[s][r.answer] ?? 0) + 1; }
+}
+const de = (x: number, d = 3) => x.toFixed(d).replace(".", ",");
+const pc = (x: number) => `${Math.round(100 * x)} %`;
+const VN: Record<string, string> = { A_ohne_filter: "A · ohne Vorfilter", B_yolo: "B · YOLO-Filter", C_eigener_vorfilter: "C · eigener Vorfilter (DINOv2)" };
+---
+
+<Kapitel slug="vorfilter" satz="Vor den Klassifikator kommt die Frage 'Ist auf der Bahn eine Honigbiene?'; wenn nicht, wird die Bahn direkt Artefakt. Drei Varianten wurden mit vorab festgelegter Regel verglichen: kein Filter, YOLO-Bienendetektor, eigener DINOv2-Klassifikator.">
+
+  <h2>Warum ein Vorfilter?</h2>
+  <p>Das ResNet sieht nur die Bahn, nicht das Bild. Ein schwingendes Blatt oder eine Fliege kann eine Bahn wie ein Orientierungsflug machen. Auf Val waren Artefakte die
+    größte Quelle falscher Orientierungsflüge (10 von 69 Artefakten wurden „Orientierung“).</p>
+
+  <h2>Die Labels dafür</h2>
+  <p>Alle 255 Artefakt-Bahnen aus Train und Val wurden auf der Seite <a href="/biene">/biene</a> angesehen: 8 Ausschnitte (96 px, volle Auflösung) gleichmäßig entlang der Bahn.</p>
+  <table class="p">
+    <tr><th></th><th>Honigbiene</th><th>anderes Insekt</th><th>kein Tier</th><th>unklar</th></tr>
+    {["train", "val"].map((s) => <tr><td>{s}</td>{["honigbiene", "anderes_insekt", "kein_tier", "unklar"].map((a) => <td class="n">{bee[s][a] ?? 0}</td>)}</tr>)}
+  </table>
+  <p><b>Zielgröße:</b> „keine Honigbiene“ = Artefakt mit <i>anderes Insekt</i> oder <i>kein Tier</i>. „Honigbiene“ = alle Bahnen der drei anderen Klassen plus Artefakte mit
+    <i>Honigbiene</i>. <i>Unklar</i> geht nicht ins Training.</p>
+
+  <h2>Variante B: YOLO26s als Bienendetektor</h2>
+  <ol class="steps">
+    <li><b>Detektor:</b> YOLO26s (Ultralytics), vortrainiert auf COCO, feinjustiert auf Darians handgelabelten Bienen-Frames: 1 Klasse „bee“, Bildgröße 1920 (native
+      Auflösung), 100 Epochen (Abbruch nach 30 ohne Verbesserung), Batch 4, Augmentierung: Mosaik, Spiegeln, Drehen ±10°, Skalieren ±50 %, Farbe, Bewegungsunschärfe.</li>
+    <li><b>Pro Bahn 8 Punkte</b> gleichmäßig entlang der Bahn; an jedem ein 320 × 320-Ausschnitt in voller Auflösung, YOLO mit Bildgröße 320, Konfidenz ≥ 0,25.</li>
+    <li><b>Treffer</b>, wenn das Zentrum einer Box höchstens 30 px vom Bahnpunkt entfernt ist.</li>
+    <li><b>Score</b> = 1 − Anteil Treffer. Ist der Score ≥ Schwelle, wird die Bahn Artefakt.</li>
+  </ol>
+  <div class="merke"><b>YOLO in einem Absatz:</b> Ein CNN teilt das Bild in ein Raster und sagt für jede Zelle direkt Boxen (Position, Größe) und eine Klassenwahrscheinlichkeit
+    voraus, in einem einzigen Durchlauf („You Only Look Once“). YOLO26 ist eine neuere Version ohne Non-Maximum-Suppression am Ende.</div>
+
+  <h2>Variante C: eigener Vorfilter</h2>
+  <ol class="steps">
+    <li>An denselben 8 Punkten ein 96-px-Ausschnitt, auf 224 px vergrößert, ImageNet-Normalisierung.</li>
+    <li><b>DINOv2 ViT-S/14</b> (eingefroren) gibt pro Ausschnitt den Klassentoken (384 Zahlen).</li>
+    <li>Über die 8 Ausschnitte: Mittelwert und Maximum → 768 Zahlen pro Bahn.</li>
+    <li>StandardScaler + <b>logistische Regression</b> (C = 1, balancierte Klassengewichte) sagt P(keine Honigbiene).</li>
+  </ol>
+
+  <h2>Schwelle: Youden-Index auf Train</h2>
+  <div class="formel">
+    <math display="block"><mi>J</mi><mo>(</mo><mi>s</mi><mo>)</mo><mo>=</mo><mi>Sensitivität</mi><mo>(</mo><mi>s</mi><mo>)</mo><mo>+</mo><mi>Spezifität</mi><mo>(</mo><mi>s</mi><mo>)</mo><mo>−</mo><mn>1</mn></math>
+    <div class="erk">Sensitivität = Anteil der Nicht-Bienen, die der Filter erkennt; Spezifität = Anteil der echten Bienen, die er durchlässt. Gewählt wird die Schwelle s mit
+      dem größten J auf Train. Für C auf Vorhersagen aus 5-facher Kreuzvalidierung, damit das Modell die Bahnen, die es bewertet, nicht schon gesehen hat.</div>
+  </div>
+
+  <div class="rechnung"><b>Rechenweg mit echten Zahlen · YOLO-Schwelle auf Train</b>
+    <p>Train: 88 Bahnen ohne Honigbiene, 389 mit (Unklare ausgelassen). Score = 1 − Anteil der 8 Punkte mit Biene, also nur die Werte 0; 0,125; …; 1.</p>
+    <table>
+      <tr><th>Schwelle</th><th>heißt: höchstens … von 8 Punkten Biene</th><th>Sensitivität</th><th>Spezifität</th><th>J</th></tr>
+      <tr><th>0,500</th><td>4</td><td>77/88 = 0,875</td><td>332/389 = 0,853</td><td>0,728</td></tr>
+      <tr><th>0,625</th><td>3</td><td>77/88 = 0,875</td><td>358/389 = 0,920</td><td class="d">0,795</td></tr>
+      <tr><th>0,750</th><td>2</td><td>75/88 = 0,852</td><td>365/389 = 0,938</td><td>0,790</td></tr>
+      <tr><th>0,875</th><td>1</td><td>72/88 = 0,818</td><td>376/389 = 0,967</td><td>0,785</td></tr>
+    </table>
+    <p>Beispiel Zeile 0,625: <span class="eq">J = 0,875 + 0,920 − 1 = 0,795</span> → größtes J, also gewählt: Eine Bahn wird Artefakt, wenn YOLO an höchstens 3 der 8 Punkte eine Biene findet.</p>
+  </div>
+
+  <h2>Auswahlregel (vorher festgeschrieben)</h2>
+  <p>Gewählt wird die Variante mit der höchsten BA auf Val; eine Filter-Variante muss mindestens 0,005 besser sein als die einfachere (A vor B vor C).
+    Danach wird nichts mehr geändert. <span class="src"><code>outputs/final/regeln.md</code></span></p>
+
+  <h2>Ergebnis auf Val</h2>
+  {vf ? (
+    <>
+      <table class="p">
+        <tr><th>Filter</th><th>Schwelle (Train)</th><th>erkennt Nicht-Bienen</th><th>lässt Bienen durch</th></tr>
+        <tr><td>B · YOLO</td><td class="n">Score ≥ {de(vf.thresholds.B_yolo, 3)}</td><td class="n">{pc(vf.filter_val.B_yolo.sensitivity_no_bee)}</td><td class="n">{pc(vf.filter_val.B_yolo.specificity)}</td></tr>
+        <tr><td>C · eigener</td><td class="n">P ≥ {de(vf.thresholds.C_eigener_vorfilter, 3)}</td><td class="n">{pc(vf.filter_val.C_eigener_vorfilter.sensitivity_no_bee)}</td><td class="n">{pc(vf.filter_val.C_eigener_vorfilter.specificity)}</td></tr>
+      </table>
+      <table class="p">
+        <tr><th>Variante</th><th>BA</th><th>Recall O</th><th>Precision O</th><th>Artefakt → O</th><th>O → Artefakt</th></tr>
+        {Object.entries(vf.variants).map(([k, v]: [string, any]) => (
+          <tr style={k === vf.auswahl ? "font-weight:700;background:#fdf6e8" : ""}><td>{VN[k] ?? k}{k === vf.auswahl ? " ✓ gewählt" : ""}</td><td class="n">{de(v.ba)}</td>
+            <td class="n">{de(v.recall_o, 2)}</td><td class="n">{de(v.precision_o, 2)}</td><td class="n">{v.artefakt_als_o}</td><td class="n">{v.o_als_artefakt}</td></tr>
+        ))}
+      </table>
+      <p class="src">Berechnet mit {vf.seeds} Seeds des finalen Ensembles. YOLO-Score ≥ {de(vf.thresholds.B_yolo, 3)} heißt: an höchstens {Math.round(8 * (1 - vf.thresholds.B_yolo))} der 8 Punkte eine Biene.</p>
+    </>
+  ) : <p class="achtung">Noch nicht berechnet.</p>}
+
+  <h2>Und fertige Artenerkennung?</h2>
+  <p><b>BioCLIP</b> (Stevens et al., CVPR 2024; CLIP trainiert auf dem Baum des Lebens) wurde ohne Training getestet: Textbeschreibungen „Apis mellifera“, „Vespula vulgaris“,
+    „Musca domestica“, „a leaf“ … gegen die Ausschnitte. Auf Val wurden nur 18–20 % der Ausschnitte echter Sammelabflüge und Anflüge als Honigbiene erkannt, meist als Fliege.
+    Artefakte genauso oft (19 %). Bei ≈ 30 px und Bewegungsunschärfe ist die Art nicht erkennbar; BioCLIP kennt scharfe Nahaufnahmen.</p>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum kann der Vorfilter nicht alle Artefakte abfangen?</summary><div>Viele Artefakte zeigen echte Honigbienen (Vorbeiflug, Bienenwechsel, Krabbeln).
+      Der Filter fragt nur „Biene ja/nein“; diese Artefakte muss weiter der Klassifikator erkennen.</div></details>
+    <details><summary>Warum wird die Schwelle auf Train und nicht auf Val gewählt?</summary><div>Val entscheidet zwischen den Varianten. Würde man dort auch die Schwelle
+      wählen, wäre der Val-Wert doppelt optimistisch. Auf Train gewählt, ist Val ein ehrlicher Vergleich.</div></details>
+    <details><summary>Warum ist der eigene Vorfilter schwach?</summary><div>Nur etwa 88 Nicht-Bienen in Train, und DINOv2-Merkmale eines 30-px-Objekts sind wenig
+      spezifisch. YOLO dagegen wurde eigens auf handgelabelten Bienenboxen in voller Auflösung trainiert.</div></details>
+    <details><summary>Was bedeutet Youden-Index anschaulich?</summary><div>Der senkrechte Abstand der ROC-Kurve zur Diagonalen (Zufall). Er gewichtet verpasste Nicht-Bienen
+      und fälschlich verworfene Bienen gleich.</div></details>
+  </div>
+</Kapitel>

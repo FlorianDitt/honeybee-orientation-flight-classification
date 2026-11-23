@@ -1,0 +1,119 @@
+---
+import Kapitel from "../../components/Kapitel.astro";
+---
+
+<Kapitel slug="tracking" satz="Jede Biene hat einen Kalman-Filter, der ihre nächste Position vorhersagt; pro Frame werden alle Vorhersagen und alle Beobachtungen auf einmal optimal zugeordnet (Global Nearest Neighbor mit der Ungarischen Methode).">
+
+  <p>Nach <b>Chiron et al. 2013</b>, Abschnitt 4 (3D-GNN), hier in der Bildebene. Ergebnis: <b>Tracklets</b>, also Folgen
+    (t, x, y) derselben Biene. Sie sind zuverlässig, brechen aber ab, wenn eine Biene einige Frames nicht detektiert wird
+    (dafür Kapitel 5).</p>
+
+  <h2>Ablauf pro Frame</h2>
+  <div class="fig">
+    <svg viewBox="0 0 860 170">
+      <circle cx="80" cy="90" r="5" fill="#16181d" /><circle cx="140" cy="80" r="5" fill="#16181d" /><circle cx="200" cy="74" r="5" fill="#16181d" />
+      <text x="140" y="60" class="c m">bisherige Bahn</text>
+      <ellipse cx="262" cy="70" rx="34" ry="22" fill="#fbe9c6" stroke="#d99a1e" /><circle cx="262" cy="70" r="4" fill="#d99a1e" />
+      <text x="262" y="112" class="c m">Vorhersage + Unsicherheit S</text>
+      <circle cx="275" cy="62" r="5" fill="#3d93c9" /><circle cx="330" cy="120" r="5" fill="#3d93c9" />
+      <text x="350" y="64" class="m">Beobachtung im Gate → Kosten</text><text x="350" y="124" class="m">außerhalb → keine Zuordnung</text>
+      {["1 vorhersagen", "2 Kosten (NLL)", "3 Ungarisch zuordnen", "4 aktualisieren", "5 löschen / neu"].map((s, i) => (
+        <g transform={`translate(${560},${20 + i * 28})`}><rect width="280" height="22" rx="5" fill="#f1efe9" /><text x="10" y="15" class="b">{s}</text></g>
+      ))}
+    </svg>
+  </div>
+
+  <h2>Der Kalman-Filter</h2>
+  <p>Zustand einer Biene: Position und Geschwindigkeit, Modell <b>konstante Geschwindigkeit</b>, ein Zeitschritt = 1 Frame.</p>
+  <div class="formel">
+    <math display="block"><mi mathvariant="bold">x</mi><mo>=</mo><msup><mrow><mo>(</mo><mi>x</mi><mo>,</mo><mi>y</mi><mo>,</mo><mover><mi>x</mi><mo>˙</mo></mover><mo>,</mo><mover><mi>y</mi><mo>˙</mo></mover><mo>)</mo></mrow><mi>T</mi></msup>
+      <mspace width="2em"/><mi>F</mi><mo>=</mo><mrow><mo>[</mo><mtable><mtr><mtd><mn>1</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd><mtd><mn>0</mn></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd><mtd><mn>0</mn></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd></mtr></mtable><mo>]</mo></mrow>
+      <mspace width="2em"/><mi>H</mi><mo>=</mo><mrow><mo>[</mo><mtable><mtr><mtd><mn>1</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>0</mn></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd><mtd><mn>0</mn></mtd><mtd><mn>0</mn></mtd></mtr></mtable><mo>]</mo></mrow></math>
+    <div class="erk">F schiebt die Position um die Geschwindigkeit weiter; H sagt: gemessen wird nur die Position (der Schwerpunkt).</div>
+  </div>
+  <div class="two">
+    <div class="formel"><b>1 · Vorhersage</b>
+      <math display="block"><mi mathvariant="bold">x</mi><mo>←</mo><mi>F</mi><mi mathvariant="bold">x</mi></math>
+      <math display="block"><mi>P</mi><mo>←</mo><mi>F</mi><mi>P</mi><msup><mi>F</mi><mi>T</mi></msup><mo>+</mo><mi>Q</mi></math>
+      <div class="erk">P = Kovarianz (Unsicherheit) des Zustands; sie wächst mit jedem Schritt um Q.</div></div>
+    <div class="formel"><b>4 · Aktualisierung</b> mit Beobachtung z
+      <math display="block"><mi>S</mi><mo>=</mo><mi>H</mi><mi>P</mi><msup><mi>H</mi><mi>T</mi></msup><mo>+</mo><mi>R</mi><mo>,</mo><mspace width="1em"/><mi>K</mi><mo>=</mo><mi>P</mi><msup><mi>H</mi><mi>T</mi></msup><msup><mi>S</mi><mrow><mo>−</mo><mn>1</mn></mrow></msup></math>
+      <math display="block"><mi mathvariant="bold">x</mi><mo>←</mo><mi mathvariant="bold">x</mi><mo>+</mo><mi>K</mi><mo>(</mo><mi>z</mi><mo>−</mo><mi>H</mi><mi mathvariant="bold">x</mi><mo>)</mo><mo>,</mo><mspace width="1em"/><mi>P</mi><mo>←</mo><mo>(</mo><mi>I</mi><mo>−</mo><mi>K</mi><mi>H</mi><mo>)</mo><mi>P</mi></math>
+      <div class="erk">S = Unsicherheit der vorhergesagten Messung, K = Kalman-Gewinn: wie stark die Messung der Vorhersage vorgezogen wird.</div></div>
+  </div>
+  <div class="formel">
+    <b>Rauschen</b>
+    <math display="block"><mi>Q</mi><mo>=</mo><msubsup><mi>σ</mi><mi>a</mi><mn>2</mn></msubsup><mrow><mo>[</mo><mtable><mtr><mtd><mfrac><mn>1</mn><mn>4</mn></mfrac></mtd><mtd><mn>0</mn></mtd><mtd><mfrac><mn>1</mn><mn>2</mn></mfrac></mtd><mtd><mn>0</mn></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mfrac><mn>1</mn><mn>4</mn></mfrac></mtd><mtd><mn>0</mn></mtd><mtd><mfrac><mn>1</mn><mn>2</mn></mfrac></mtd></mtr><mtr><mtd><mfrac><mn>1</mn><mn>2</mn></mfrac></mtd><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd><mtd><mn>0</mn></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mfrac><mn>1</mn><mn>2</mn></mfrac></mtd><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd></mtr></mtable><mo>]</mo></mrow>
+      <mspace width="1.5em"/><mi>R</mi><mo>=</mo><msubsup><mi>σ</mi><mi>m</mi><mn>2</mn></msubsup><msub><mi>I</mi><mn>2</mn></msub>
+      <mspace width="1.5em"/><msub><mi>P</mi><mn>0</mn></msub><mo>=</mo><mi>diag</mi><mo>(</mo><msubsup><mi>σ</mi><mi>m</mi><mn>2</mn></msubsup><mo>,</mo><msubsup><mi>σ</mi><mi>m</mi><mn>2</mn></msubsup><mo>,</mo><msubsup><mi>σ</mi><mrow><mi>v</mi><mn>0</mn></mrow><mn>2</mn></msubsup><mo>,</mo><msubsup><mi>σ</mi><mrow><mi>v</mi><mn>0</mn></mrow><mn>2</mn></msubsup><mo>)</mo></math>
+    <div class="erk">Q kommt aus „zufällige Beschleunigung a pro Frame“: Position ändert sich um ½a, Geschwindigkeit um a, daher ¼, ½, 1.
+      σ<sub>a</sub> = 4 px/Frame² (Bienen drehen scharf), σ<sub>m</sub> = 2 px (Messfehler des Schwerpunkts), σ<sub>v0</sub> = 20 px/Frame
+      (neue Bahn: Geschwindigkeit unbekannt, Start mit v = 0).</div>
+  </div>
+
+  <h2>Zuordnung: Global Nearest Neighbor</h2>
+  <ol class="steps">
+    <li>Für jedes Paar (Bahn <i>i</i>, Beobachtung <i>j</i>): Innovation e = z<sub>j</sub> − Hx<sub>i</sub> und <b>Mahalanobis-Distanz</b>
+      d² = eᵀ S⁻¹ e. Sie misst den Abstand in Einheiten der Unsicherheit: Bei einer unsicheren Bahn darf die Beobachtung weiter weg liegen.</li>
+    <li><b>Gate:</b> nur Paare mit d² &lt; 13,8 sind erlaubt. 13,8 ist das 99,9-%-Quantil der χ²-Verteilung mit 2 Freiheitsgraden:
+      Eine echte Beobachtung fällt nur in 0,1 % der Fälle heraus.</li>
+    <li><b>Kosten</b> = negative Log-Likelihood der Beobachtung unter der Vorhersage (Gl. 16–19):</li>
+  </ol>
+  <div class="formel">
+    <math display="block"><msub><mi>c</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo><mi>ln</mi><msqrt><mrow><mo>|</mo><msub><mi>S</mi><mi>i</mi></msub><mo>|</mo></mrow></msqrt><mo>+</mo><mfrac><mrow><mi>N</mi><mi>ln</mi><mn>2</mn><mi>π</mi><mo>+</mo><msubsup><mi>d</mi><mrow><mi>i</mi><mi>j</mi></mrow><mn>2</mn></msubsup></mrow><mn>2</mn></mfrac><mo>,</mo><mspace width="1em"/><mi>N</mi><mo>=</mo><mn>2</mn></math>
+    <div class="erk">Der Term ln√|S| bestraft unsichere Bahnen: Bei gleicher Distanz gewinnt die Bahn, die sich ihrer Vorhersage sicherer ist.</div>
+  </div>
+  <ol class="steps" start="4">
+    <li><b>Ungarische Methode</b> (<code>scipy linear_sum_assignment</code>): findet die Zuordnung mit der kleinsten <i>Summe</i> aller Kosten,
+      jede Bahn höchstens eine Beobachtung, jede Beobachtung höchstens eine Bahn. „Global“ heißt: Nicht jede Bahn nimmt gierig ihre nächste
+      Beobachtung, sondern alle zusammen werden optimal verteilt (wichtig, wenn Bienen sich kreuzen).</li>
+    <li><b>Aktualisieren</b> der zugeordneten Bahnen (Formel oben). Nicht zugeordnete Bahnen zählen einen Fehlschlag.</li>
+    <li><b>Löschen:</b> nach <b>3 Fehlschlägen in Folge</b> endet die Bahn (Paper: „destroyed if it is not associated … three times in succession“).</li>
+    <li><b>Neu:</b> jede nicht zugeordnete Beobachtung startet eine neue Bahn.</li>
+  </ol>
+
+  <div class="rechnung"><b>Rechenweg mit echten Zahlen · eine Train-Bahn (rec2123_seq015, ab Frame 1515)</b>
+    <p>Beobachtungen (halbe Auflösung, Zonenkoordinaten): z<sub>0</sub> = (199,6; 115,7), z<sub>1</sub> = (203,3; 119,7), z<sub>2</sub> = (208,0; 125,3). Da x und y unabhängig sind, reicht eine Achse; hier x.</p>
+    <ol>
+      <li><b>Start</b> bei z<sub>0</sub>: x = (199,6; 115,7; 0; 0), P = diag(4; 4; 400; 400).</li>
+      <li><b>Vorhersage für Frame 1:</b> Position 199,6 + 0 = <span class="eq">199,6</span> (Geschwindigkeit noch 0). Varianz Position: 4 + 400 (aus der unsicheren Geschwindigkeit) + 4 (Q, ¼ · 16) =
+        <span class="eq">408</span>; Kovarianz Position–Geschwindigkeit 400 + 8 = 408; Varianz Geschwindigkeit 400 + 16 = 416.</li>
+      <li><b>Innovation:</b> e = z<sub>1</sub> − Vorhersage = (3,7; 4,0). S = 408 + R (4) = <span class="eq">412</span> je Achse.</li>
+      <li><b>Mahalanobis:</b> <span class="eq">d² = 3,7²/412 + 4,0²/412 = (13,69 + 16,00)/412 = 0,072</span> &lt; 13,8 → im Gate.</li>
+      <li><b>Kosten:</b> <span class="eq">½ ln(412²) + ½ (2 ln 2π + 0,072) = 6,021 + 1,838 + 0,036 = 7,895</span>. Gibt es nur diese Beobachtung, wird sie zugeordnet.</li>
+      <li><b>Gewinn:</b> K<sub>Pos</sub> = 408/412 = 0,990, K<sub>Geschw</sub> = 408/412 = 0,990. Die Messung ist viel genauer als die Vorhersage, also folgt der Filter fast ganz der Messung.</li>
+      <li><b>Update:</b> Position 199,6 + 0,990 · 3,7 = <span class="eq">203,26</span>, Geschwindigkeit 0 + 0,990 · 3,7 = <span class="eq">3,66 px/Frame</span> (y: 119,66 und 3,96). Varianz Position jetzt nur noch 3,96, Geschwindigkeit 11,96.</li>
+      <li><b>Frame 2:</b> Vorhersage 203,26 + 3,66 = 206,93 (y 123,62), Messung 208,0 (y 125,3), e = (1,07; 1,68). S ist auf <span class="eq">31,84</span> geschrumpft, weil die Geschwindigkeit jetzt bekannt ist:
+        d² = (1,07² + 1,68²)/31,84 = <span class="res">0,125</span>, Kosten 5,361 (kleiner als 7,895: die Bahn ist sich sicherer).</li>
+    </ol>
+  </div>
+
+  <h2>Parameter</h2>
+  <table class="p">
+    <tr><th>Name</th><th>Wert</th><th>Herkunft</th></tr>
+    <tr><td>Bewegungsmodell</td><td class="n">konstante Geschwindigkeit</td><td><span class="tag paper">Paper</span></td></tr>
+    <tr><td>Kosten</td><td class="n">NLL der Innovation</td><td><span class="tag paper">Paper (Gl. 16–19)</span></td></tr>
+    <tr><td>MAX_MISSES</td><td class="n">3</td><td><span class="tag paper">Paper</span></td></tr>
+    <tr><td>σ<sub>m</sub>, σ<sub>a</sub>, σ<sub>v0</sub></td><td class="n">2 px, 4 px/F², 20 px/F</td><td><span class="tag eigen">eigene Wahl</span> (Paper nennt keine Werte)</td></tr>
+    <tr><td>Gate</td><td class="n">χ²₂(0,999) = 13,8</td><td><span class="tag eigen">eigene Wahl</span></td></tr>
+  </table>
+  <p class="src">Code: <code>Track</code> und <code>gnn_track()</code> in <code>src/beeflight/chiron.py</code>. Vergleichsvariante: SORT (Bewley 2016) in <code>src/beeflight/sort.py</code>.</p>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum Mahalanobis- und nicht euklidische Distanz?</summary><div>Sie berücksichtigt die Unsicherheit S der
+      Vorhersage und deren Richtung. Nach einem verpassten Frame ist S größer, die Biene darf weiter weg sein. Euklidisch würde
+      jede Bahn gleich behandeln.</div></details>
+    <details><summary>Was bedeutet „Global“ Nearest Neighbor im Gegensatz zu greedy?</summary><div>Greedy: jede Bahn nimmt nacheinander
+      ihre nächste freie Beobachtung; die Reihenfolge entscheidet und kann Bienen vertauschen. GNN löst ein Zuordnungsproblem über alle
+      Paare gleichzeitig (minimale Gesamtkosten) mit der Ungarischen Methode in O(n³).</div></details>
+    <details><summary>Woher kommen die Einträge ¼, ½, 1 in Q?</summary><div>Aus dem Modell „weißes Rauschen in der Beschleunigung“:
+      Eine Beschleunigung a über einen Frame ändert die Position um ½·a·Δt² und die Geschwindigkeit um a·Δt (Δt = 1).
+      Q = σ<sub>a</sub>² · G Gᵀ mit G = (½, 1) je Achse.</div></details>
+    <details><summary>Was macht der Kalman-Gewinn K anschaulich?</summary><div>Er gewichtet zwischen Vorhersage und Messung. Ist die
+      Vorhersage unsicher (P groß) oder die Messung genau (R klein), folgt der Zustand stark der Messung; sonst eher der Vorhersage.</div></details>
+    <details><summary>Warum brechen Tracklets ab, und warum ist das nicht schlimm?</summary><div>Über Gras oder bei Unschärfe wird die
+      Biene einige Frames nicht detektiert; nach 3 Fehlschlägen endet die Bahn. Das Linking (Kapitel 5) setzt solche Bruchstücke danach
+      wieder zusammen; dort darf die Lücke bis 60 Frames lang sein.</div></details>
+  </div>
+</Kapitel>

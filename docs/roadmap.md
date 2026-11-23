@@ -1,7 +1,6 @@
 # Roadmap zum Endprodukt
 
-Stand 28.10.2026. Präsentationstermine im Kurs: 25.11. oder 01.12. Der Plan rechnet mit dem **25.11.**;
-beim 01.12. wird Woche 5 zum Puffer.
+Stand 08.11.2026. Präsentation am **26.11.2026** (bestätigt am 08.11.).
 
 ## Endprodukt
 
@@ -15,12 +14,31 @@ Am Ende stehen drei Dinge:
 
 ```
  Woche 1          Woche 2           Woche 3            Woche 4            Termin
- 28.10.–03.11.    04.11.–10.11.     11.11.–17.11.      18.11.–24.11.      25.11.
+ 28.10.–03.11.    04.11.–10.11.     11.11.–17.11.      18.11.–24.11.      26.11.
  ─────────────────────────────────────────────────────────────────────────────────
  Bahnen für alle  Detektor          Modelle            Test einmal        Vortrag
  Label-Tool       Labels 300+80     Vergleich auf Val  Folien, Proben
  erste 100 Labels ▲ Gate 1          ▲ Gate 2           ▲ Freeze
 ```
+
+## Nächste Schritte (Stand 07.11.2026)
+
+Ergänzt nach Literaturprüfung, Fehleranalyse und Vorbereitung des Rechecks. Die Phasen unten bleiben gültig, diese
+Liste ordnet nur die restliche Zeit.
+
+| Bis | Schritt | Details |
+|---|---|---|
+| 10.11. | **Labelregeln für Grenzfälle festlegen** (G1–G4: kreisender Abflug, Rand-zu-Rand-Vorbeiflug, Brett zu Brett, Bienenwechsel) | Entwurf mit offenen Fragen in [labeling.md](labeling.md#labelregeln-für-grenzfälle--entwurf-entscheidung-durch-florian); auch entscheiden, ob rückwirkend und ob die Online-Kurzfassung sich ändert |
+| ab 10.11. | **Recheck Validierung** (50 Bahnen, blind) | [labeling.md](labeling.md#zweitlabeln-recheck); Auswertung nur nach der vorab festgelegten Regel |
+| ab 12.11. | **Recheck Train** (50 Bahnen, blind) | Wochenabstand zum ersten Label |
+| laufend | **Experimente auf der DGX Spark** | Läuft in einer eigenen Sitzung; Ergebnisse werden in [methode.md](methode.md#5-modelle) nachgetragen (Platzhalter dort) |
+| nach Recheck | Recheck auswerten, ggf. `val.jsonl` korrigieren (archiviert), Modellauswahl einmal wiederholen | danach nicht weiter auf Val tunen |
+| **~14.11.** | **Freeze** | siehe Phase 5 |
+| danach | **Genau eine Testauswertung** pro Testset | siehe Phase 5, Metriken nach [methode.md](methode.md#6-metriken) |
+| bis Termin | **Folien** mit echten Zahlen, Proben | siehe Phase 6; Vorarbeiten-Satz aus [literatur.md](literatur.md#vorarbeiten-und-abgrenzung) übernehmen |
+
+Zwischen 12.11. (Beginn Train-Recheck) und dem Freeze bleiben nur zwei Tage. **Offen:** Freeze verschieben, falls das
+Recheck Val-Korrekturen ergibt, oder das Train-Recheck nur noch berichten und nicht mehr für Korrekturen nutzen.
 
 ## Phase 0: erledigt
 
@@ -157,7 +175,8 @@ Fragmente als eigene Kategorie mitzählen.
 - [ ] **300 Trainingsbahnen** und **80 Validierungsbahnen** gelabelt (≈ 3–4 h, auf mehrere Tage verteilt)
 - [ ] 8 Pakete an Helfende verteilen (je zwei pro Paket), Exporte nach `labels/votes/`, `beeflight-vote`
 - [ ] Mindestens **40 Orientierungsflüge** im Training, sonst gezielt kurvige Abflüge nachziehen
-- [ ] Übereinstimmung berichten: Krippendorffs α über alle Labelnden (Zweitlabeln für Cohen's κ nur noch optional)
+- [ ] Übereinstimmung berichten: Krippendorffs α über alle Labelnden (nur Testsets), dazu mein Intra-Rater-κ aus
+      dem Recheck für Train und Val
 
 ## Phase 4: Modelle (Woche 3)
 
@@ -168,17 +187,22 @@ Modelle und Begründung in [methode.md](methode.md#5-modelle).
 - [x] **Kandidat 2: DINOv2 auf Ausschnitten** (`beeflight-dinov2`)
 - [x] **Kandidaten 3 und 4: Fusion und G-Blend** (`beeflight-fusion`)
 - [x] Vergleich auf Validierung: **ResNet gewählt**, aber nicht klar besser als die Regel
-- [ ] Details des ResNet am Volltext von Fawaz et al. 2019 prüfen (arXiv 1809.04356), bevor sie zitiert werden
+- [x] Details des ResNet am Volltext von Fawaz et al. 2019 prüfen (arXiv 1809.04356), bevor sie zitiert werden:
+      07.11.2026, „bestes“ gilt nur unter den DL-Modellen ([literatur.md](literatur.md#modelle))
+- [x] Volltextprüfung der übrigen Methoden- und Auswertungspaper, Literaturliste [literatur.md](literatur.md)
+- [x] Fehleranalyse der alten Modelle ([methode.md](methode.md#7-fehleranalyse-und-labelqualität))
+- [ ] Ergebnisse der Spark-Läufe in [methode.md](methode.md#5-modelle) eintragen
 - [ ] Experimente als JSON in `outputs/runs/` (Konfiguration, Seed, Git-Hash, Metriken), damit jede Zahl auf den
       Folien reproduzierbar ist
-- [ ] Zweitlabeln der 50 Bahnen, κ berechnen
+- [ ] Zweitlabeln: je 50 Bahnen Val (ab 10.11.) und Train (ab 12.11.), κ nach der vorab festgelegten Regel
+      ([labeling.md](labeling.md#zweitlabeln-recheck))
 
 > **Gate 2 (Ende Woche 3):** Schlägt das Modell die Baseline auf Validierung nicht klar, wird trotzdem eingefroren. Dann
 > lautet das Ergebnis: Die einfache Regel reicht fast, und die Diskussion erklärt, warum.
 
 ## Phase 5: Einfrieren und Test (Anfang Woche 4)
 
-- [ ] **Freeze**: bestes Modell, alle Schwellen und Zonen festschreiben, Commit taggen (`v1.0-freeze`)
+- [ ] **Freeze** (geplant ~14.11.): bestes Modell, alle Schwellen und Zonen festschreiben, Commit taggen (`v1.0-freeze`)
 - [ ] Testsets herunterladen (`beeflight-splits --download test_same_hive`, `… test_other_hive`)
 - [ ] Zonen für Stock B aus einem einzelnen Frame setzen, nicht anhand von Ergebnissen
 - [ ] Testbahnen erzeugen und **erst jetzt** labeln (Test A: 4 Sequenzen, Test B: 21 Sequenzen)
@@ -191,6 +215,8 @@ Modelle und Begründung in [methode.md](methode.md#5-modelle).
       (Geschwindigkeit, Länge, Fragmentanteil). Lässt sich der Leistungsabfall *ohne Labels* vorab erkennen?
 
 ## Phase 6: Präsentation (Woche 4)
+
+Erkenntnisse aus den Vorträgen von Mo und Darian, Fragen und Antworten: [vortrag.md](vortrag.md).
 
 - [ ] Folie 3 mit echten Zahlen füllen: Test A, Test B, Domain Shift, Baseline-Vergleich
 - [ ] Neue Abbildungen: Konfusionsmatrix, Indikator über die Zeit

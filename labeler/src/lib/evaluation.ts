@@ -6,8 +6,16 @@ import { LABELS_DIR, readSplits } from "./store";
 import { trackerFolders, trackerRuns } from "./trackers";
 
 // order matters: a new tracker goes to the end, so the samples of the others (and their verdicts) stay the same
-export const EVAL_TRACKERS = ["flights_chiron_sort", "flights_chiron", "flights", "flights_chiron_linked"];
+export const EVAL_TRACKERS = ["flights_chiron_sort", "flights_chiron", "flights", "flights_chiron_linked", "flights_darian_hybrid",
+  "flights_sledevic26_hybrid"];
 export const PER_TRACKER = 30;
+// 17.11.: the trackers on slide 2 (SORT, Chiron, Chiron + Huang) and the Sledevič YOLO26s hybrid get 60 tracks each,
+// the Darian hybrid 30 (only for background). The first 30 per tracker are the same as before (the shuffle per tracker
+// does not depend on the sample size), so the verdicts of 31.10. stay valid.
+export const PER: Record<string, number> = { flights_chiron_sort: 60, flights_chiron: 60, flights_chiron_linked: 60,
+  flights_sledevic26_hybrid: 60 };
+export const perTracker = (k: string) => PER[k] ?? PER_TRACKER;
+export const EVAL_TOTAL = EVAL_TRACKERS.reduce((a, k) => a + perTracker(k), 0);
 const SEED = 2013;
 export const VERDICTS = [
   { key: "korrekt", name: "Korrekt und ganz", hint: "eine Biene, von Brett/Rand bis Brett/Rand" },
@@ -59,7 +67,7 @@ export function evalSample(): { items: EvalItem[]; trackers: string[]; missing: 
     }
   }
   const rand = rng(SEED);
-  const items = trackers.flatMap((k) => shuffle(pools.get(k)!, rand).slice(0, PER_TRACKER));
+  const items = trackers.flatMap((k) => shuffle(pools.get(k)!, rand).slice(0, perTracker(k)));
   return { items: shuffle(items, rand), trackers, missing };
 }
 

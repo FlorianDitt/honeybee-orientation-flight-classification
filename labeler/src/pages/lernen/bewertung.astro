@@ -1,0 +1,105 @@
+---
+import Kapitel from "../../components/Kapitel.astro";
+---
+
+<Kapitel slug="bewertung" satz="Alles beginnt mit der Konfusionsmatrix; Hauptmaß ist die Balanced Accuracy (mittlere Trefferquote pro Klasse), dazu Recall, Precision und F1 der Orientierung; Unsicherheit wird mit einem Bootstrap über ganze Sequenzen geschätzt, weil Bahnen derselben Sequenz zusammenhängen.">
+
+  <h2>Konfusionsmatrix</h2>
+  <div class="fig">
+    <svg viewBox="0 0 860 210">
+      <text x="160" y="20" class="c m">vorhergesagt →</text>
+      {["O", "S", "A", "Art"].map((c, j) => <text x={80 + j * 50 + 25} y="42" class="c b">{c}</text>)}
+      {["O", "S", "A", "Art"].map((c, i) => <text x="60" y={70 + i * 36} class="c b">{c}</text>)}
+      {[[32, 3, 3, 4], [7, 33, 0, 8], [3, 1, 38, 3], [10, 7, 7, 45]].map((row, i) => row.map((v, j) => (
+        <g><rect x={80 + j * 50} y={50 + i * 36} width="48" height="34" fill={i === j ? "#fbe9c6" : "#fff"} stroke="#e5e7eb" />
+          <text x={80 + j * 50 + 24} y={72 + i * 36} class="c">{v}</text></g>))
+      )}
+      <text x="20" y="130" class="m" transform="rotate(-90 20 130)">wahr ↓</text>
+      <text x="320" y="70" class="b">Beispiel: Ensemble Kombi auf Val</text>
+      <text x="320" y="94" class="m">Zeile = wahre Klasse, Spalte = Vorhersage, Diagonale = richtig.</text>
+      <text x="320" y="118">Recall O = 32 / (32+3+3+4) = 32/42 = 0,76</text>
+      <text x="320" y="142">Precision O = 32 / (32+7+3+10) = 32/52 = 0,62</text>
+      <text x="320" y="166">F1 O = 2·32 / (42 + 52) = 0,68</text>
+      <text x="320" y="190" class="m">Größter Fehler: 10 Artefakte → Orientierung</text>
+    </svg>
+  </div>
+
+  <h2>Die Maße</h2>
+  <div class="two">
+    <div class="formel"><b>Recall</b> (Trefferquote) von Klasse k
+      <math display="block"><msub><mi>R</mi><mi>k</mi></msub><mo>=</mo><mfrac><msub><mi>C</mi><mrow><mi>k</mi><mi>k</mi></mrow></msub><mrow><munder><mo>∑</mo><mi>j</mi></munder><msub><mi>C</mi><mrow><mi>k</mi><mi>j</mi></mrow></msub></mrow></mfrac></math>
+      <div class="erk">Von allen echten k: wie viele gefunden?</div></div>
+    <div class="formel"><b>Precision</b> von Klasse k
+      <math display="block"><msub><mi>P</mi><mi>k</mi></msub><mo>=</mo><mfrac><msub><mi>C</mi><mrow><mi>k</mi><mi>k</mi></mrow></msub><mrow><munder><mo>∑</mo><mi>i</mi></munder><msub><mi>C</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub></mrow></mfrac></math>
+      <div class="erk">Von allen als k vorhergesagten: wie viele stimmen?</div></div>
+  </div>
+  <div class="two">
+    <div class="formel"><b>F1</b> von Klasse k
+      <math display="block"><msub><mi>F</mi><mn>1</mn></msub><mo>=</mo><mfrac><mrow><mn>2</mn><msub><mi>P</mi><mi>k</mi></msub><msub><mi>R</mi><mi>k</mi></msub></mrow><mrow><msub><mi>P</mi><mi>k</mi></msub><mo>+</mo><msub><mi>R</mi><mi>k</mi></msub></mrow></mfrac><mo>=</mo><mfrac><mrow><mn>2</mn><msub><mi>C</mi><mrow><mi>k</mi><mi>k</mi></mrow></msub></mrow><mrow><msub><mi>n</mi><mi>k</mi></msub><mo>+</mo><msub><mover><mi>n</mi><mo>^</mo></mover><mi>k</mi></msub></mrow></mfrac></math>
+      <div class="erk">Harmonisches Mittel; hoch nur, wenn beide hoch sind. n<sub>k</sub> = echte, n̂<sub>k</sub> = vorhergesagte k.</div></div>
+    <div class="formel"><b>Balanced Accuracy</b> (Hauptmaß)
+      <math display="block"><mi>BA</mi><mo>=</mo><mfrac><mn>1</mn><mi>K</mi></mfrac><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>K</mi></munderover><msub><mi>R</mi><mi>k</mi></msub></math>
+      <div class="erk">Mittel der Recalls über die K vorhandenen Klassen (Opitz 2024, Gl. 7). Raten: 1/K = 0,25.</div></div>
+  </div>
+  <div class="merke"><b>Warum BA und nicht Accuracy?</b> Die Klassen sind ungleich häufig (Val: 42 O, 48 S, 45 A, 69 Art). Accuracy belohnt, die häufige Klasse oft zu sagen.
+    BA zählt jede Klasse gleich. Eine Klasse ohne Beispiele wird ausgelassen (nicht als Recall 0 gezählt).</div>
+  <div class="merke"><b>Zufalls-F1 der Orientierung:</b> Rät ein Modell mit Wahrscheinlichkeit q „Orientierung“, ist P = Anteil O = π und R = q, also F1 = 2πq/(π + q).
+    Bei π = 42/204 ≈ 0,21: gleichverteilt raten (q = 0,25) gibt ≈ 0,23; immer „Orientierung“ (q = 1) gibt ≈ 0,34.</div>
+
+  <div class="rechnung"><b>Rechenweg mit echten Zahlen · Balanced Accuracy auf Test B</b>
+    <table>
+      <tr><th>Klasse</th><th>richtig / echte</th><th>Recall</th></tr>
+      <tr><th>Orientierung</th><td>28 / 53</td><td>0,528</td></tr>
+      <tr><th>Sammelabflug</th><td>41 / 47</td><td>0,872</td></tr>
+      <tr><th>Anflug</th><td>103 / 127</td><td>0,811</td></tr>
+      <tr><th>Artefakt</th><td>150 / 183</td><td>0,820</td></tr>
+    </table>
+    <p><span class="eq">BA = (0,528 + 0,872 + 0,811 + 0,820) / 4 = 3,031 / 4 = 0,758</span>. Accuracy wäre (28 + 41 + 103 + 150) / 410 = 322 / 410 = 0,785: höher, weil die häufigen
+      Klassen Anflug und Artefakt gut erkannt werden und Orientierung (selten, schwer) weniger zählt.</p>
+  </div>
+
+  <h2>Unsicherheit: Cluster-Bootstrap</h2>
+  <ol class="steps">
+    <li>Bahnen derselben Sequenz sind nicht unabhängig (gleiches Licht, gleiche Bienen, Orientierungs-Phasen). Darum wird über <b>Sequenzen</b> gezogen, nicht über Bahnen.</li>
+    <li>2000-mal (Val-Vergleiche: 1000-mal): aus den S Sequenzen S Stück <b>mit Zurücklegen</b> ziehen, alle ihre Bahnen nehmen, das Maß berechnen (bei mehreren Seeds: Mittel über Seeds).</li>
+    <li>95-%-Intervall = 2,5. bis 97,5. Perzentil der 2000 Werte (Perzentil-Methode).</li>
+    <li><b>Gepaarte Differenz</b> zweier Modelle: in jeder Ziehung dieselben Bahnen für beide, Differenz berechnen. Enthält das Intervall die 0 nicht, ist der Unterschied deutlich.</li>
+  </ol>
+  <div class="achtung"><b>Test A hat nur 4 Sequenzen.</b> Damit gibt es nur 35 verschiedene Bootstrap-Stichproben, zu wenig. Ab weniger als 10 Sequenzen gibt es deshalb
+    statt Bootstrap: <b>Wilson-Intervalle</b> für Recall und Precision (ignorieren die Abhängigkeit, eher zu schmal) und die Spanne beim <b>Weglassen je einer Sequenz</b>.</div>
+  <div class="formel"><b>Wilson-Intervall</b> für einen Anteil r = k/n
+    <math display="block"><mfrac><mrow><mi>r</mi><mo>+</mo><mfrac><msup><mi>z</mi><mn>2</mn></msup><mrow><mn>2</mn><mi>n</mi></mrow></mfrac><mo>±</mo><mi>z</mi><msqrt><mrow><mfrac><mrow><mi>r</mi><mo>(</mo><mn>1</mn><mo>−</mo><mi>r</mi><mo>)</mo></mrow><mi>n</mi></mfrac><mo>+</mo><mfrac><msup><mi>z</mi><mn>2</mn></msup><mrow><mn>4</mn><msup><mi>n</mi><mn>2</mn></msup></mrow></mfrac></mrow></msqrt></mrow><mrow><mn>1</mn><mo>+</mo><mfrac><msup><mi>z</mi><mn>2</mn></msup><mi>n</mi></mfrac></mrow></mfrac><mo>,</mo><mspace width="1em"/><mi>z</mi><mo>=</mo><mn>1,96</mn></math>
+    <div class="erk">Besser als r ± z√(r(1−r)/n): bleibt in [0, 1] und funktioniert auch bei kleinen n oder r nahe 0 oder 1.</div>
+  </div>
+
+  <div class="rechnung"><b>Rechenweg mit echten Zahlen · Wilson für Recall Orientierung auf Test A (31 von 57)</b>
+    <ol>
+      <li><span class="eq">r = 31 / 57 = 0,5439</span>, n = 57, z = 1,96, z² = 3,8416.</li>
+      <li>Nenner: <span class="eq">1 + 3,8416 / 57 = 1,0674</span></li>
+      <li>Mitte: <span class="eq">(0,5439 + 3,8416 / 114) / 1,0674 = (0,5439 + 0,0337) / 1,0674 = 0,5411</span></li>
+      <li>Wurzel: <span class="eq">√(0,5439 · 0,4561 / 57 + 3,8416 / (4 · 57²)) = √(0,004352 + 0,000296) = √0,004648 = 0,0682</span></li>
+      <li>Halbe Breite: <span class="eq">1,96 · 0,0682 / 1,0674 = 0,1252</span></li>
+      <li>Intervall: <span class="res">[0,541 − 0,125; 0,541 + 0,125] = [0,416; 0,666]</span>. Die einfache Formel r ± 1,96·√(r(1−r)/n) gäbe [0,415; 0,673], fast gleich; Wilson
+        lohnt sich vor allem bei kleinem n oder r nahe 0 oder 1.</li>
+    </ol>
+  </div>
+
+  <h2>Indikator für die Biologie</h2>
+  <div class="formel">
+    <math display="block"><mi>Anteil Orientierung</mi><mo>=</mo><mfrac><msub><mi>n</mi><mi>O</mi></msub><mrow><mi>n</mi><mo>−</mo><msub><mi>n</mi><mi>Art</mi></msub></mrow></mfrac><mo>,</mo><mspace width="1.5em"/><mi>Fehler</mi><mo>=</mo><msub><mi>Anteil</mi><mi>vorhergesagt</mi></msub><mo>−</mo><msub><mi>Anteil</mi><mi>wahr</mi></msub></math>
+    <div class="erk">Wie viele der echten Flüge sind Orientierungsflüge? Artefakte zählen nicht. Positiver Fehler = das Modell überschätzt.</div>
+  </div>
+  <p class="src">Code: <code>src/beeflight/metrics.py</code> (alle Maße, Bootstrap, Wilson), <code>src/beeflight/evaluate.py</code> (Auswertung, Testsets nur mit <code>--test</code>).</p>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum Bootstrap über Sequenzen und nicht über Bahnen?</summary><div>Bahnen einer Sequenz sind korreliert. Zieht man Bahnen einzeln, tut man so,
+      als gäbe es 204 unabhängige Beobachtungen; das Intervall wird zu schmal. Über Sequenzen ziehen respektiert die Abhängigkeit.</div></details>
+    <details><summary>Was sagt ein Differenz-Intervall von [−0,000; +0,086]?</summary><div>Der beste Schätzer ist positiv, aber die untere Grenze liegt praktisch bei 0:
+      Ein echter Vorteil ist wahrscheinlich, aber nicht sicher nachgewiesen.</div></details>
+    <details><summary>Warum ist F1 der Orientierung zusätzlich zur BA wichtig?</summary><div>Die Arbeit fragt nach Orientierungsflügen. BA mittelt über alle vier Klassen;
+      F1 der Orientierung zeigt gezielt, wie gut genau diese Klasse gefunden wird und wie oft ein „Orientierung“ stimmt.</div></details>
+    <details><summary>Wie hoch ist die BA eines Zufallsmodells, und warum?</summary><div>0,25: Bei zufälliger Vorhersage ist der Recall jeder Klasse gleich dem Anteil,
+      mit dem sie vorhergesagt wird; im Mittel über die 4 Klassen ergibt das immer 1/4, egal wie oft welche geraten wird.</div></details>
+  </div>
+</Kapitel>

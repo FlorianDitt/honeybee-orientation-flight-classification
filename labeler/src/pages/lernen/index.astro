@@ -1,0 +1,63 @@
+---
+// Overview of the learning platform: the pipeline as a clickable map, then all chapters.
+import Layout from "../../layouts/Layout.astro";
+import { CHAPTERS } from "../../lib/lernen";
+
+const parts = [...new Set(CHAPTERS.map((k) => k.part))];
+const STAGES = [
+  ["Video", "1080×1920, 59,94 fps", "daten"], ["Detektion", "Chiron 2013", "detektion"], ["Tracking", "Kalman + GNN", "tracking"],
+  ["Linking", "Huang 2008", "linking"], ["Bahn", "Filter + Merkmale", "bahnen"], ["Eingabe", "7 Kanäle × 128", "eingabe"],
+  ["Vorfilter", "Biene?", "vorfilter"], ["Ensemble Kombi", "5 × ResNet", "ensemble"], ["Klasse", "4 Klassen", "labels"],
+];
+---
+
+<Layout title="Lernplattform">
+  <main class="lx">
+    <a href="/" class="back">← Übersicht</a>
+    <div class="kicker">beeflight · Lernplattform</div>
+    <h1>Jeder Schritt, jedes Modell</h1>
+    <p class="lead">13 Kapitel in der Reihenfolge der Pipeline. Jedes Kapitel hat: <b>einen Satz</b> zum Merken, ein <b>Bild</b>,
+      die <b>Schritte</b> genau wie im Code, <b>Formeln</b>, alle <b>Parameter</b> mit Herkunft (Paper oder eigene Wahl),
+      das <b>Warum</b> und <b>Prüfungsfragen</b> mit Lösung.</p>
+
+    <div class="map">
+      {STAGES.map(([t, s, slug], i) => (
+        <a href={`/lernen/${slug}`} class={`st ${t === "Ensemble Kombi" ? "hl" : ""}`}>
+          <b>{t}</b><span>{s}</span>
+        </a>
+      ))}
+    </div>
+    <p class="hint">Auf eine Stufe klicken, um zum Kapitel zu springen. Kurzfassung ohne Details: <a href="/erklaerung">So funktioniert's</a>.</p>
+
+    {parts.map((p) => (
+      <section>
+        <h2>{p}</h2>
+        <div class="grid">
+          {CHAPTERS.filter((k) => k.part === p).map((k) => (
+            <a href={`/lernen/${k.slug}`} class="card"><i>{k.nr}</i><b>{k.title}</b><span>{k.short}</span></a>
+          ))}
+        </div>
+      </section>
+    ))}
+  </main>
+</Layout>
+
+<style>
+  .lx { max-width: 1060px; margin: 0 auto; padding: 24px 16px 64px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 12px; }
+  h1 { font-size: 32px; margin: 4px 0 8px; letter-spacing: -.02em; }
+  .lead { font-size: 16px; max-width: 80ch; margin: 0 0 20px; }
+  .map { display: flex; flex-wrap: wrap; gap: 0; }
+  .st { flex: 1 1 100px; text-decoration: none; background: #fff; border: 1px solid var(--line); padding: 10px; position: relative; margin-right: 14px; margin-bottom: 8px; border-radius: 8px; }
+  .st:not(:last-child)::after { content: "→"; position: absolute; right: -13px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+  .st b { display: block; font-size: 14px; } .st span { font-size: 12px; color: var(--muted); }
+  .st:hover { border-color: var(--accent); } .st.hl { background: #fdf6e8; border-color: var(--accent); }
+  .hint { font-size: 13px; color: var(--muted); }
+  h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 28px 0 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .card { text-decoration: none; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; position: relative; }
+  .card:hover { border-color: var(--accent); }
+  .card i { font-style: normal; font-weight: 700; color: var(--accent); font-size: 20px; display: block; }
+  .card b { display: block; font-size: 15px; margin: 2px 0; } .card span { font-size: 13px; color: var(--muted); }
+</style>

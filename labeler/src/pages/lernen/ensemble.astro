@@ -1,0 +1,86 @@
+---
+import Kapitel from "../../components/Kapitel.astro";
+---
+
+<Kapitel slug="ensemble" satz="Dasselbe ResNet Kombi wird fünfmal mit verschiedenem Zufallsstart trainiert; die fünf Wahrscheinlichkeitsvektoren werden gemittelt, und die Klasse mit dem größten Mittel ist die Vorhersage.">
+
+  <h2>Ablauf</h2>
+  <ol class="steps">
+    <li><b>5 Seeds</b> (0 bis 4): Der Seed legt die Startgewichte und die Reihenfolge der Batches fest. Sonst ist alles gleich: gleiche Daten,
+      gleiche Architektur, gleiche Hyperparameter.</li>
+    <li>Jedes Netz gibt pro Bahn 4 Wahrscheinlichkeiten p<sup>(s)</sup>.</li>
+    <li><b>Mitteln</b> und die größte nehmen:</li>
+  </ol>
+  <div class="formel">
+    <math display="block"><msub><mover><mi>p</mi><mo>¯</mo></mover><mi>k</mi></msub><mo>=</mo><mfrac><mn>1</mn><mn>5</mn></mfrac><munderover><mo>∑</mo><mrow><mi>s</mi><mo>=</mo><mn>0</mn></mrow><mn>4</mn></munderover><msubsup><mi>p</mi><mi>k</mi><mrow><mo>(</mo><mi>s</mi><mo>)</mo></mrow></msubsup><mo>,</mo><mspace width="2em"/><mover><mi>y</mi><mo>^</mo></mover><mo>=</mo><munder><mi>arg max</mi><mi>k</mi></munder><msub><mover><mi>p</mi><mo>¯</mo></mover><mi>k</mi></msub></math>
+    <div class="erk">„Soft Voting“: gemittelt werden Wahrscheinlichkeiten, nicht Stimmen. Ein Netz, das sehr sicher ist, zählt mehr als eines, das zwischen zwei Klassen schwankt.</div>
+  </div>
+  <div class="fig">
+    <svg viewBox="0 0 860 150">
+      {[[0.5, 0.3, 0.1, 0.1], [0.3, 0.45, 0.1, 0.15], [0.55, 0.25, 0.1, 0.1], [0.45, 0.35, 0.05, 0.15], [0.4, 0.4, 0.1, 0.1]].map((p, s) => (
+        <g transform={`translate(${20 + s * 120},10)`}>
+          <text x="40" y="12" class="c m">Seed {s}</text>
+          {p.map((v, k) => <rect x={k * 20} y={110 - 90 * v} width="16" height={90 * v} fill={["#e0662a", "#3d93c9", "#3f9d6b", "#8a8f98"][k]} />)}
+        </g>
+      ))}
+      <text x="640" y="70" class="m" style="font-size:20px">→ Ø</text>
+      <g transform="translate(700,10)">
+        <text x="40" y="12" class="c b">Ensemble</text>
+        {[0.44, 0.35, 0.09, 0.12].map((v, k) => <rect x={k * 20} y={110 - 90 * v} width="16" height={90 * v} fill={["#e0662a", "#3d93c9", "#3f9d6b", "#8a8f98"][k]} />)}
+        <text x="40" y="132" class="c m">Orientierung</text>
+      </g>
+    </svg>
+    <div class="cap">Seed 1 allein hätte „Sammelabflug“ gesagt; der Mittelwert entscheidet stabiler.</div>
+  </div>
+
+  <div class="rechnung"><b>Rechenweg mit echten Zahlen · dieselbe Val-Bahn, alle 5 Seeds (wahr: Orientierung)</b>
+    <table>
+      <tr><th>Seed</th><th>O</th><th>S</th><th>A</th><th>Art</th><th>Einzelvorhersage</th></tr>
+      <tr><th>0</th><td class="d">0,522</td><td>0,008</td><td>0,136</td><td>0,334</td><td>O ✓</td></tr>
+      <tr><th>1</th><td class="d">0,734</td><td>0,001</td><td>0,008</td><td>0,256</td><td>O ✓</td></tr>
+      <tr><th>2</th><td>0,028</td><td>0,001</td><td>0,132</td><td class="d">0,840</td><td>Art ✗</td></tr>
+      <tr><th>3</th><td class="d">0,819</td><td>0,000</td><td>0,081</td><td>0,100</td><td>O ✓</td></tr>
+      <tr><th>4</th><td>0,175</td><td>0,000</td><td class="d">0,637</td><td>0,187</td><td>A ✗</td></tr>
+      <tr><th>Ø</th><td class="d">0,456</td><td>0,002</td><td>0,199</td><td>0,344</td><td class="res">O ✓</td></tr>
+    </table>
+    <p>Mittel für O: <span class="eq">(0,522 + 0,734 + 0,028 + 0,819 + 0,175) / 5 = 2,278 / 5 = 0,456</span>; für Art: (0,334 + 0,256 + 0,840 + 0,100 + 0,187) / 5 = 0,343.
+      Zwei Seeds irren, aber in verschiedene Richtungen. Im Mittel gewinnt die richtige Klasse.</p>
+  </div>
+
+  <h2>Warum hilft das?</h2>
+  <ul>
+    <li><b>Varianz senken.</b> Bei nur 515 Train-Bahnen hängt ein einzelnes Netz merklich vom Zufallsstart ab. Die Fehler verschiedener Seeds sind nur teilweise
+      gleich; im Mittel heben sich zufällige Fehler auf, systematische bleiben.</li>
+    <li><b>Besser kalibriert.</b> Gemittelte Wahrscheinlichkeiten sind seltener extrem falsch sicher.</li>
+    <li><b>Kosten:</b> 5-fache Trainings- und Vorhersagezeit. Für 4 Klassen und kleine Netze unkritisch.</li>
+  </ul>
+  <table class="p">
+    <tr><th>Val (204 Bahnen)</th><th>BA</th><th>F1 Orientierung</th></tr>
+    <tr><td>ResNet Basis (Mittel der 5 Seeds)</td><td class="n">0,689</td><td class="n">0,591</td></tr>
+    <tr><td>ResNet Kombi (Mittel der 5 Seeds)</td><td class="n">0,715</td><td class="n">0,624</td></tr>
+    <tr><td><b>Ensemble Kombi</b></td><td class="n"><b>0,737</b></td><td class="n"><b>0,681</b></td></tr>
+  </table>
+  <p>Unterschied Ensemble Kombi − Basis: +0,048 BA, 95-%-Intervall [−0,000; +0,086] (gepaarter Cluster-Bootstrap über Sequenzen, Kapitel 12). Ensemble Länge 128
+    lag fast gleichauf (0,736, Intervall [+0,010; +0,083]).</p>
+
+  <h2>Warum gerade dieses Modell eingefroren wurde</h2>
+  <ol class="steps">
+    <li>Regel vom 16.11.: Varianten auf Train trainieren, auf Val vergleichen, die beste <b>einmal</b> auf Test prüfen.</li>
+    <li>Ensemble Kombi hatte auf Val die höchste BA und den höchsten F1 der Orientierung unter allen ~70 Varianten.</li>
+    <li>Nach dem Freeze wurde es neu trainiert (5 Seeds, nur Train, Gewichte gespeichert, <code>outputs/final/kombi/</code>) und unverändert auf beide Testsets angewandt.</li>
+  </ol>
+  <div class="achtung"><b>Ehrlich dazu:</b> Wer unter ~70 Varianten die beste auf Val nimmt, bekommt einen etwas zu optimistischen Val-Wert
+    (Selektionsbias, „Winner's Curse“). Deshalb zählt für die Leistung nur der Test.</div>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Was ist der Unterschied zwischen Soft und Hard Voting?</summary><div>Hard Voting: jedes Netz gibt eine Stimme, die Mehrheit
+      gewinnt. Soft Voting: die Wahrscheinlichkeiten werden gemittelt. Soft nutzt die Sicherheit der Netze und hat keine Gleichstände bei 5 Netzen und 4 Klassen.</div></details>
+    <details><summary>Warum sind 5 Netze mit verschiedenen Seeds überhaupt verschieden?</summary><div>Das Verlustgebirge eines neuronalen Netzes hat viele
+      gute Täler. Andere Startgewichte und eine andere Batch-Reihenfolge führen in andere Täler, also zu Netzen, die auf schwierigen Bahnen verschieden entscheiden.</div></details>
+    <details><summary>Warum ist der Val-Wert des Ensembles mit Vorsicht zu lesen?</summary><div>Es wurde auf Val ausgewählt. Bei vielen Varianten ist der
+      Spitzenreiter oft auch zufällig begünstigt. Die Testauswertung mit dem eingefrorenen Modell ist davon frei.</div></details>
+    <details><summary>Hätte man das Ensemble auch auf Train + Val trainieren können?</summary><div>Ja, das ist nach der Auswahl üblich und gibt mehr Daten.
+      Hier wurde nur auf Train trainiert, damit das getestete Modell genau dem auf Val gewählten entspricht.</div></details>
+  </div>
+</Kapitel>

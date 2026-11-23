@@ -1,0 +1,97 @@
+---
+import Kapitel from "../../components/Kapitel.astro";
+---
+
+<Kapitel slug="eingabe" satz="Jede Bahn wird zu einer Tabelle 7 × 128: Position relativ zum Flugloch, Geschwindigkeit, Tempo, Kurvenwinkel und Dauer, auf 128 Punkte gestreckt und mit den Mittelwerten von Train standardisiert.">
+
+  <h2>Von Punkten zu Kanälen</h2>
+  <div class="fig">
+    <svg viewBox="0 0 860 200">
+      <text x="20" y="20" class="b">Bahn: n Punkte (t, x, y)</text>
+      <path d="M40 60 C 10 110, 30 170, 90 160 S 160 90, 100 50" fill="none" stroke="#e0662a" stroke-width="3" />
+      <text x="200" y="110" class="m" style="font-size:22px">→</text>
+      <text x="240" y="20" class="b">n × 7</text>
+      {["x", "y", "dx", "dy", "|v|", "dθ", "Dauer"].map((c, i) => <text x="250" y={46 + i * 21} class="m">{c}</text>)}
+      <rect x="290" y="32" width="110" height="148" fill="#f1efe9" stroke="#e5e7eb" /><text x="345" y="110" class="c m">n Spalten</text>
+      <text x="420" y="110" class="m" style="font-size:22px">→</text>
+      <text x="460" y="20" class="b">interpolieren auf 128</text>
+      <rect x="460" y="32" width="160" height="148" fill="#f1efe9" stroke="#e5e7eb" /><text x="540" y="110" class="c m">128 Spalten</text>
+      <text x="640" y="110" class="m" style="font-size:22px">→</text>
+      <text x="680" y="20" class="b">standardisieren</text>
+      <rect x="680" y="32" width="160" height="148" fill="#fdf6e8" stroke="#d99a1e" /><text x="760" y="104" class="c b">7 × 128</text><text x="760" y="122" class="c m">Eingabe des Netzes</text>
+    </svg>
+  </div>
+
+  <h2>1 · Koordinaten relativ zum Flugloch</h2>
+  <div class="formel">
+    <math display="block"><msub><mi>x</mi><mi>e</mi></msub><mo>=</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mn>270</mn></mrow><mn>540</mn></mfrac><mo>,</mo><mspace width="2em"/><msub><mi>y</mi><mi>e</mi></msub><mo>=</mo><mfrac><mrow><mi>y</mi><mo>−</mo><mi>b</mi></mrow><mn>540</mn></mfrac></math>
+    <div class="erk">x, y in halber Auflösung, y ab Brett-Oberkante. 270 = Mitte der Brettunterkante (Flugloch), 540 = Brettbreite (bei beiden Stöcken
+      die ganze Bildbreite), b = Brettunterkante in Zonenkoordinaten (Stock A: 90). Einheit: <b>Brettbreiten</b>. x<sub>e</sub> = 0 heißt
+      „genau vor dem Flugloch“, y<sub>e</sub> &gt; 0 heißt „unterhalb des Bretts, vom Stock weg“. So bedeuten die Zahlen bei beiden Stöcken dasselbe.</div>
+  </div>
+
+  <h2>2 · Bewegung</h2>
+  <div class="formel">
+    <math display="block"><mi>Δ</mi><msub><mi>t</mi><mi>k</mi></msub><mo>=</mo><mi>max</mi><mo>(</mo><msub><mi>t</mi><mi>k</mi></msub><mo>−</mo><msub><mi>t</mi><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>,</mo><mn>1</mn><mo>)</mo><mo>,</mo><mspace width="1.5em"/>
+      <msub><mi mathvariant="bold">d</mi><mi>k</mi></msub><mo>=</mo><mfrac><mrow><msub><mi mathvariant="bold">p</mi><mi>k</mi></msub><mo>−</mo><msub><mi mathvariant="bold">p</mi><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></msub></mrow><mrow><mi>Δ</mi><msub><mi>t</mi><mi>k</mi></msub></mrow></mfrac><mo>,</mo><mspace width="1.5em"/><msub><mi mathvariant="bold">d</mi><mn>0</mn></msub><mo>=</mo><mn>0</mn></math>
+    <math display="block"><mo>(</mo><mi>dx</mi><mo>,</mo><mi>dy</mi><mo>)</mo><mo>=</mo><mn>50</mn><mo>·</mo><msub><mi mathvariant="bold">d</mi><mi>k</mi></msub><mo>,</mo><mspace width="1.5em"/><mo>|</mo><mi>v</mi><mo>|</mo><mo>=</mo><mn>50</mn><mo>·</mo><mo>‖</mo><msub><mi mathvariant="bold">d</mi><mi>k</mi></msub><mo>‖</mo><mo>,</mo><mspace width="1.5em"/>
+      <mi>dθ</mi><mo>=</mo><mi>wrap</mi><mo>(</mo><msub><mi>θ</mi><mi>k</mi></msub><mo>−</mo><msub><mi>θ</mi><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>)</mo><mo>,</mo><mspace width="0.5em"/><msub><mi>θ</mi><mi>k</mi></msub><mo>=</mo><mi>atan2</mi><mo>(</mo><msub><mi>d</mi><mi>y</mi></msub><mo>,</mo><msub><mi>d</mi><mi>x</mi></msub><mo>)</mo></math>
+    <div class="erk">Geschwindigkeit pro Frame in Brettbreiten, mal 50 (nur Skalierung). Fehlende Frames (Lücken aus dem Linking) werden durch Δt geteilt,
+      damit eine Lücke nicht wie ein Sprung aussieht. wrap bringt den Winkel nach (−π, π]: Eine Drehung von 179° nach −179° ist 2°, nicht 358°.
+      Steht die Biene fast still (‖d‖ &lt; 0,001), ist dθ = 0, weil die Richtung dann nur Rauschen ist.</div>
+  </div>
+
+  <div class="rechnung"><b>Rechenweg mit echten Zahlen · dieselbe Train-Bahn (rec2123_seq015 ab Frame 1515)</b>
+    <p>Punkte (halbe Auflösung): p<sub>0</sub> = (199,6; 115,7), p<sub>1</sub> = (203,3; 119,7), p<sub>2</sub> = (208,0; 125,3), Frames 1515, 1516, 1517.</p>
+    <ol>
+      <li><b>Position von p<sub>1</sub>:</b> <span class="eq">x<sub>e</sub> = (203,3 − 270) / 540 = −66,7 / 540 = −0,124</span>
+        <span class="eq">y<sub>e</sub> = (119,7 − 90) / 540 = 29,7 / 540 = 0,055</span> → etwas links vom Flugloch, 0,055 Brettbreiten unter dem Brett.</li>
+      <li><b>Schritt:</b> Δt = 1516 − 1515 = 1. In Brettbreiten: d = (3,7; 4,0) / 540 = (0,00685; 0,00741).
+        <span class="eq">dx = 50 · 0,00685 = 0,343</span> <span class="eq">dy = 50 · 0,00741 = 0,370</span></li>
+      <li><b>Tempo:</b> <span class="eq">|v| = 50 · √(0,00685² + 0,00741²) = 50 · 0,01009 = 0,505</span></li>
+      <li><b>Richtung:</b> θ<sub>1</sub> = atan2(4,0; 3,7) = 47,2° = 0,824 rad. Bei p<sub>2</sub>: θ<sub>2</sub> = atan2(5,6; 4,7) = 50,0° = 0,873 rad →
+        <span class="eq">dθ<sub>2</sub> = 0,873 − 0,824 = 0,048 rad</span> (2,8° Drehung im Uhrzeigersinn, so wie man das Bild sieht; y zeigt nach unten).</li>
+      <li><b>Dauer:</b> 34 Frames: <span class="eq">ln(34 / 59,94) = ln(0,567) = −0,567</span> in allen 128 Spalten.</li>
+      <li><b>Standardisieren</b> (μ, σ über alle Train-Punkte): x<sub>e</sub>: μ = 0,050, σ = 0,276 → <span class="eq">(−0,124 − 0,050) / 0,276 = −0,63</span>;
+        |v|: μ = 0,945, σ = 0,751 → <span class="eq">(0,505 − 0,945) / 0,751 = −0,59</span> (langsamer als der Durchschnitt).</li>
+    </ol>
+    <p class="src">Alle μ: x 0,050 · y 0,238 · dx −0,054 · dy 0,025 · |v| 0,945 · dθ 0,005 · Dauer 0,028. Alle σ: 0,276 · 0,206 · 0,963 · 0,726 · 0,751 · 0,716 · 0,683.</p>
+  </div>
+
+  <h2>3 · Dauer (nur Kombi)</h2>
+  <div class="formel">
+    <math display="block"><mi>Dauer</mi><mo>=</mo><mi>ln</mi><mfrac><mrow><msub><mi>t</mi><mtext>letzter</mtext></msub><mo>−</mo><msub><mi>t</mi><mtext>erster</mtext></msub><mo>+</mo><mn>1</mn></mrow><mn>59,94</mn></mfrac><mspace width="1em"/><mtext>(in jeder Spalte gleich)</mtext></math>
+    <div class="erk">Das Strecken auf 128 Punkte versteckt, wie lang eine Bahn war: Eine 0,3-s-Bahn und eine 3-s-Bahn sehen gleich lang aus. Der
+      konstante Kanal gibt die Dauer zurück. Logarithmus, weil Dauern über eine Größenordnung streuen.</div>
+  </div>
+
+  <h2>4 · Auf 128 Punkte strecken</h2>
+  <p>Jeder Kanal wird <b>linear interpoliert</b> von n Punkten auf 128: alte Stützstellen gleichmäßig auf [0, 1] (nach Punktindex, nicht nach Zeit), neue
+    128 Stützstellen gleichmäßig auf [0, 1]. Kürzere Bahnen werden gedehnt, längere gestaucht. Grund: Ein CNN mit festem Klassifikator am Ende braucht
+    feste Länge pro Batch. Median der Train-Bahnen: 35 Punkte, längste: 238.</p>
+  <div class="merke"><b>Warum 128?</b> Das Basis-ResNet streckt auf die längste Train-Bahn (238). Auf Val war 128 besser (BA 0,708 gegen 0,689):
+    Die meisten Bahnen werden weniger stark gedehnt, und das Netz muss weniger künstlich glatte Werte verarbeiten. 64 und 96 wurden auch getestet.</div>
+
+  <h2>5 · Standardisieren</h2>
+  <div class="formel">
+    <math display="block"><msub><mover><mi>s</mi><mo>~</mo></mover><mi>c</mi></msub><mo>=</mo><mfrac><mrow><msub><mi>s</mi><mi>c</mi></msub><mo>−</mo><msub><mi>μ</mi><mi>c</mi></msub></mrow><mrow><msub><mi>σ</mi><mi>c</mi></msub><mo>+</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>6</mn></mrow></msup></mrow></mfrac></math>
+    <div class="erk">μ<sub>c</sub>, σ<sub>c</sub> = Mittelwert und Standardabweichung von Kanal c über <b>alle Punkte aller Train-Bahnen</b> (vor dem Strecken).
+      Val und Test werden mit denselben Train-Werten standardisiert, nie mit eigenen (sonst flösse Information aus Val/Test ins Modell).</div>
+  </div>
+  <p class="src">Code: <code>to_entrance()</code>, <code>channels()</code>, <code>interpolate()</code> in <code>src/beeflight/resnet.py</code>; Dauer-Kanal und
+    Standardisierung in <code>series()</code> / <code>prepare()</code> von <code>outputs/experimente/hp_search.py</code>.</p>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum relativ zum Flugloch und nicht in Pixeln?</summary><div>„Nah am Flugloch“ und „wendet sich ihm zu“ sind die
+      biologischen Kennzeichen eines Orientierungsflugs. Relativ zum Flugloch und in Brettbreiten bedeuten die Werte bei jedem Stock und jeder
+      Kamera-Entfernung dasselbe. Für Stock B ist das wichtig (Test B).</div></details>
+    <details><summary>Warum braucht man dθ, wenn dx und dy schon da sind?</summary><div>dx, dy geben Richtung und Tempo, aber Kurven muss
+      das Netz daraus erst ableiten. dθ gibt die Kurvigkeit direkt: Schleifen und Zickzack (Orientierung) erzeugen viele große dθ-Werte,
+      ein Sammelabflug fast nur kleine.</div></details>
+    <details><summary>Was geht beim Strecken auf 128 verloren, und wie wird es ausgeglichen?</summary><div>Die absolute Dauer und das Tempo
+      pro Spalte. Das Tempo bleibt über |v| erhalten (vor dem Strecken berechnet), die Dauer über den eigenen Dauer-Kanal.</div></details>
+    <details><summary>Warum mit Train-Werten standardisieren, auch für Test?</summary><div>Das Modell hat gelernt, was ein Wert relativ zur
+      Train-Verteilung bedeutet. Eigene Mittelwerte für Test würden die Skala verschieben und Information über die Testdaten benutzen.</div></details>
+  </div>
+</Kapitel>

@@ -1,6 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { PER_TRACKER, VERDICTS, evalSample, readEval } from "../lib/evaluation";
+import { VERDICTS, evalSample, readEval } from "../lib/evaluation";
 import { trackerRuns } from "../lib/trackers";
 
 const { items, trackers, missing } = evalSample();
@@ -13,6 +13,12 @@ const table = trackers.map((k) => {
   return { k, name: names[k], n, counts: VERDICTS.map((v) => mine.filter((i) => verdicts[i.id] === v.key).length) };
 });
 const pct = (a: number, n: number) => (n ? `${Math.round((100 * a) / n)} %` : "–");
+// Wilson 95 % interval of a share
+const wilson = (a: number, n: number) => {
+  if (!n) return "–";
+  const z = 1.96, p = a / n, d = 1 + z * z / n, c = (p + z * z / (2 * n)) / d, h = (z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / d;
+  return `${Math.round(100 * (c - h))}–${Math.round(100 * (c + h))} %`;
+};
 ---
 
 <Layout title="Tracker bewerten">
@@ -21,7 +27,7 @@ const pct = (a: number, n: number) => (n ? `${Math.round((100 * a) / n)} %` : "�
     <header>
       <div class="kicker">beeflight · Tracker</div>
       <h1>Tracker blind bewerten</h1>
-      <p>{PER_TRACKER} zufällige Bahnen pro Tracker aus den Validierungssequenzen, gemischt und ohne Namen. Schau zu,
+      <p>30 bis 60 zufällige Bahnen pro Tracker aus den Validierungssequenzen, gemischt und ohne Namen. Schau zu,
         ob der Punkt die ganze Zeit auf <b>derselben Biene</b> bleibt und ob die Bahn am Brett oder Bildrand beginnt und endet.</p>
     </header>
 
@@ -57,10 +63,10 @@ const pct = (a: number, n: number) => (n ? `${Math.round((100 * a) / n)} %` : "�
         <details class="result">
           <summary>Ergebnis anzeigen (erst nach dem Bewerten öffnen)</summary>
           <table>
-            <thead><tr><th>Tracker</th><th>n</th>{VERDICTS.map((v) => <th>{v.name}</th>)}</tr></thead>
+            <thead><tr><th>Tracker</th><th>n</th>{VERDICTS.map((v) => <th>{v.name}</th>)}<th>95 % „korrekt und ganz“</th></tr></thead>
             <tbody>
               {table.map((r) => (
-                <tr><th>{r.name}</th><td>{r.n}</td>{r.counts.map((c) => <td>{pct(c, r.n)}<small>{c}</small></td>)}</tr>
+                <tr><th>{r.name}</th><td>{r.n}</td>{r.counts.map((c) => <td>{pct(c, r.n)}<small>{c}</small></td>)}<td>{wilson(r.counts[0], r.n)}</td></tr>
               ))}
             </tbody>
           </table>

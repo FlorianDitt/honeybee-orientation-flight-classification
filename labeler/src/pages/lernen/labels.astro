@@ -1,0 +1,124 @@
+---
+import Kapitel from "../../components/Kapitel.astro";
+---
+
+<Kapitel slug="labels" satz="Jede Bahn bekommt von Hand eine von vier Klassen; im Test entscheidet die Mehrheit mehrerer Labelnder, und ein blinder zweiter Durchgang (Recheck) misst, wie konsistent gelabelt wurde.">
+
+  <h2>Die vier Klassen</h2>
+  <table class="p">
+    <tr><th>Klasse</th><th>Definition (docs/labeling.md)</th><th>Typische Bahn</th></tr>
+    <tr><td><b style="color:var(--c-orientierung)">orientierung</b></td><td>Startet auf dem Brett oder schwebt direkt davor; dreht sich zum
+      Stock und fliegt Bögen, Schleifen oder Zickzack quer zum Flugloch, meist langsam und nahe am Eingang. Kernregel: nach dem Start
+      fliegt sie mindestens einmal <b>wieder auf das Flugloch zu</b>.</td><td>Brett → Bögen → Rand oder Brett</td></tr>
+    <tr><td><b style="color:var(--c-sammelabflug)">sammelabflug</b></td><td>Startet auf dem Brett, verlässt die Flugzone zügig ohne
+      Schleife; eine kurze Kurve direkt nach dem Start ist erlaubt; biegt nur vom Flugloch weg ab.</td><td>Brett → fast gerade → Rand</td></tr>
+    <tr><td><b style="color:var(--c-anflug)">anflug</b></td><td>Kommt von außerhalb und endet auf dem Brett (oder ist erkennbar dorthin
+      unterwegs); darf kurven, abbremsen, suchen; abgebrochene Landungen gehören dazu.</td><td>Rand → Brett</td></tr>
+    <tr><td><b style="color:var(--c-artefakt)">artefakt</b></td><td>Keine echte Flugbahn einer Biene am Stock: Gras, Blätter, Schatten,
+      Lichtwechsel, Bienenwechsel (Tracker vertauscht zwei Bienen), Vorbeiflug ohne Bezug zum Stock, Krabbeln, zu kurz, andere Insekten.</td><td>beliebig</td></tr>
+  </table>
+  <p>Zusätzliche Flags: <code>fragment</code> (Bahn echt, aber Anfang oder Ende fehlt; Klasse trotzdem, wenn erkennbar) und
+    <code>unsicher</code>.</p>
+  <div class="merke"><b>Merke:</b> „artefakt“ ist eine Sammelklasse. Viele Artefakte zeigen <i>echte Bienen</i> (Vorbeiflug,
+    Bienenwechsel). Deshalb kann ein reiner Bienen-Detektor nur einen Teil davon abfangen (Kapitel 11).</div>
+
+  <h2>Wie gelabelt wird</h2>
+  <ol class="steps">
+    <li><b>Stichprobe ziehen.</b> Aus allen Flugbahnen eines Splits wird eine Warteschlange gezogen (<code>labels/queue_&lt;split&gt;.json</code>).</li>
+    <li><b>Ansehen.</b> Im Labeler läuft das Video der Bahn (verlangsamt, 0,25×), die Bahn ist eingezeichnet, mit Übersichtsbild.</li>
+    <li><b>Klasse vergeben</b> mit Taste 1–4; bei Artefakt zusätzlich ein Grund (Gras, Bienenwechsel, Vorbeiflug …).</li>
+    <li><b>Helfende</b> labeln über eine Online-Version in Paketen; vorher Tutorial und Übungsrunde mit Rückmeldung.</li>
+  </ol>
+
+  <h2>Mehrheit im Test</h2>
+  <p>Für die Testsets gibt es Stimmen von Florian, Labeler2 und Labeler3. <code>beeflight-vote --test</code> bildet daraus ein Label pro Bahn:</p>
+  <ol class="steps">
+    <li><b>Strikte Mehrheit</b> entscheidet: mehr als die Hälfte der Stimmen (2 von 3, 3 von 4 …).</li>
+    <li><b>Keine Mehrheit</b> (z. B. 1 : 1): Florians Label entscheidet, die Bahn bekommt das Flag <code>strittig</code>.</li>
+    <li>Ein Flag bleibt, wenn mindestens die Hälfte der Stimmen es gesetzt hat.</li>
+    <li>Ausgewertet wird gegen die Mehrheit (primär), zusätzlich gegen Florians Labels und nur auf einstimmigen Bahnen.</li>
+  </ol>
+  <div class="formel">
+    <b>Krippendorffs α (nominal)</b> misst die Übereinstimmung zwischen Labelnden, korrigiert um Zufall:
+    <math display="block"><mi>α</mi><mo>=</mo><mn>1</mn><mo>−</mo><mfrac><msub><mi>D</mi><mi>o</mi></msub><msub><mi>D</mi><mi>e</mi></msub></mfrac></math>
+    <div class="erk"><i>D</i><sub>o</sub> = beobachtete Uneinigkeit (Anteil ungleicher Paare), <i>D</i><sub>e</sub> = erwartete Uneinigkeit, wenn die Labels
+      zufällig nach ihren Häufigkeiten verteilt wären. α = 1: perfekt, α = 0: wie Zufall. Funktioniert auch, wenn nicht jede Bahn gleich viele Stimmen hat.</div>
+  </div>
+
+  <div class="rechnung"><b>Rechenweg mit echten Zahlen · Test B</b>
+    <p>100 Bahnen von Test B haben 3 Stimmen (Florian, Labeler2, Labeler3). 69-mal alle gleich, 29-mal 2 gegen 1, 2-mal alle verschieden.</p>
+    <ol>
+      <li><b>Paare bilden.</b> In jeder Bahn wird jede Stimme mit jeder anderen gepaart. Bei m = 3 Stimmen sind das 3 · 2 = 6 geordnete Paare,
+        jedes zählt mit Gewicht 1/(m − 1) = 1/2. Also trägt jede Bahn genau 3 „Paareinheiten“ bei, alle 100 Bahnen zusammen <span class="eq">n = 300</span>.</li>
+      <li><b>Koinzidenzmatrix</b> o<sub>ab</sub> (wie oft steht Label a mit Label b in einem Paar):
+        <table>
+          <tr><th></th><th>O</th><th>S</th><th>A</th><th>Art</th><th>Summe n<sub>a</sub></th></tr>
+          <tr><th>O</th><td class="d">39</td><td>5,5</td><td>8,5</td><td>13</td><td class="s">66</td></tr>
+          <tr><th>S</th><td>5,5</td><td class="d">40</td><td>0</td><td>2,5</td><td class="s">48</td></tr>
+          <tr><th>A</th><td>8,5</td><td>0</td><td class="d">90</td><td>2,5</td><td class="s">101</td></tr>
+          <tr><th>Art</th><td>13</td><td>2,5</td><td>2,5</td><td class="d">67</td><td class="s">85</td></tr>
+        </table>
+        Beispiel: Eine Bahn mit Stimmen O, O, Art gibt die Paare (O,O) zweimal, (O,Art) zweimal, (Art,O) zweimal, je mal ½ → o<sub>OO</sub> + 1, o<sub>O,Art</sub> + 1, o<sub>Art,O</sub> + 1.</li>
+      <li><b>Beobachtete Uneinigkeit:</b> alles außerhalb der Diagonale.
+        <span class="eq">Σ<sub>a≠b</sub> o<sub>ab</sub> = 300 − (39 + 40 + 90 + 67) = 300 − 236 = 64</span> → D<sub>o</sub> = 64 / 300 = 0,213.</li>
+      <li><b>Erwartete Uneinigkeit</b> bei zufälligem Ziehen ohne Zurücklegen aus allen 300 Werten:
+        <span class="eq">Σ<sub>a≠b</sub> n<sub>a</sub> n<sub>b</sub> = 300² − (66² + 48² + 101² + 85²) = 90 000 − 24 086 = 65 914</span>
+        <span class="eq">D<sub>e</sub> = 65 914 / (300 · 299) = 0,735</span></li>
+      <li><b>α</b> = 1 − D<sub>o</sub> / D<sub>e</sub> = 1 − 0,213 / 0,735 = <span class="res">0,710</span>.</li>
+    </ol>
+    <p>Zum Vergleich (gleiche Rechnung): Test A 0,538, Val 0,478, Train 0,474. Nach der üblichen Faustregel (Krippendorff) gilt erst α ≥ 0,667 als vorläufig verlässlich:
+      Die Klassengrenzen sind auch für Menschen schwer.</p>
+  </div>
+
+  <h2>Recheck: Wie konsistent bin ich selbst?</h2>
+  <p>Je 50 Bahnen aus Train und Val wurden <b>blind ein zweites Mal</b> gelabelt (ohne das erste Label zu sehen). Die Auswertungsregel
+    wurde vorher festgelegt:</p>
+  <ol class="steps">
+    <li><b>Cohens κ</b> (ungewichtet, 4 Klassen), erstes gegen zweites Label, mit 95-%-Bootstrap-Intervall (2000 Ziehungen über Bahnen).</li>
+    <li>Val: nur die 35 <i>Zufalls</i>bahnen zählen für κ; 15 Bahnen waren nach Modellfehlern ausgewählt („Verdächtige“) und würden κ verzerren.</li>
+    <li>Verdächtige gegen Zufallsbahnen: Änderungsrate mit exaktem Fisher-Test (einseitig). Höher bei Verdächtigen → Labelfehler erklären einen Teil der Modellfehler.</li>
+    <li>Korrigiert wurde nur „Label war falsch“ (abweichend und nicht <code>unsicher</code>), alte Version archiviert. Danach nicht erneut auf Val getunt.</li>
+  </ol>
+  <div class="formel">
+    <math display="block"><mi>κ</mi><mo>=</mo><mfrac><mrow><msub><mi>p</mi><mi>o</mi></msub><mo>−</mo><msub><mi>p</mi><mi>e</mi></msub></mrow><mrow><mn>1</mn><mo>−</mo><msub><mi>p</mi><mi>e</mi></msub></mrow></mfrac></math>
+    <div class="erk"><i>p</i><sub>o</sub> = Anteil gleicher Labels, <i>p</i><sub>e</sub> = Anteil, der bei unabhängigem Labeln mit denselben
+      Klassenhäufigkeiten zufällig gleich wäre (Summe über Klassen von Anteil₁ × Anteil₂).</div>
+  </div>
+  <div class="rechnung"><b>Rechenweg mit echten Zahlen · Recheck Train (50 Bahnen)</b>
+    <ol>
+      <li><b>Kreuztabelle</b> erstes Label (Zeile) gegen zweites Label (Spalte):
+        <table>
+          <tr><th>1. ↓ / 2. →</th><th>O</th><th>S</th><th>A</th><th>Art</th><th>Summe</th></tr>
+          <tr><th>O</th><td class="d">10</td><td>0</td><td>4</td><td>3</td><td class="s">17</td></tr>
+          <tr><th>S</th><td>2</td><td class="d">12</td><td>0</td><td>0</td><td class="s">14</td></tr>
+          <tr><th>A</th><td>1</td><td>0</td><td class="d">6</td><td>0</td><td class="s">7</td></tr>
+          <tr><th>Art</th><td>0</td><td>1</td><td>1</td><td class="d">10</td><td class="s">12</td></tr>
+          <tr><th>Summe</th><td class="s">13</td><td class="s">13</td><td class="s">11</td><td class="s">13</td><td class="s">50</td></tr>
+        </table></li>
+      <li><b>Beobachtete Übereinstimmung</b> = Diagonale / alle:
+        <span class="eq">p<sub>o</sub> = (10 + 12 + 6 + 10) / 50 = 38 / 50 = 0,76</span></li>
+      <li><b>Zufalls-Übereinstimmung:</b> Für jede Klasse Zeilenanteil × Spaltenanteil, dann summieren.
+        <span class="eq">p<sub>e</sub> = (17·13 + 14·13 + 7·11 + 12·13) / 50² = (221 + 182 + 77 + 156) / 2500 = 636 / 2500 = 0,254</span><br />
+        Bedeutung: Würde ich zweimal unabhängig mit denselben Häufigkeiten raten, stimmten 25,4 % zufällig überein.</li>
+      <li><b>κ</b> = (p<sub>o</sub> − p<sub>e</sub>) / (1 − p<sub>e</sub>) = (0,76 − 0,254) / (1 − 0,254) = 0,506 / 0,746 = <span class="res">0,68</span>.</li>
+    </ol>
+    <p>Lesart: Von der Übereinstimmung, die über Zufall hinaus möglich ist, erreiche ich 68 %. Nach Landis &amp; Koch „substanziell“ (0,61–0,80).
+      Die Fehler sitzen fast alle in der ersten Zeile: 7 von 17 ersten „Orientierung“-Labels wurden beim zweiten Mal Anflug (4) oder Artefakt (3).</p>
+  </div>
+  <p class="src">Code: <code>src/beeflight/vote.py</code>; Regeln: <code>docs/labeling.md</code> (Abschnitt Auswertungsregel).</p>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum ist „artefakt“ eine eigene Klasse und nicht einfach weggelassen?</summary><div>Der Tracker liefert auch
+      Bahnen von Gras, Schatten oder vertauschten Bienen. Im Einsatz muss das Modell diese erkennen, sonst würden sie als Flüge
+      gezählt. Für den Biologie-Indikator (Anteil Orientierung) werden Artefakte ausgeschlossen: Orientierung / alles außer Artefakt.</div></details>
+    <details><summary>Was ist der Unterschied zwischen κ und α?</summary><div>Beide sind zufallskorrigierte Übereinstimmung. Cohens κ
+      vergleicht genau zwei Rater auf denselben Einheiten (hier: ich gegen mich selbst). Krippendorffs α erlaubt beliebig viele
+      Rater und fehlende Stimmen (Helfende haben nicht alle Bahnen gelabelt).</div></details>
+    <details><summary>Warum zählen die 15 „Verdächtigen“ nicht für κ?</summary><div>Sie wurden ausgewählt, weil Modelle sich bei
+      ihnen irrten, also sind es schwierige Bahnen. Sie würden κ nach unten verzerren und nicht die normale Konsistenz zeigen.</div></details>
+    <details><summary>Wer gewinnt bei 1 : 1 im Test, und warum ist das vertretbar?</summary><div>Florians Label, Flag „strittig“.
+      Florian hat die Klassendefinition festgelegt und alle Bahnen gelabelt; zusätzlich wird auf einstimmigen Bahnen getrennt
+      ausgewertet, damit man sieht, ob strittige Fälle das Ergebnis tragen.</div></details>
+  </div>
+</Kapitel>

@@ -77,6 +77,19 @@ feste Kamera sie zuverlässig sieht, und genau den zeigt der Datensatz.
   Das ist ein realistischer ML-System-Aufbau mit wenig Annotationsbudget.
 - **Domain Shift:** zwei Stöcke, zwei Lichtsituationen, zwei Kamera-Abstände.
 
+## Vorarbeiten
+
+Uns ist keine Arbeit bekannt, die Orientierungsflüge automatisch klassifiziert, und kein Benchmark dafür (begrenzte
+Suche, Stand 07.11.2026). Am nächsten kommen:
+
+- **Morton Williams 2024** (Dissertation, Bangor): Flugbahnen vor dem Flugloch in rein / raus / schweben, dazu
+  Hummel-Flüge per Harmonic Radar; Orientierungsflüge nur als Ausblick.
+- **Sledevič et al. 2025** (PLOS ONE): Verhalten auf dem Flugbrett, regelbasiert über Geschwindigkeits- und
+  Zeitschwellen; Orientierungsflüge nur in der Einleitung.
+- **Rodriguez et al. 2022** (Frontiers in Computer Science): Ein- und Ausflug über Start- und Endpunkt der Bahn.
+
+Vollständige Angaben und geprüfte Zitate: [literatur.md](literatur.md#vorarbeiten-und-abgrenzung).
+
 ## Abgrenzung zu anderen Themen im Kurs
 
 | Thema (Person) | Unterschied |
@@ -100,6 +113,9 @@ feste Kamera sie zuverlässig sieht, und genau den zeigt der Datensatz.
 | Keine echte Ground Truth über das Alter der Bienen | Ehrlich formulieren: das Modell erkennt *Flugverhalten, das Orientierungsflügen entspricht*, nicht das Alter |
 
 ## Literatur
+
+Methoden-, Auswertungs- und Vorarbeiten-Literatur mit Prüfstatus: [literatur.md](literatur.md). Hier nur die
+biologischen Quellen.
 
 - Capaldi, E. A., Smith, A. D., Osborne, J. L., et al. (2000). Ontogeny of orientation flight in the honeybee
   revealed by harmonic radar. *Nature*, 403, 537–540. doi:10.1038/35000564

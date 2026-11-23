@@ -85,7 +85,8 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
       backend: {
         async save(t, l) {
           if (tutorialMode) return;
-          const rec: Rec = { ...l, split: data.items[t.id].split, labeled_at: new Date().toISOString() };
+          // the package decides the split: a recheck track is also a val/train track (or a tutorial example)
+          const rec: Rec = { ...l, split: practiceMode ? data.items[t.id].split : pkg.split, labeled_at: new Date().toISOString() };
           target[t.id] = rec;
           store(state);
         },

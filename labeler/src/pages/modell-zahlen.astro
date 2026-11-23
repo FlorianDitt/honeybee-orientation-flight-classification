@@ -1,0 +1,380 @@
+---
+// Hyperparameters and setups of the trajectory classifier on val, from outputs/hp_vergleich.json
+// (written by outputs/experimente/hp_search.py aggregate). Trained on train, selected on val, test once later.
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import Layout from "../layouts/Layout.astro";
+import { ROOT } from "../lib/store";
+
+interface C { seeds_done: number; kind: string; change: Record<string, unknown> | null;
+  ba: number; ba_sd: number; ba_ci: [number, number]; recall_o: number; recall_o_ci: [number, number];
+  precision_o: number; precision_o_ci: [number, number]; ba_diff?: number; ba_diff_ci?: [number, number];
+  recall_o_diff?: number; recall_o_diff_ci?: [number, number]; orientierung_als: Record<string, number>; confusion: number[][] }
+const file = resolve(ROOT, "outputs", "hp_vergleich.json");
+const data = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
+const NAMES: Record<string, string> = {
+  base: "ResNet Basis (Fawaz 2019)", klassengewichte: "Klassengewichte", epochen_300: "300 Epochen", epochen_750: "750 Epochen",
+  "lr_0.0003": "Lernrate 0,0003", "lr_0.003": "Lernrate 0,003", filter_32: "32 Filter", filter_128: "128 Filter",
+  laenge_128: "Länge 128", laenge_256: "Länge 256", nur_position: "nur Position (x, y)", nur_bewegung: "nur Bewegung",
+  mit_dauer: "+ Dauer als Kanal", augmentierung: "Augmentierung (Ausschnitt, Spiegeln)", label_smoothing: "Label Smoothing 0,1",
+  "dropout_0.3": "Dropout 0,3", weight_decay: "Weight Decay 0,001", regel_fest: "Regel (feste Schwellen)",
+  regel_auf_train: "Regel (Schwellen auf Train)", gradient_boosting: "Gradient Boosting (Bahnmerkmale)" };
+const name = (k: string) => NAMES[k] ?? k;
+
+// setups: input (bahn, video, spaet, fusion) x classes (4, 2), from outputs/setups_vergleich.json (setups.py aggregate)
+interface Su { input: string; k: number; seeds_done: number; ba2: number; ba2_ci: [number, number]; recall_o: number;
+  precision_o: number; f1_o: number; f1_o_ci: [number, number]; share_err: number; ba4?: number; ba4_ci?: [number, number];
+  hits_o: number; pred_o: number; f1_o_diff?: number; f1_o_diff_ci?: [number, number] }
+const sfile = resolve(ROOT, "outputs", "setups_vergleich.json");
+const sdata = existsSync(sfile) ? JSON.parse(readFileSync(sfile, "utf8")) : null;
+const INPUT_NAMES: Record<string, string> = { bahn: "nur Bahn", video: "nur Video-Clip", spaet: "beides (späte Fusion)", fusion: "beides (gemeinsam trainiert)" };
+const INPUT_ORDER = ["bahn", "video", "spaet", "fusion"];
+const srows: [string, Su][] = sdata ? (Object.entries(sdata.setups) as [string, Su][])
+  .sort((a, b) => INPUT_ORDER.indexOf(a[1].input) - INPUT_ORDER.indexOf(b[1].input) || b[1].k - a[1].k) : [];
+const SROW = 30, STOP = 30, SH = STOP + srows.length * SROW + 20, SLO = 0.2, SHI = 0.8;
+const fx = (v: number) => 300 + ((Math.max(SLO, Math.min(SHI, v)) - SLO) / (SHI - SLO)) * (1000 - 300 - 60);
+const pctS = (v: number) => (v >= 0 ? "+" : "−") + Math.abs(100 * v).toFixed(1).replace(".", ",") + " PP";
+const rows: [string, C][] = data ? (Object.entries(data.configs) as [string, C][]).sort((a, b) => b[1].ba - a[1].ba) : [];
+const group = (k: string, c: C) => (k === "base" ? "final" : c.kind === "resnet" ? "yolo" : "motion");
+const f2 = (x: number) => (x ?? NaN).toFixed(3).replace(".", ",");
+const pts = (x: number) => (x >= 0 ? "+" : "−") + Math.abs(x).toFixed(3).replace(".", ",");
+const CLASSES: string[] = data?.classes ?? ["orientierung", "sammelabflug", "anflug", "artefakt"];
+const CCOL: Record<string, string> = { orientierung: "#e0662a", sammelabflug: "#3d93c9", anflug: "#3f9d6b", artefakt: "#8a8f98" };
+
+const W = 1000, L = 300, R = 40, ROW = 24, TOP = 30;
+const H = TOP + rows.length * ROW + 20;
+const LO = 0.4, HI = 0.9;
+const x = (v: number) => L + ((Math.max(LO, Math.min(HI, v)) - LO) / (HI - LO)) * (W - L - R);
+const diffs = rows.filter(([k, c]) => k !== "base" && c.ba_diff !== undefined);
+const DH = TOP + diffs.length * ROW + 20, DLO = -0.15, DHI = 0.1;
+const dx = (v: number) => L + ((Math.max(DLO, Math.min(DHI, v)) - DLO) / (DHI - DLO)) * (W - L - R);
+// scatter recall vs precision of orientierung
+const S = 460, SP = 50;
+const sx = (v: number) => SP + v * (S - SP - 20), sy = (v: number) => S - SP - v * (S - SP - 20);
+// round 2 (17.11.): new trajectory models, ensembles, video networks, clustering; outputs/modelle2_vergleich.json
+interface M2 { kind: string; seeds_done: number; ba: number; ba_ci: [number, number]; recall_o: number; precision_o: number;
+  f1_o: number; f1_o_ci: [number, number]; ba_diff?: number; ba_diff_ci?: [number, number]; f1_o_diff?: number;
+  f1_o_diff_ci?: [number, number] }
+const mfile = resolve(ROOT, "outputs", "modelle2_vergleich.json");
+const mdata = existsSync(mfile) ? JSON.parse(readFileSync(mfile, "utf8")) : null;
+const M2N: Record<string, string> = { ...NAMES, kombi: "ResNet Länge 128 + lr 0,0003 + Dauer", laenge_64: "ResNet Länge 64",
+  laenge_96: "ResNet Länge 96", laenge_128: "ResNet Länge 128", laenge_128_lr: "ResNet Länge 128 + lr 0,0003",
+  laenge_128_dauer: "ResNet Länge 128 + Dauer", inception: "InceptionTime", inception_kombi: "InceptionTime + lr 0,0003 + Dauer",
+  bild_absolut: "Bahn als Bild (absolut) + CNN", bild_zentriert: "Bahn als Bild (zentriert) + CNN",
+  r3d_c112: "R3D-18 · Clip 112 px", r3d_c224: "R3D-18 · Clip 224 px", mc3_c112: "MC3-18 · Clip 112 px", mc3_c224: "MC3-18 · Clip 224 px" };
+const m2name = (k: string) => k.startsWith("ensemble_") ? `Ensemble 5 Seeds: ${M2N[k.slice(9)] ?? k.slice(9)}` : (M2N[k] ?? k);
+const KIND_N: Record<string, string> = { bahn: "Bahn-Netz", ensemble: "Ensemble", video: "Video-Netz", cluster: "Clustering", ohne_netz: "ohne Netz" };
+const mall: [string, M2][] = mdata ? (Object.entries(mdata.configs) as [string, M2][]) : [];
+const clusterRows = mall.filter(([k]) => k.startsWith("cluster_"));
+const bestCluster = ["merkmale", "bahn", "video"].map((f) => clusterRows.filter(([k]) => k.startsWith(`cluster_${f}_`))
+  .sort((a, b) => b[1].ba - a[1].ba)[0]).filter(Boolean);
+const mrows = [...mall.filter(([k]) => !k.startsWith("cluster_")), ...bestCluster].sort((a, b) => b[1].ba - a[1].ba);
+const MROW = 24, MTOP = 30, MH = MTOP + mrows.length * MROW + 20, MLO = 0.3, MHI = 0.9;
+const mx = (v: number) => 340 + ((Math.max(MLO, Math.min(MHI, v)) - MLO) / (MHI - MLO)) * (1000 - 340 - 60);
+// clustering: BA and F1 orientierung against K
+const KS: number[] = [...new Set(clusterRows.map(([k]) => Number(k.split("_k")[1])))].sort((a, b) => a - b);
+const KW = 1000, KH = 300, KL = 60, KR = 20, KT = 20, KB = 40;
+const kx = (k: number) => KL + (KS.indexOf(k) / Math.max(1, KS.length - 1)) * (KW - KL - KR);
+const ky = (v: number) => KH - KB - ((v - 0.2) / 0.6) * (KH - KB - KT);
+const FCOL: Record<string, string> = { merkmale: "#8a8f98", bahn: "#2f6fb0", video: "#e0662a" };
+const kline = (f: string, key: "ba" | "f1_o") => KS.map((k) => mdata?.configs[`cluster_${f}_k${k}`])
+  .map((c, i) => c ? `${kx(KS[i])},${ky(c[key])}` : "").filter(Boolean).join(" ");
+// F1 of chance on val: random of 4 classes, and always "orientierung"
+const prev = mdata ? mdata.support[0] / mdata.n : 0.2;
+const f1Rand = (2 * prev * 0.25) / (prev + 0.25), f1All = (2 * prev) / (1 + prev);
+---
+
+<Layout title="Modell in Zahlen">
+  <main>
+    <a href="/" class="back">← Übersicht</a>
+    <header>
+      <div class="kicker">beeflight · Klassifikator</div>
+      <h1>Modell in Zahlen</h1>
+      <p>Jede Einstellung auf Train trainiert ({data?.seeds ?? 5} Seeds) und auf Val gemessen ({data?.n ?? "–"} Bahnen,
+        {data?.seqs ?? "–"} Sequenzen, nach den Recheck-Korrekturen). Gewählt wird die beste Balanced Accuracy auf Val;
+        dieses Modell läuft einmal auf Test. Intervalle: 95 %, Bootstrap über Sequenzen.
+        <span class="sw final"></span> ResNet Basis · <span class="sw yolo"></span> eine Änderung an der Basis ·
+        <span class="sw motion"></span> ohne Netz</p>
+    </header>
+
+    <section>
+      <h2>A · Setups: Bahn, Video, beides – mit 4 oder 2 Klassen</h2>
+      {!sdata ? (
+        <p class="hint">Noch keine Zahlen. Erst <code>uv run python outputs/experimente/setups.py aggregate</code>.</p>
+      ) : (
+        <>
+          <p class="sub">Verglichen wird, was alle Setups gemeinsam haben: die Entscheidung „Orientierungsflug oder nicht“
+            ({sdata.orientierung} echte Orientierungsflüge unter {sdata.n} Val-Bahnen). Punkt: F1 für Orientierung (Mittel aus
+            Recall und Precision), Balken: 95-%-Intervall. <span class="sw k4"></span> 4 Klassen · <span class="sw k2"></span> 2 Klassen
+            (Orientierung / Rest). Video-Clip: 8 Bilder entlang der Bahn, 224-px-Ausschnitt um die Biene, Farbbild und
+            Differenzbild, eingefrorenes DINOv2 ViT-S.</p>
+          <svg viewBox={`0 0 1000 ${SH}`} role="img" aria-label="F1 Orientierung je Setup">
+            {[0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8].map((v) => (
+              <g><line x1={fx(v)} x2={fx(v)} y1={STOP - 8} y2={SH - 16} class="grid" /><text x={fx(v)} y={STOP - 14} class="tick">{v.toFixed(1).replace(".", ",")}</text></g>
+            ))}
+            {srows.map(([key, s], i) => {
+              const y = STOP + i * SROW + SROW / 2;
+              return (
+                <g class={s.k === 4 ? "k4" : "k2"}>
+                  <text x={290} y={y + 4} class="lab">{INPUT_NAMES[s.input] ?? s.input} · {s.k} Kl.{s.seeds_done < sdata.seeds ? ` (${s.seeds_done}/${sdata.seeds})` : ""}</text>
+                  <line x1={fx(s.f1_o_ci[0])} x2={fx(s.f1_o_ci[1])} y1={y} y2={y} class="ci" />
+                  <circle cx={fx(s.f1_o)} cy={y} r="6" class="dot" />
+                  <text x={fx(s.f1_o_ci[1]) + 8} y={y + 4} class="val">{f2(s.f1_o)}</text>
+                </g>
+              );
+            })}
+          </svg>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>Setup</th><th>Klassen</th><th>Seeds</th><th>F1 Orient. (95 %)</th><th>Recall</th><th>Precision</th>
+                <th>BA Orient./Rest</th><th>Anteilsfehler</th><th>BA 4 Klassen</th><th>Δ F1 zu Bahn · 4 Kl.</th></tr></thead>
+              <tbody>
+                {srows.map(([key, s]) => (
+                  <tr class={s.k === 4 ? "k4" : "k2"}>
+                    <td>{INPUT_NAMES[s.input] ?? s.input}</td><td>{s.k}</td><td>{s.seeds_done}</td>
+                    <td>{f2(s.f1_o)} ({f2(s.f1_o_ci[0])}–{f2(s.f1_o_ci[1])})</td>
+                    <td>{f2(s.recall_o)} ({s.hits_o.toFixed(1).replace(".", ",")}/{sdata.orientierung})</td>
+                    <td>{f2(s.precision_o)} ({s.hits_o.toFixed(1).replace(".", ",")}/{s.pred_o.toFixed(1).replace(".", ",")})</td>
+                    <td>{f2(s.ba2)}</td><td>{pctS(s.share_err)}</td>
+                    <td>{s.ba4 === undefined ? "–" : f2(s.ba4)}</td>
+                    <td>{s.f1_o_diff === undefined ? "–" : `${pts(s.f1_o_diff)} (${pts(s.f1_o_diff_ci![0])} … ${pts(s.f1_o_diff_ci![1])})`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+
+    <section>
+      <h2>C · Runde 2: neue Bahn-Netze, Ensembles, Video-Netze, Clustering</h2>
+      {!mdata ? (
+        <p class="hint">Noch keine Zahlen. Erst <code>uv run python outputs/experimente/modelle2.py aggregate</code>.</p>
+      ) : (
+        <>
+          <p class="sub">Balanced Accuracy auf Val (4 Klassen), Punkt = Mittel über die Seeds, Balken = 95-%-Intervall.
+            Gestrichelt: ResNet Basis. Beim Clustering steht je Merkmalsart nur das beste K (alle K unten).
+            Zufall: BA 0,25 · F1 Orientierung {f2(f1Rand)} (zufällig raten) bzw. {f2(f1All)} (immer „Orientierung“).
+            {Object.entries(KIND_N).map(([k, n]) => <><span class={`sw m-${k}`}></span> {n} </>)}</p>
+          <svg viewBox={`0 0 1000 ${MH}`} role="img" aria-label="Balanced Accuracy Runde 2">
+            {[0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].map((v) => (
+              <g><line x1={mx(v)} x2={mx(v)} y1={MTOP - 8} y2={MH - 16} class="grid" /><text x={mx(v)} y={MTOP - 14} class="tick">{v.toFixed(1).replace(".", ",")}</text></g>
+            ))}
+            {mdata.configs.base && <line x1={mx(mdata.configs.base.ba)} x2={mx(mdata.configs.base.ba)} y1={MTOP - 8} y2={MH - 16} class="refline" />}
+            {mrows.map(([k, c], i) => {
+              const y = MTOP + i * MROW + MROW / 2;
+              return (
+                <g class={`m-${c.kind}`}>
+                  <text x={330} y={y + 4} class="lab">{m2name(k)}{c.kind === "video" && c.seeds_done < 3 ? ` (${c.seeds_done}/3)` : (c.kind === "bahn" && c.seeds_done < 5 ? ` (${c.seeds_done}/5)` : "")}</text>
+                  <line x1={mx(c.ba_ci[0])} x2={mx(c.ba_ci[1])} y1={y} y2={y} class="ci" />
+                  <circle cx={mx(c.ba)} cy={y} r="6" class="dot" />
+                  <text x={mx(c.ba_ci[1]) + 8} y={y + 4} class="val">{f2(c.ba)}</text>
+                </g>
+              );
+            })}
+          </svg>
+          {KS.length > 0 && (
+            <>
+              <h2>Clustering: Wie viele Cluster?</h2>
+              <p class="sub">k-Means auf Train, jeder Cluster bekommt das Mehrheitslabel seiner Train-Bahnen, eine Val-Bahn das
+                Label des nächsten Clusters. Durchgezogen: Balanced Accuracy, gestrichelt: F1 Orientierung.
+                {["merkmale", "bahn", "video"].map((f) => <><span class="sw" style={`background:${FCOL[f]}`}></span> {f === "merkmale" ? "Bahnmerkmale" : f === "bahn" ? "Bahn (PCA)" : "Video (DINOv2, PCA)"} </>)}</p>
+              <svg viewBox={`0 0 ${KW} ${KH}`} role="img" aria-label="Clustering gegen K">
+                {[0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8].map((v) => (
+                  <g><line x1={KL} x2={KW - KR} y1={ky(v)} y2={ky(v)} class="grid" /><text x={KL - 8} y={ky(v) + 4} class="tick end">{v.toFixed(1).replace(".", ",")}</text></g>
+                ))}
+                {KS.map((k) => <text x={kx(k)} y={KH - KB + 18} class="tick">{k}</text>)}
+                <text x={(KW + KL) / 2} y={KH - 4} class="tick">Anzahl Cluster K</text>
+                {mdata.configs.base && <line x1={KL} x2={KW - KR} y1={ky(mdata.configs.base.ba)} y2={ky(mdata.configs.base.ba)} class="refline" />}
+                {["merkmale", "bahn", "video"].map((f) => (
+                  <g>
+                    <polyline points={kline(f, "ba")} fill="none" stroke={FCOL[f]} stroke-width="2.5" />
+                    <polyline points={kline(f, "f1_o")} fill="none" stroke={FCOL[f]} stroke-width="2" stroke-dasharray="5 4" />
+                  </g>
+                ))}
+              </svg>
+            </>
+          )}
+          <div class="scroll">
+            <table>
+              <thead><tr><th>Modell</th><th>Art</th><th>Seeds</th><th>Balanced Acc. (95 %)</th><th>Δ BA zur Basis (95 %)</th>
+                <th>F1 Orient. (95 %)</th><th>Recall</th><th>Precision</th></tr></thead>
+              <tbody>
+                {mrows.map(([k, c]) => (
+                  <tr class={`m-${c.kind}`}>
+                    <td>{m2name(k)}</td><td>{KIND_N[c.kind] ?? c.kind}</td><td>{c.seeds_done}</td>
+                    <td>{f2(c.ba)} ({f2(c.ba_ci[0])}–{f2(c.ba_ci[1])})</td>
+                    <td>{c.ba_diff === undefined ? "–" : `${pts(c.ba_diff)} (${pts(c.ba_diff_ci![0])} … ${pts(c.ba_diff_ci![1])})`}</td>
+                    <td>{f2(c.f1_o)} ({f2(c.f1_o_ci[0])}–{f2(c.f1_o_ci[1])})</td><td>{f2(c.recall_o)}</td><td>{f2(c.precision_o)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+
+    <h2 class="part">B · Hyperparameter des Bahn-Modells (4 Klassen)</h2>
+    {!data ? (
+      <p class="hint">Noch keine Zahlen. Erst <code>uv run python outputs/experimente/hp_search.py aggregate</code>.</p>
+    ) : (
+      <>
+        <section>
+          <h2>1 · Balanced Accuracy auf Val</h2>
+          <p class="sub">Punkt: Mittel über die Seeds, Balken: 95-%-Intervall. Zufall wäre 0,25. Eine Zeile mit weniger als
+            {` ${data.seeds} `}Seeds ist noch nicht fertig gerechnet.</p>
+          <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Balanced Accuracy je Einstellung">
+            {[0.4, 0.5, 0.6, 0.7, 0.8, 0.9].map((v) => (
+              <g><line x1={x(v)} x2={x(v)} y1={TOP - 8} y2={H - 16} class="grid" /><text x={x(v)} y={TOP - 14} class="tick">{v.toFixed(1).replace(".", ",")}</text></g>
+            ))}
+            {data.configs.base && <line x1={x(data.configs.base.ba)} x2={x(data.configs.base.ba)} y1={TOP - 8} y2={H - 16} class="refline" />}
+            {rows.map(([k, c], i) => {
+              const y = TOP + i * ROW + ROW / 2;
+              return (
+                <g class={group(k, c)}>
+                  <text x={L - 10} y={y + 4} class="lab">{name(k)}{c.seeds_done < data.seeds && c.kind === "resnet" ? ` (${c.seeds_done}/${data.seeds})` : ""}</text>
+                  <line x1={x(c.ba_ci[0])} x2={x(c.ba_ci[1])} y1={y} y2={y} class="ci" />
+                  <circle cx={x(c.ba)} cy={y} r="6" class="dot" />
+                  <text x={x(c.ba_ci[1]) + 8} y={y + 4} class="val">{f2(c.ba)}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </section>
+
+        <section>
+          <h2>2 · Unterschied zur ResNet-Basis</h2>
+          <p class="sub">Gepaart auf denselben Bahnen und Seeds. Schneidet der Balken die Null-Linie, ist der Unterschied nicht
+            gesichert. Achtung: Bei {diffs.length} Vergleichen ist einer allein durch Zufall „gesichert“ zu erwarten.</p>
+          <svg viewBox={`0 0 ${W} ${DH}`} role="img" aria-label="Unterschied zur Basis">
+            {[-0.15, -0.1, -0.05, 0, 0.05, 0.1].map((v) => (
+              <g><line x1={dx(v)} x2={dx(v)} y1={TOP - 8} y2={DH - 16} class={v === 0 ? "zero" : "grid"} /><text x={dx(v)} y={TOP - 14} class="tick">{pts(v)}</text></g>
+            ))}
+            {diffs.map(([k, c], i) => {
+              const y = TOP + i * ROW + ROW / 2;
+              return (
+                <g class={group(k, c)}>
+                  <text x={L - 10} y={y + 4} class="lab">{name(k)}</text>
+                  <line x1={dx(c.ba_diff_ci![0])} x2={dx(c.ba_diff_ci![1])} y1={y} y2={y} class="ci" />
+                  <circle cx={dx(c.ba_diff!)} cy={y} r="6" class="dot" />
+                  <text x={dx(c.ba_diff_ci![1]) + 8} y={y + 4} class="val">{pts(c.ba_diff!)}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </section>
+
+        <section class="two">
+          <div>
+            <h2>3 · Orientierungsflüge: Recall gegen Precision</h2>
+            <p class="sub">Recall: Anteil der echten Orientierungsflüge, die erkannt werden. Precision: Anteil der als Orientierung
+              vorhergesagten, die wirklich eine sind. Oben rechts ist gut.</p>
+            <svg viewBox={`0 0 ${S} ${S}`} role="img" aria-label="Recall gegen Precision Orientierung" class="square">
+              {[0, 0.2, 0.4, 0.6, 0.8, 1].map((v) => (
+                <g>
+                  <line x1={sx(v)} x2={sx(v)} y1={sy(0)} y2={sy(1)} class="grid" /><line x1={sx(0)} x2={sx(1)} y1={sy(v)} y2={sy(v)} class="grid" />
+                  <text x={sx(v)} y={sy(0) + 18} class="tick">{v.toFixed(1).replace(".", ",")}</text>
+                  <text x={sx(0) - 8} y={sy(v) + 4} class="tick end">{v.toFixed(1).replace(".", ",")}</text>
+                </g>
+              ))}
+              <text x={sx(0.5)} y={S - 8} class="tick">Recall Orientierung</text>
+              <text x={14} y={sy(0.5)} class="tick" transform={`rotate(-90 14 ${sy(0.5)})`}>Precision Orientierung</text>
+              {rows.map(([k, c]) => (
+                <g class={group(k, c)}>
+                  <circle cx={sx(c.recall_o)} cy={sy(c.precision_o)} r={k === "base" ? 7 : 5} class="dot"><title>{name(k)}: Recall {f2(c.recall_o)}, Precision {f2(c.precision_o)}</title></circle>
+                </g>
+              ))}
+            </svg>
+          </div>
+          <div>
+            <h2>4 · Wohin gehen die echten Orientierungsflüge?</h2>
+            <p class="sub">Für jede Einstellung: Anteil der echten Orientierungsflüge auf Val ({data.support[0]} Bahnen), die als
+              welche Klasse vorhergesagt werden.</p>
+            <div class="legend">{CLASSES.map((c) => <span><i style={`background:${CCOL[c]}`}></i>{c}</span>)}</div>
+            <div class="stack">
+              {rows.map(([k, c]) => (
+                <div class="srow">
+                  <span class="sname">{name(k)}</span>
+                  <span class="sbar">{CLASSES.map((cl) => <i style={`width:${100 * (c.orientierung_als[cl] ?? 0)}%;background:${CCOL[cl]}`} title={`${cl}: ${Math.round(100 * (c.orientierung_als[cl] ?? 0))} %`}></i>)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Tabelle</h2>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>Einstellung</th><th>Seeds</th><th>Balanced Acc. (95 %)</th><th>Δ zur Basis (95 %)</th>
+                <th>Recall Orient.</th><th>Precision Orient.</th></tr></thead>
+              <tbody>
+                {rows.map(([k, c]) => (
+                  <tr class={group(k, c)}>
+                    <td>{name(k)}</td><td>{c.seeds_done}</td>
+                    <td>{f2(c.ba)} ({f2(c.ba_ci[0])}–{f2(c.ba_ci[1])})</td>
+                    <td>{c.ba_diff === undefined ? "–" : `${pts(c.ba_diff)} (${pts(c.ba_diff_ci![0])} … ${pts(c.ba_diff_ci![1])})`}</td>
+                    <td>{f2(c.recall_o)}</td><td>{f2(c.precision_o)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p class="sub">Grenzen: Wer auf Val auswählt, überschätzt den Gewinner (Auswahl unter {rows.length} Einstellungen auf
+            {` ${data.n} `}Bahnen). Darum zählt erst das Ergebnis auf Test.</p>
+        </section>
+      </>
+    )}
+  </main>
+</Layout>
+
+<style>
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 48px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 16px; }
+  h1 { font-size: 34px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  h2 { font-size: 20px; margin: 32px 0 4px; }
+  header p, .sub { color: var(--muted); margin: 0 0 12px; max-width: 900px; }
+  code { font-family: ui-monospace, monospace; font-size: 13px; background: var(--panel); padding: 1px 6px; border-radius: 4px; }
+  .hint { color: var(--muted); }
+  svg { width: 100%; height: auto; display: block; }
+  svg.square { max-width: 460px; }
+  svg text { font-size: 13px; fill: var(--ink); }
+  .lab { text-anchor: end; }
+  .tick { fill: var(--muted); font-size: 12px; text-anchor: middle; }
+  .tick.end { text-anchor: end; }
+  .val { font-size: 12px; fill: var(--muted); }
+  .grid { stroke: var(--line); }
+  .zero { stroke: var(--ink); stroke-width: 1.5; }
+  .refline { stroke-dasharray: 4 4; stroke: #2f6fb0; stroke-width: 1.5; }
+  .ci { stroke-width: 4; stroke-linecap: round; opacity: .45; stroke: var(--c); }
+  .final { --c: #2f6fb0; }
+  .yolo { --c: #d99a1e; }
+  .motion { --c: #8a8f98; }
+  .k4 { --c: #2f6fb0; }
+  .k2 { --c: #e0662a; }
+  .m-bahn { --c: #2f6fb0; }
+  .m-ensemble { --c: #6a4fb3; }
+  .m-video { --c: #e0662a; }
+  .m-cluster { --c: #3f9d6b; }
+  .m-ohne_netz { --c: #8a8f98; }
+  h2.part { font-size: 24px; margin-top: 48px; border-top: 1px solid var(--line); padding-top: 24px; }
+  .dot { fill: var(--c); }
+  .final .lab, .final td:first-child { font-weight: 700; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); margin-left: 6px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  @media (max-width: 800px) { .two { grid-template-columns: 1fr; } }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; margin-bottom: 8px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+  .srow { display: grid; grid-template-columns: 210px 1fr; gap: 8px; align-items: center; font-size: 13px; margin: 3px 0; }
+  .sname { text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sbar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; background: var(--panel); }
+  .sbar i { display: block; height: 100%; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; }
+</style>

@@ -1,0 +1,101 @@
+---
+// Frame of one chapter of /lernen: sidebar with all chapters, title, "in one sentence", content, prev/next.
+import Layout from "../layouts/Layout.astro";
+import { CHAPTERS, chapter } from "../lib/lernen";
+
+interface Props { slug: string; satz: string }
+const { slug, satz } = Astro.props;
+const c = chapter(slug);
+const i = CHAPTERS.indexOf(c);
+const prev = CHAPTERS[i - 1], next = CHAPTERS[i + 1];
+const parts = [...new Set(CHAPTERS.map((k) => k.part))];
+---
+
+<Layout title={`${c.nr}. ${c.title}`}>
+  <div class="wrap">
+    <aside class="side">
+      <a href="/lernen" class="home">Lernplattform</a>
+      {parts.map((p) => (
+        <div class="part">
+          <div class="ptitle">{p}</div>
+          {CHAPTERS.filter((k) => k.part === p).map((k) => (
+            <a href={`/lernen/${k.slug}`} class={k.slug === slug ? "on" : ""}><b>{k.nr}</b> {k.title}</a>
+          ))}
+        </div>
+      ))}
+    </aside>
+    <main>
+      <div class="kicker">Kapitel {c.nr} · {c.part}</div>
+      <h1>{c.title}</h1>
+      <p class="satz"><span>In einem Satz</span>{satz}</p>
+      <slot />
+      <nav class="pn">
+        {prev ? <a href={`/lernen/${prev.slug}`}>← {prev.nr}. {prev.title}</a> : <span></span>}
+        {next ? <a href={`/lernen/${next.slug}`} class="nx">{next.nr}. {next.title} →</a> : <span></span>}
+      </nav>
+    </main>
+  </div>
+</Layout>
+
+<style is:global>
+  .wrap { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 32px; max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+  .side { position: sticky; top: 16px; align-self: start; max-height: calc(100vh - 32px); overflow-y: auto; font-size: 13.5px; }
+  .side .home { display: block; font-weight: 700; text-decoration: none; margin-bottom: 12px; color: var(--accent); }
+  .side .ptitle { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 12px 0 4px; }
+  .side a { display: block; text-decoration: none; padding: 4px 8px; border-radius: 6px; color: var(--ink); }
+  .side a b { color: var(--muted); display: inline-block; width: 18px; }
+  .side a.on { background: var(--ink); color: #fff; } .side a.on b { color: #ccc; }
+  .side a:hover:not(.on) { background: var(--panel); }
+  main { min-width: 0; }
+  main .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  main h1 { font-size: 30px; margin: 4px 0 12px; letter-spacing: -.02em; }
+  main h2 { font-size: 21px; margin: 34px 0 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+  main h3 { font-size: 16px; margin: 20px 0 8px; }
+  main p, main li { max-width: 74ch; }
+  .satz { background: #fdf6e8; border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: 17px; margin: 0 0 8px; }
+  .satz span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+  .merke { background: #eef6fb; border-left: 4px solid #3d93c9; padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch; }
+  .merke b:first-child { color: #2a6f9a; }
+  .achtung { background: #fff4e5; border-left: 4px solid #e0662a; padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 74ch; }
+  ol.steps { counter-reset: s; list-style: none; padding: 0; max-width: 78ch; }
+  ol.steps > li { counter-increment: s; position: relative; padding: 8px 0 8px 40px; border-bottom: 1px dashed var(--line); }
+  ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 8px; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--ink); color: #fff; font-size: 13px; font-weight: 700; display: grid; place-items: center; }
+  table.p { border-collapse: collapse; font-size: 14px; background: #fff; border: 1px solid var(--line); margin: 10px 0; max-width: 100%; }
+  table.p th, table.p td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  table.p th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--panel); }
+  table.p td.n { font-family: ui-monospace, monospace; white-space: nowrap; }
+  table.p td.diag { background: #fbe9c6; font-weight: 700; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 4px; }
+  .tag.paper { background: #e3f0e8; color: #2c7a50; } .tag.eigen { background: #fbe9c6; color: #8a5a00; }
+  .formel { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 10px 0; overflow-x: auto; max-width: 78ch; }
+  .formel math { font-size: 1.12em; }
+  .formel .erk { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  code { font: 13px ui-monospace, "JetBrains Mono", monospace; background: var(--panel); padding: 1px 4px; border-radius: 4px; }
+  .src { font-size: 12.5px; color: var(--muted); margin: 6px 0; }
+  .fig { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin: 12px 0; max-width: 860px; }
+  .fig svg { width: 100%; height: auto; display: block; }
+  .fig .cap { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .fig text { font: 12px Inter, system-ui, sans-serif; fill: var(--ink); }
+  .fig text.m { fill: var(--muted); } .fig text.b { font-weight: 700; } .fig text.c { text-anchor: middle; }
+  .rechnung { background: #f7fbf8; border: 1px solid #cfe5d7; border-radius: 10px; padding: 12px 16px; margin: 12px 0 18px; max-width: 82ch; }
+  .rechnung > b:first-child { display: block; color: #2c7a50; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
+  .rechnung ol { margin: 6px 0; padding-left: 22px; } .rechnung li { margin: 6px 0; }
+  .rechnung .eq { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 13.5px; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; display: inline-block; margin: 3px 0; }
+  .rechnung table { border-collapse: collapse; font-size: 13.5px; background: #fff; margin: 6px 0; }
+  .rechnung td, .rechnung th { border: 1px solid var(--line); padding: 4px 8px; text-align: center; }
+  .rechnung th { background: var(--panel); font-size: 12px; } .rechnung td.d { background: #fbe9c6; font-weight: 700; } .rechnung td.s { color: var(--muted); }
+  .rechnung .res { font-weight: 700; color: #2c7a50; }
+  .quiz { margin: 10px 0; max-width: 78ch; }
+  .quiz details { background: #fff; border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; }
+  .quiz summary { cursor: pointer; padding: 10px 14px; font-weight: 600; list-style: none; }
+  .quiz summary::before { content: "?"; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 12px; margin-right: 8px; }
+  .quiz details[open] summary { border-bottom: 1px solid var(--line); }
+  .quiz details > div { padding: 10px 14px; }
+  .pn { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .pn a { text-decoration: none; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .pn a:hover { border-color: var(--accent); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } .side { position: static; max-height: none; } .two { grid-template-columns: 1fr; } }
+</style>

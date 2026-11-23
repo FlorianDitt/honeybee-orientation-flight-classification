@@ -1,0 +1,85 @@
+---
+import Kapitel from "../../components/Kapitel.astro";
+---
+
+<Kapitel slug="linking" satz="Das Ende eines Tracklets wird mit dem Anfang eines späteren verbunden, wenn beide Bewegungsvorhersagen zueinander passen; alle Verbindungen werden gemeinsam optimal gewählt, und 'nicht verbinden' ist immer eine erlaubte Option.">
+
+  <p>Nach <b>Huang, Wu &amp; Nevatia 2008</b> (ECCV), zweite Stufe der hierarchischen Zuordnung: Erst zuverlässige, kurze Tracklets
+    bilden (Kapitel 4), dann diese zu langen Bahnen verknüpfen.</p>
+
+  <h2>Die Idee</h2>
+  <div class="fig">
+    <svg viewBox="0 0 860 170">
+      <polyline points="40,120 90,100 140,90 190,86" fill="none" stroke="#3d93c9" stroke-width="3" />
+      <text x="110" y="140" class="c m">Tracklet A (endet)</text>
+      <line x1="190" y1="86" x2="400" y2="74" stroke="#3d93c9" stroke-dasharray="5 5" /><text x="290" y="66" class="c m">A vorwärts extrapoliert</text>
+      <polyline points="420,76 470,70 520,74 570,90" fill="none" stroke="#e0662a" stroke-width="3" />
+      <text x="500" y="110" class="c m">Tracklet B (startet g Frames später)</text>
+      <line x1="420" y1="76" x2="210" y2="96" stroke="#e0662a" stroke-dasharray="5 5" /><text x="300" y="118" class="c m">B rückwärts extrapoliert</text>
+      <circle cx="400" cy="74" r="24" fill="none" stroke="#d99a1e" /><circle cx="190" cy="86" r="24" fill="none" stroke="#d99a1e" />
+      <text x="660" y="60" class="b">Beide Fehler &lt; Toleranz</text><text x="660" y="80" class="m">tol = 10 + 1,5 · g  px</text>
+      <text x="660" y="104" class="m">„fwd“: A-Ende + v_A·g  vs.  B-Start</text><text x="660" y="124" class="m">„bwd“: B-Start − v_B·g  vs.  A-Ende</text>
+    </svg>
+  </div>
+
+  <h2>Ablauf</h2>
+  <ol class="steps">
+    <li><b>Kandidaten.</b> Alle Tracklets mit mindestens 2 Punkten. Für jedes Ende i und jeden Start j mit Lücke
+      <b>1 ≤ g ≤ 60 Frames</b> (bis 1 s).</li>
+    <li><b>Geschwindigkeit</b> am Ende von A aus seinen letzten 5 Punkten, am Anfang von B aus den ersten 5 Punkten:
+      v = (p<sub>letzter</sub> − p<sub>erster</sub>) / Δt.</li>
+    <li><b>Plausibilität:</b> Abstand Ende–Start höchstens <b>30 px pro Frame Lücke</b> (keine Biene ist schneller).</li>
+    <li><b>Beide Vorhersagen</b> müssen passen: fwd = ‖p<sub>A,Ende</sub> + v<sub>A</sub>·g − p<sub>B,Start</sub>‖ und
+      bwd = ‖p<sub>B,Start</sub> − v<sub>B</sub>·g − p<sub>A,Ende</sub>‖, beide &lt; tol = 10 + 1,5·g. Die Toleranz wächst mit der Lücke, weil die
+      Biene in der Zeit abbiegen kann.</li>
+    <li><b>Kosten</b> einer erlaubten Verbindung (zwischen 0 und 1):</li>
+  </ol>
+  <div class="formel">
+    <math display="block"><msub><mi>c</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo><mfrac><mrow><mi>fwd</mi><mo>+</mo><mi>bwd</mi></mrow><mrow><mn>2</mn><mo>·</mo><mi>tol</mi></mrow></mfrac><mspace width="1em"/><mo>∈</mo><mo>[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>)</mo></math>
+  </div>
+  <ol class="steps" start="6">
+    <li><b>Erweiterte Zuordnung.</b> Eine Matrix der Größe 2n × 2n: oben links Enden × Starts (Kosten c<sub>ij</sub>), dazu für jedes Ende
+      und jeden Start eine Option <b>„keine Verbindung“ mit Kosten 1</b>. Die Ungarische Methode löst sie global. Weil „keine Verbindung“
+      genau so viel kostet wie die Toleranzgrenze, wird eine Verbindung nur gewählt, wenn sie besser ist als keine.</li>
+    <li><b>Ketten bilden:</b> Verbindungen A→B→C… werden zu einer Bahn aneinandergehängt. Die Lücke bleibt als Lücke in der Zeit
+      stehen (keine erfundenen Punkte).</li>
+  </ol>
+
+  <div class="rechnung"><b>Rechenweg · Rechenbeispiel mit typischen Zahlen</b>
+    <p>Tracklet A endet in Frame 500 bei (300; 200), Geschwindigkeit aus den letzten 5 Punkten v<sub>A</sub> = (4; 2) px/Frame. Tracklet B startet in Frame 510 bei (342; 218), v<sub>B</sub> = (4; 1,5).</p>
+    <ol>
+      <li>Lücke <span class="eq">g = 510 − 500 = 10</span> Frames (1 ≤ g ≤ 60 ✓).</li>
+      <li>Abstand ‖(42; 18)‖ = 45,7 px ≤ 30 · 10 = 300 ✓.</li>
+      <li>Vorwärts: A + v<sub>A</sub>·g = (300 + 40; 200 + 20) = (340; 220) → fwd = ‖(342 − 340; 218 − 220)‖ = ‖(2; −2)‖ = <span class="eq">2,83</span></li>
+      <li>Rückwärts: B − v<sub>B</sub>·g = (342 − 40; 218 − 15) = (302; 203) → bwd = ‖(2; 3)‖ = <span class="eq">3,61</span></li>
+      <li>Toleranz <span class="eq">tol = 10 + 1,5 · 10 = 25</span>; beide &lt; 25 ✓.</li>
+      <li>Kosten <span class="eq">(2,83 + 3,61) / (2 · 25) = 0,129</span> &lt; 1 („keine Verbindung“) → wird verbunden, sofern kein anderer Start für A oder kein anderes Ende für B zusammen günstiger ist.</li>
+    </ol>
+  </div>
+
+  <h2>Parameter</h2>
+  <table class="p">
+    <tr><th>Name</th><th>Wert</th><th>Herkunft</th></tr>
+    <tr><td>LINK_GAP</td><td class="n">60 Frames (1 s)</td><td><span class="tag eigen">eigene Wahl</span></td></tr>
+    <tr><td>LINK_R0, LINK_R1</td><td class="n">10 px, 1,5 px/Frame</td><td><span class="tag eigen">eigene Wahl</span></td></tr>
+    <tr><td>LINK_VMAX</td><td class="n">30 px/Frame</td><td><span class="tag eigen">eigene Wahl</span></td></tr>
+    <tr><td>Bewegungsaffinität vorwärts + rückwärts</td><td class="n">beide müssen passen</td><td><span class="tag paper">Paper (Huang 2008)</span></td></tr>
+    <tr><td>globale Zuordnung (Ungarisch)</td><td class="n">mit „keine Verbindung“</td><td><span class="tag paper">Paper</span></td></tr>
+  </table>
+  <p class="src">Code: <code>link_tracklets()</code> in <code>src/beeflight/chiron.py</code>. Die finale Variante heißt <code>chiron_linked</code>
+    (D<sub>M</sub> 25 / D<sub>RM</sub> 10 + Linking), Ausgabe <code>outputs/flights_chiron_linked/</code>.</p>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum zwei Vorhersagen (vorwärts und rückwärts) statt einer?</summary><div>Eine allein kann zufällig passen,
+      z. B. wenn eine andere Biene zufällig dort startet, wo A hinzeigt. Wenn auch B rückwärts genau auf das Ende von A zeigt, sind
+      Richtung und Ort von beiden Seiten konsistent; das senkt falsche Verbindungen deutlich.</div></details>
+    <details><summary>Warum braucht die Matrix die Option „keine Verbindung“?</summary><div>Ohne sie würde die Ungarische Methode jedes
+      Ende mit irgendeinem Start verbinden, auch wenn alle schlecht passen. Mit Kosten 1 für „keine Verbindung“ wird nur verbunden, was
+      besser als die Toleranzgrenze passt.</div></details>
+    <details><summary>Was ist der Unterschied zum Tracking in Kapitel 4?</summary><div>Tracking verbindet Beobachtungen Frame für Frame
+      (Lücke höchstens 2 Frames). Linking verbindet ganze Tracklets über Lücken bis 60 Frames und nutzt dafür die Bewegung beider Stücke.</div></details>
+    <details><summary>Welcher Fehler kann durch Linking entstehen?</summary><div>Ein Bienenwechsel: Ende von Biene 1 wird mit Start von
+      Biene 2 verbunden, wenn beide zufällig zueinander passen. Solche Bahnen werden beim Labeln als Artefakt („Bienenwechsel“) markiert.</div></details>
+  </div>
+</Kapitel>

@@ -1,0 +1,72 @@
+---
+import Kapitel from "../../components/Kapitel.astro";
+---
+
+<Kapitel slug="bahnen" satz="Aus allen verknüpften Bahnen bleiben nur echte Flüge (genug Punkte, überwiegend unter dem Brett, lang und schnell genug); jede Bahn bekommt Start- und Endzone und einfache Merkmale wie Gradlinigkeit und Dauer.">
+
+  <h2>Welche Bahnen sind Flüge?</h2>
+  <p>Eine Bahn wird nur behalten, wenn <b>alle vier</b> Bedingungen gelten:</p>
+  <table class="p">
+    <tr><th>Bedingung</th><th>Schwelle</th><th>Warum</th></tr>
+    <tr><td>Anzahl Punkte</td><td class="n">≥ 15</td><td>kürzer: zu wenig für eine Aussage (¼ s)</td></tr>
+    <tr><td>Anteil unter dem Brett</td><td class="n">≥ 60 %</td><td>Krabbeln auf dem Brett ist kein Flug</td></tr>
+    <tr><td>Weglänge</td><td class="n">≥ 60 px</td><td>halbe Auflösung ≈ 4 Bienenlängen</td></tr>
+    <tr><td>Median-Schrittweite</td><td class="n">≥ 1 px/Frame</td><td>sitzende oder zitternde Flecken fallen weg</td></tr>
+  </table>
+  <p class="src">Code: <code>flight_rows()</code> in <code>src/beeflight/tracks.py</code>.</p>
+
+  <h2>Zonen</h2>
+  <div class="fig">
+    <svg viewBox="0 0 860 220">
+      <rect x="250" y="10" width="360" height="200" fill="#fff" stroke="#16181d" />
+      <rect x="250" y="10" width="360" height="40" fill="#c9a46a" opacity=".5" /><text x="430" y="34" class="c b">board (Brett + 30 px)</text>
+      <rect x="250" y="50" width="20" height="160" fill="#3d93c9" opacity=".25" /><rect x="590" y="50" width="20" height="160" fill="#3d93c9" opacity=".25" />
+      <rect x="250" y="190" width="360" height="20" fill="#3d93c9" opacity=".25" /><text x="430" y="204" class="c">edge (30 px Rand)</text>
+      <text x="430" y="125" class="c b">lost</text><text x="430" y="143" class="c m">mitten im Bild: Bahn verloren</text>
+      <text x="40" y="60" class="m">Start- und Endpunkt</text><text x="40" y="78" class="m">einer Bahn fallen je</text><text x="40" y="96" class="m">in eine Zone.</text>
+      <text x="640" y="60" class="m">board → board: auf dem</text><text x="640" y="78" class="m">Brett gestartet und gelandet</text>
+      <text x="640" y="110" class="m">„lost“ an Start oder Ende</text><text x="640" y="128" class="m">= Fragment</text>
+    </svg>
+  </div>
+
+  <h2>Bahnmerkmale</h2>
+  <p>Diese Merkmale nutzen die Regel, Gradient Boosting und das Clustering (Kapitel 10). Das ResNet nutzt sie <b>nicht</b>; es sieht die Rohbahn (Kapitel 7).</p>
+  <table class="p">
+    <tr><th>Merkmal</th><th>Formel</th><th>Einheit</th></tr>
+    <tr><td><code>n</code></td><td>Anzahl Punkte</td><td>–</td></tr>
+    <tr><td><code>dur_s</code></td><td>(t<sub>letzter</sub> − t<sub>erster</sub>) / 59,94</td><td>s</td></tr>
+    <tr><td><code>path</code></td><td>Σ ‖p<sub>k+1</sub> − p<sub>k</sub>‖</td><td>px</td></tr>
+    <tr><td><code>net</code></td><td>‖p<sub>letzter</sub> − p<sub>erster</sub>‖</td><td>px</td></tr>
+    <tr><td><code>straight</code></td><td>net / path (1 = gerade, klein = kurvig)</td><td>–</td></tr>
+    <tr><td><code>turn_deg</code></td><td>Netto-Richtungsänderung: Richtung über Sehnen von 3 Frames (p<sub>k+3</sub> − p<sub>k</sub>, nur wenn &gt; 3 px), entfaltet, letzte − erste</td><td>°</td></tr>
+    <tr><td><code>abs_turn_deg</code></td><td>Σ |Δ Richtung| über dieselben Sehnen: wie viel insgesamt gekurvt wurde</td><td>°</td></tr>
+    <tr><td><code>speed</code></td><td>Median der Schrittweiten</td><td>px/Frame</td></tr>
+    <tr><td><code>frac_below_board</code></td><td>Anteil Punkte unter der Brettunterkante</td><td>–</td></tr>
+    <tr><td><code>start</code>, <code>end</code></td><td>Zone des ersten bzw. letzten Punkts</td><td>board / edge / lost</td></tr>
+  </table>
+  <div class="rechnung"><b>Rechenweg mit echten Zahlen · Train-Bahn rec2123_seq015 ab Frame 1515 (Label: Orientierung)</b>
+    <ol>
+      <li>34 Punkte, erster (199,6; 115,7) in Frame 1515, letzter (344,7; 112,2) in Frame 1548.</li>
+      <li><span class="eq">dur_s = (1548 − 1515) / 59,94 = 33 / 59,94 = 0,551 s</span></li>
+      <li><span class="eq">net = ‖(344,7 − 199,6; 112,2 − 115,7)‖ = ‖(145,1; −3,5)‖ = 145,1 px</span></li>
+      <li>path = Summe der 33 Schrittlängen = 189,7 px → <span class="eq">straight = 145,1 / 189,7 = 0,765</span></li>
+      <li>Zonen: Brettunterkante y = 90, also „board“ bis y &lt; 120. Start y = 115,7 → board, Ende y = 112,2 → board.</li>
+      <li>abs_turn_deg = 181,7°, turn_deg = −148,1°, speed (Median-Schritt) = 6,36 px/Frame.</li>
+      <li>Die Regel (Kapitel 10) sagt wegen board → board sofort „Orientierung“: hier richtig.</li>
+    </ol>
+  </div>
+
+  <div class="merke"><b>Warum Sehnen über 3 Frames?</b> Die Richtung von Frame zu Frame zittert durch Pixelrauschen. Über 3 Frames ist die
+    Richtung stabil, sonst würde sich kleines Zittern zu großen Scheindrehungen aufsummieren.</div>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Was unterscheidet turn_deg von abs_turn_deg?</summary><div>turn_deg ist die Netto-Drehung (eine Linkskurve und eine
+      gleich große Rechtskurve heben sich auf). abs_turn_deg summiert die Beträge: Eine Zickzack-Bahn hat großes abs_turn_deg, aber kleines turn_deg.</div></details>
+    <details><summary>Wozu dienen die Zonen?</summary><div>Sie fassen zusammen, woher eine Bahn kommt und wohin sie geht. Die Regel
+      (Kapitel 10) entscheidet fast nur damit: board → board = Orientierung, Ende board = Anflug. „lost“ markiert Fragmente.</div></details>
+    <details><summary>Warum sieht das ResNet nicht diese Merkmale?</summary><div>Merkmale sind von Hand ausgedacht und verlieren
+      Information (z. B. wo und wann gekurvt wird). Das ResNet bekommt den ganzen Verlauf und lernt selbst, was wichtig ist. Gradient
+      Boosting auf den Merkmalen ist der Vergleich dazu (Val BA 0,659 gegen 0,689 für das einfache ResNet).</div></details>
+  </div>
+</Kapitel>

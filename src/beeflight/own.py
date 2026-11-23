@@ -7,6 +7,7 @@ script adds the geometry from the queue and writes every train / val label like 
 existing label of the same track is replaced only by a newer one.
 
 Usage: beeflight-own beeflight_florian_2026-11-10.jsonl [--dry-run]
+       beeflight-own <export> --test   # after the freeze: only the test sets -> labels/test_*.jsonl (for beeflight-vote --test)
 """
 import argparse
 import json
@@ -16,7 +17,8 @@ from pathlib import Path
 from .splits import ROOT
 
 LABELS = ROOT / "labels"
-SPLITS = ["train", "val"]
+SPLITS = ["train", "val", "recheck", "recheck_val"]  # recheck*: blind second pass, own result files
+TEST_SPLITS = ["test_same_hive", "test_other_hive"]  # only with --test, after the model is frozen
 CLASSES = {"orientierung", "sammelabflug", "anflug", "artefakt"}
 
 
@@ -30,11 +32,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("export", type=Path, help="export file of the online labeler")
     ap.add_argument("--dry-run", action="store_true", help="only count, write nothing")
+    ap.add_argument("--test", action="store_true", help="only the test sets (and nothing else); after the freeze")
     args = ap.parse_args()
-    recs = [r for r in read_jsonl(args.export) if not r.get("practice") and r.get("split") in SPLITS]
+    splits = TEST_SPLITS if args.test else SPLITS
+    recs = [r for r in read_jsonl(args.export) if not r.get("practice") and r.get("split") in splits]
     if not recs:
-        raise SystemExit("no train or val labels in the file")
-    for s in SPLITS:
+        raise SystemExit(f"no labels of {', '.join(splits)} in the file")
+    for s in splits:
         mine = [r for r in recs if r["split"] == s]
         if not mine:
             continue

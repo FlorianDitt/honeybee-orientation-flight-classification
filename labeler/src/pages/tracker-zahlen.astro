@@ -1,0 +1,191 @@
+---
+// All trackers against the final one on the 14 val videos, from outputs/tracker_vergleich.json
+// (written by outputs/experimente/paired_compare.py all). No ground truth: completeness and same-bee pairs only.
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import Layout from "../layouts/Layout.astro";
+import { ROOT } from "../lib/store";
+import { NAMES } from "../lib/trackers";
+
+interface T { tracks: number; complete: number; share: number; diff: number; ci: [number, number]; per_video: (number | null)[];
+  matched: number; unmatched: number; both: number; neither: number; only_ref: number; only_this: number; p: number; longer: number; shorter: number }
+const file = resolve(ROOT, "outputs", "tracker_vergleich.json");
+const data = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
+const ref: string = data?.ref ?? "flights_chiron_linked";
+const name = (k: string) => NAMES[k] ?? k.replace(/^flights_/, "");
+const YOLO = /darian|ratnayake|board_yolo|yolo|hybrid|bytetrack/;
+const group = (k: string) => (k === ref ? "final" : YOLO.test(k) ? "yolo" : "motion");
+const rows: [string, T][] = data ? (Object.entries(data.trackers) as [string, T][]).filter(([, t]) => t.tracks > 0).sort((a, b) => b[1].share - a[1].share) : [];
+const empty: string[] = data ? Object.entries(data.trackers as Record<string, T>).filter(([, t]) => t.tracks === 0).map(([k]) => k) : [];
+const pct = (x: number, d = 1) => (100 * x).toFixed(d).replace(".", ",") + " %";
+const pts = (x: number) => (x >= 0 ? "+" : "−") + Math.abs(100 * x).toFixed(1).replace(".", ",");
+const pval = (p: number) => (p < 0.001 ? "< 0,001" : p.toFixed(3).replace(".", ","));
+
+// plot geometry (shared x axis 0..100 % for the share plot)
+const W = 1000, L = 300, R = 30, ROW = 24, TOP = 30;
+const H = TOP + rows.length * ROW + 20;
+const x = (v: number) => L + v * (W - L - R);
+// difference plot: −20 .. +5 points, clipped
+const DLO = -0.2, DHI = 0.06;
+const dx = (v: number) => L + ((Math.max(DLO, Math.min(DHI, v)) - DLO) / (DHI - DLO)) * (W - L - R);
+const refT: T | undefined = data?.trackers[ref];
+const close = rows.filter(([k, t]) => k !== ref && t.diff > DLO);
+const DH = TOP + close.length * ROW + 20;
+// discordant pairs: same bee, complete in only one tracker
+const pairs = rows.filter(([k, t]) => k !== ref && t.only_ref + t.only_this > 0);
+const PMAX = Math.max(1, ...pairs.map(([, t]) => Math.max(t.only_ref, t.only_this)));
+const PH = TOP + pairs.length * ROW + 20;
+const mid = L + (W - L - R) / 2;
+const px = (n: number) => (n / PMAX) * ((W - L - R) / 2 - 10);
+---
+
+<Layout title="Tracker in Zahlen">
+  <main>
+    <a href="/" class="back">← Übersicht</a>
+    <header>
+      <div class="kicker">beeflight · Tracker</div>
+      <h1>Tracker in Zahlen</h1>
+      <p>Alle Tracker auf den {data?.seqs.length ?? 14} Val-Videos, verglichen mit dem finalen Tracker <b>{name(ref)}</b>. Es gibt keine
+        Ground Truth: gemessen wird, wie oft eine Bahn vollständig ist (Brett oder Bildrand an beiden Enden), und bei derselben
+        Biene, welcher Tracker sie vollständig verfolgt. <span class="sw final"></span> final · <span class="sw yolo"></span> mit YOLO ·
+        <span class="sw motion"></span> nur Bewegung</p>
+    </header>
+
+    {!data ? (
+      <p class="hint">Noch keine Zahlen. Erst <code>uv run python outputs/experimente/paired_compare.py all</code>.</p>
+    ) : (
+      <>
+        <section>
+          <h2>1 · Anteil vollständiger Bahnen</h2>
+          <p class="sub">Punkt: alle Videos zusammen. Striche: die einzelnen Videos, so sieht man die Streuung.</p>
+          <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Anteil vollständiger Bahnen je Tracker">
+            {[0, 0.2, 0.4, 0.6, 0.8, 1].map((v) => (
+              <g><line x1={x(v)} x2={x(v)} y1={TOP - 8} y2={H - 16} class="grid" /><text x={x(v)} y={TOP - 14} class="tick">{v * 100} %</text></g>
+            ))}
+            {refT && <line x1={x(refT.share)} x2={x(refT.share)} y1={TOP - 8} y2={H - 16} class="refline" />}
+            {rows.map(([k, t], i) => {
+              const y = TOP + i * ROW + ROW / 2;
+              return (
+                <g class={group(k)}>
+                  <text x={L - 10} y={y + 4} class="lab">{name(k)}</text>
+                  {t.per_video.map((v) => v !== null && <line x1={x(v)} x2={x(v)} y1={y - 6} y2={y + 6} class="vid" />)}
+                  <circle cx={x(t.share)} cy={y} r="6" class="dot" />
+                  <text x={x(t.share) + 10} y={y + 4} class="val">{pct(t.share)}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </section>
+
+        <section>
+          <h2>2 · Unterschied zum finalen Tracker</h2>
+          <p class="sub">Prozentpunkte mit 95-%-Konfidenzintervall (Bootstrap über die Videos, gepaart). Schneidet der Balken die
+            Null-Linie, ist der Unterschied nicht gesichert. Nur Tracker ab −20 Punkten.</p>
+          <svg viewBox={`0 0 ${W} ${DH}`} role="img" aria-label="Unterschied zum finalen Tracker">
+            {[-0.2, -0.15, -0.1, -0.05, 0, 0.05].map((v) => (
+              <g><line x1={dx(v)} x2={dx(v)} y1={TOP - 8} y2={DH - 16} class={v === 0 ? "zero" : "grid"} /><text x={dx(v)} y={TOP - 14} class="tick">{pts(v)}</text></g>
+            ))}
+            {close.map(([k, t], i) => {
+              const y = TOP + i * ROW + ROW / 2;
+              return (
+                <g class={group(k)}>
+                  <text x={L - 10} y={y + 4} class="lab">{name(k)}</text>
+                  <line x1={dx(t.ci[0])} x2={dx(t.ci[1])} y1={y} y2={y} class="ci" />
+                  <circle cx={dx(t.diff)} cy={y} r="6" class="dot" />
+                  <text x={dx(t.ci[1]) + 8} y={y + 4} class="val">{pts(t.diff)}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </section>
+
+        <section>
+          <h2>3 · Dieselbe Biene, nur einer vollständig</h2>
+          <p class="sub">Jede Bahn des finalen Trackers wird der Bahn im anderen Tracker zugeordnet, die mindestens die Hälfte ihrer
+            Punkte teilt (≤ {data.near_px} px). Links: nur der finale Tracker ist vollständig. Rechts: nur der andere. Ist rechts länger,
+            verfolgt der andere Tracker dieselben Bienen öfter bis zum Ende.</p>
+          <svg viewBox={`0 0 ${W} ${PH}`} role="img" aria-label="Diskordante Paare je Tracker">
+            <text x={mid - 10} y={TOP - 14} class="tick end">← nur final vollständig</text>
+            <text x={mid + 10} y={TOP - 14} class="tick start">nur dieser vollständig →</text>
+            <line x1={mid} x2={mid} y1={TOP - 8} y2={PH - 16} class="zero" />
+            {pairs.map(([k, t], i) => {
+              const y = TOP + i * ROW + ROW / 2;
+              return (
+                <g class={group(k)}>
+                  <text x={L - 10} y={y + 4} class="lab">{name(k)}</text>
+                  <rect x={mid - px(t.only_ref)} y={y - 7} width={px(t.only_ref)} height="14" class="barref" />
+                  <rect x={mid} y={y - 7} width={px(t.only_this)} height="14" class="dotbar" />
+                  <text x={mid - px(t.only_ref) - 6} y={y + 4} class="val end">{t.only_ref}</text>
+                  <text x={mid + px(t.only_this) + 6} y={y + 4} class="val">{t.only_this}{t.p < 0.05 ? " *" : ""}</text>
+                </g>
+              );
+            })}
+          </svg>
+          <p class="sub">* McNemar-Test p &lt; 0,05.</p>
+        </section>
+
+        <section>
+          <h2>Tabelle</h2>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>Tracker</th><th>Bahnen</th><th>vollständig</th><th>Anteil</th><th>Δ Punkte (95 % KI)</th>
+                <th>gleiche Biene: nur final / nur dieser</th><th>p</th><th>Bahn länger / kürzer</th></tr></thead>
+              <tbody>
+                {rows.map(([k, t]) => (
+                  <tr class={group(k)}>
+                    <td><a href={`/tracker?seq=${data.seqs[0]}&a=${k}&b=${ref}`}>{name(k)}</a></td>
+                    <td>{t.tracks}</td><td>{t.complete}</td><td>{pct(t.share)}</td>
+                    <td>{k === ref ? "–" : `${pts(t.diff)} (${pts(t.ci[0])} … ${pts(t.ci[1])})`}</td>
+                    <td>{k === ref ? "–" : `${t.only_ref} / ${t.only_this}`}</td>
+                    <td>{k === ref ? "–" : pval(t.p)}</td>
+                    <td>{k === ref ? "–" : `${pct(t.longer, 0)} / ${pct(t.shorter, 0)}`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {empty.length > 0 && <p class="sub">Ohne eine einzige Flugbahn: {empty.map(name).join(", ")}.</p>}
+          <p class="sub">Grenzen: „vollständig“ sagt nicht, ob die Bahn stimmt (eine Bahn kann zwei Bienen verbinden). Die Schwellen
+            der YOLO-Varianten sind auf denselben Val-Videos gewählt. Nur ein Stock, ein Tag.</p>
+        </section>
+      </>
+    )}
+  </main>
+</Layout>
+
+<style>
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 48px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 16px; }
+  h1 { font-size: 34px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  h2 { font-size: 20px; margin: 32px 0 4px; }
+  header p, .sub { color: var(--muted); margin: 0 0 12px; max-width: 900px; }
+  code { font-family: ui-monospace, monospace; font-size: 13px; background: var(--panel); padding: 1px 6px; border-radius: 4px; }
+  .hint { color: var(--muted); }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-size: 13px; fill: var(--ink); }
+  .lab { text-anchor: end; }
+  .tick { fill: var(--muted); font-size: 12px; text-anchor: middle; }
+  .tick.end, .val.end { text-anchor: end; }
+  .tick.start { text-anchor: start; }
+  .val { font-size: 12px; fill: var(--muted); }
+  .grid { stroke: var(--line); }
+  .zero, .refline { stroke: var(--ink); stroke-width: 1.5; }
+  .refline { stroke-dasharray: 4 4; stroke: #2f6fb0; }
+  .vid { stroke-width: 2; opacity: .35; }
+  .ci { stroke-width: 4; stroke-linecap: round; opacity: .45; }
+  .barref { fill: #2f6fb0; opacity: .8; }
+  .final { --c: #2f6fb0; }
+  .yolo { --c: #d99a1e; }
+  .motion { --c: #8a8f98; }
+  .dot, .dotbar { fill: var(--c); }
+  .vid, .ci { stroke: var(--c); }
+  .final .lab, .final td:first-child { font-weight: 700; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); margin-left: 6px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; }
+  td a { color: inherit; }
+</style>

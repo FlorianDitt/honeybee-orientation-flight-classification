@@ -1,0 +1,223 @@
+---
+// Comparison models; the val numbers are read from the result files so they always match.
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import Kapitel from "../../components/Kapitel.astro";
+import { ROOT } from "../../lib/store";
+
+const read = (f: string) => { const p = resolve(ROOT, "outputs", f); return existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : null; };
+const m2 = read("modelle2_vergleich.json")?.configs ?? {};
+const hp = read("hp_vergleich.json")?.configs ?? {};
+const su = read("setups_vergleich.json")?.setups ?? {};
+const ba = (k: string) => { const v = m2[k]?.ba ?? hp[k]?.ba; return v == null ? "–" : v.toFixed(3).replace(".", ","); };
+const f1 = (k: string) => { const v = m2[k]?.f1_o; return v == null ? "–" : v.toFixed(3).replace(".", ","); };
+const ks = Object.keys(m2).filter((k) => k.startsWith("cluster_"));
+const bestK = (feat: string) => ks.filter((k) => k.startsWith(`cluster_${feat}_`)).sort((a, b) => m2[b].ba - m2[a].ba)[0];
+---
+
+<Kapitel slug="vergleich" satz="Jedes Vergleichsmodell testet eine andere Idee (feste Regel, Handmerkmale, andere Netzarchitektur, Bild statt Bahn, Video statt Bahn, Clustering, Körperausrichtung); alle wurden gleich trainiert (nur Train) und auf Val verglichen, keines schlug Ensemble Kombi.">
+
+  <h2>Überblick (Val, Balanced Accuracy)</h2>
+  <table class="p">
+    <tr><th>Modell</th><th>Eingabe</th><th>BA</th><th>F1 O</th><th>Kernaussage</th></tr>
+    <tr><td>Regel (feste Schwellen)</td><td>Zonen, Gradlinigkeit, Dauer</td><td class="n">{ba("regel_fest")}</td><td class="n">–</td><td>Untergrenze ohne Lernen</td></tr>
+    <tr><td>Regel (Schwellen auf Train)</td><td>dito</td><td class="n">{ba("regel_auf_train")}</td><td class="n">–</td><td>2 gelernte Zahlen</td></tr>
+    <tr><td>Gradient Boosting</td><td>9 Bahnmerkmale + Zonen</td><td class="n">{ba("gradient_boosting")}</td><td class="n">{f1("gradient_boosting")}</td><td>Handmerkmale reichen nicht</td></tr>
+    <tr><td>Clustering (beste K)</td><td>Bahn, PCA 20</td><td class="n">{bestK("bahn") ? ba(bestK("bahn")) : "–"}</td><td class="n">{bestK("bahn") ? f1(bestK("bahn")) : "–"}</td><td>Orientierung bildet keinen eigenen Cluster</td></tr>
+    <tr><td>Bahn als Bild + CNN</td><td>64×64-Bild der Bahn</td><td class="n">{ba("bild_absolut")}</td><td class="n">{f1("bild_absolut")}</td><td>Zeitliche Abfolge geht verloren</td></tr>
+    <tr><td>InceptionTime</td><td>7 × 128 wie ResNet</td><td class="n">{ba("inception")}</td><td class="n">{f1("inception")}</td><td>größer, nicht besser</td></tr>
+    <tr><td>Video R3D-18 (224→112)</td><td>16 Bildausschnitte</td><td class="n">{ba("r3d_c224")}</td><td class="n">{f1("r3d_c224")}</td><td>fast so gut, viel teurer</td></tr>
+    <tr><td>Fusion Bahn + Video</td><td>ResNet + DINOv2</td><td class="n">{su.fusion_4?.ba4?.toFixed(3).replace(".", ",") ?? "–"}</td><td class="n">–</td><td>schlechter als jeder Zweig allein</td></tr>
+    <tr><td>ResNet Kombi + Ausrichtung</td><td>7 + 4 Kanäle</td><td class="n">{ba("ensemble_kombi_pose")}</td><td class="n">{f1("ensemble_kombi_pose")}</td><td>Ausrichtung trennt nicht, stört</td></tr>
+    <tr><td><b>Ensemble Kombi</b></td><td>7 × 128</td><td class="n"><b>{ba("ensemble_kombi")}</b></td><td class="n"><b>{f1("ensemble_kombi")}</b></td><td>gewählt</td></tr>
+  </table>
+
+  <h2>1 · Regel</h2>
+  <ol class="steps">
+    <li>Start und Ende auf dem Brett → <b>orientierung</b>.</li>
+    <li>Start auf dem Brett: Gradlinigkeit &lt; s <b>und</b> Dauer &gt; d → <b>orientierung</b>, sonst <b>sammelabflug</b>.</li>
+    <li>Ende auf dem Brett → <b>anflug</b>.</li>
+    <li>Sonst → <b>artefakt</b>.</li>
+  </ol>
+  <p>Feste Schwellen aus der Vorstudie: s = 0,5, d = 0,4 s. Getunte Variante: Rastersuche s ∈ {"{"}0,20; 0,25; …; 0,90{"}"}, d ∈ {"{"}0,1; …; 1,5 s{"}"} mit der besten BA
+    auf Train. <span class="src">Code: <code>rule_predict()</code>, <code>tune_rule()</code> in <code>src/beeflight/baselines.py</code></span></p>
+
+  <h2>2 · Gradient Boosting</h2>
+  <p><b>Eingabe:</b> die Bahnmerkmale aus Kapitel 6 (abs_turn_deg, dur_s, frac_below_board, n, net, path, speed, straight, turn_deg) plus Start- und Endzone als
+    One-Hot (je board/edge/lost). <b>Modell:</b> <code>HistGradientBoostingClassifier</code> (scikit-learn, Standard-Hyperparameter: 100 Bäume, Lernrate 0,1,
+    max. 31 Blätter), <code>class_weight="balanced"</code>, 5 Seeds.</p>
+  <div class="merke"><b>Prinzip Boosting:</b> Bäume werden nacheinander gebaut; jeder neue Baum passt die Fehler (Gradienten des Verlusts) der bisherigen Summe an.
+    „Hist“: Merkmale werden in 255 Bins eingeteilt, das macht die Split-Suche schnell.</div>
+  <div class="fig">
+    <svg viewBox="0 0 860 225">
+      <text x="20" y="20" class="b">1 · Bahn → 9 Zahlen</text>
+      <path d="M30 140 C 10 80, 60 50, 90 90 S 140 170, 160 110" fill="none" stroke="#e0662a" stroke-width="3" />
+      <text x="175" y="115" class="m" style="font-size:22px">→</text>
+      <rect x="205" y="34" width="120" height="160" fill="#f1efe9" stroke="#e5e7eb" />
+      {["Dauer", "Weglänge", "Gradlinigkeit", "Tempo", "Drehung", "…", "Startzone", "Endzone"].map((c, i) => <text x="265" y={54 + i * 19} class="c m">{c}</text>)}
+      <text x="340" y="115" class="m" style="font-size:22px">→</text>
+      <text x="380" y="20" class="b">2 · Bäume nacheinander</text>
+      {[0, 1, 2].map((k) => {
+        const x = 400 + k * 110;
+        return (<g>
+          <circle cx={x + 30} cy="60" r="9" fill="#d99a1e" />
+          <line x1={x + 30} y1="69" x2={x + 12} y2="98" stroke="#a8adb5" stroke-width="2" /><line x1={x + 30} y1="69" x2={x + 48} y2="98" stroke="#a8adb5" stroke-width="2" />
+          <circle cx={x + 12} cy="104" r="7" fill="#6b8fa3" /><circle cx={x + 48} cy="104" r="7" fill="#6b8fa3" />
+          <text x={x + 30} y="135" class="c b">{k === 2 ? "Baum 100" : `Baum ${k + 1}`}</text>
+          <text x={x + 30} y="152" class="c m">{k === 0 ? "rät grob" : "lernt die Fehler"}</text>
+          {k < 2 && <text x={x + 84} y="108" class="c m" style="font-size:18px">{k === 1 ? "…" : "+"}</text>}
+        </g>);
+      })}
+      <text x="720" y="108" class="m" style="font-size:22px">=</text>
+      <rect x="745" y="70" width="100" height="70" rx="8" fill="#fdf6e8" stroke="#d99a1e" />
+      <text x="795" y="100" class="c b">Summe</text><text x="795" y="118" class="c m">→ Klasse</text>
+      <text x="205" y="218" class="m">Jeder neue Baum sieht nur, wo die bisherige Summe noch falsch liegt, und korrigiert genau das.</text>
+    </svg>
+    <div class="cap">Gradient Boosting sieht nur Zusammenfassungen der Bahn, nicht ihren Verlauf.</div>
+  </div>
+
+  <h2>3 · Clustering + Mehrheitsentscheid</h2>
+  <ol class="steps">
+    <li>Merkmale standardisieren (StandardScaler auf Train). Drei Varianten: <b>merkmale</b> (wie GB), <b>bahn</b> (die 6 Bahnkanäle ohne Dauer, auf 32 Punkte gestreckt →
+      6 × 32 = 192 Zahlen, PCA auf 20 Dimensionen), <b>video</b> (DINOv2-Merkmale, PCA 50).</li>
+    <li><b>k-Means</b> auf Train mit K ∈ {"{"}4, 6, 8, 10, 12, 16, 20, 25, 30, 40, 50{"}"}, 10 Starts (<code>n_init=10</code>), 5 Seeds.</li>
+    <li>Jeder Cluster bekommt die <b>häufigste Train-Klasse</b> seiner Mitglieder.</li>
+    <li>Eine Val-Bahn bekommt die Klasse des <b>nächsten Clusterzentrums</b>.</li>
+  </ol>
+  <div class="formel">
+    <b>k-Means</b> minimiert die Summe der quadrierten Abstände zum Zentrum:
+    <math display="block"><munder><mi>min</mi><mrow><msub><mi>μ</mi><mn>1</mn></msub><mo>…</mo><msub><mi>μ</mi><mi>K</mi></msub></mrow></munder><munder><mo>∑</mo><mi>i</mi></munder><munder><mi>min</mi><mi>k</mi></munder><mo>‖</mo><msub><mi mathvariant="bold">x</mi><mi>i</mi></msub><mo>−</mo><msub><mi>μ</mi><mi>k</mi></msub><msup><mo>‖</mo><mn>2</mn></msup></math>
+    <div class="erk">Abwechselnd: jeden Punkt dem nächsten Zentrum zuordnen, jedes Zentrum auf den Mittelwert seiner Punkte setzen, bis nichts mehr wechselt.</div>
+  </div>
+  <p><b>Ergebnis:</b> Sammelabflug, Anflug und Artefakt bilden fast reine Cluster (94–100 % bei K = 10). Orientierung erreicht in keinem Cluster mehr als 54–66 %:
+    Sie mischt sich mit Artefakt und Sammelabflug. k-Means sucht kompakte, kugelige Gruppen nach Abstand; die Grenze „wendet sich dem Flugloch wieder zu“ ist so nicht abbildbar.
+    Ein überwachtes Modell lernt die Grenze direkt aus den Labels.</p>
+
+  <h2>4 · Bahn als Bild + CNN</h2>
+  <p>Die Bahn wird als 64 × 64-Bild mit 3 Kanälen gezeichnet: Kanal 0 = Linie, Kanal 1 = Zeit (0 → 1 entlang der Bahn), Kanal 2 = Tempo (durch das 99. Perzentil geteilt,
+    auf 1 begrenzt). „absolut“: gleicher Maßstab für alle Bahnen (1.–99. Perzentil von Train); „zentriert“: jede Bahn in ihr eigenes Rechteck. Netz: 4 Blöcke
+    (32, 64, 128, 128 Filter) aus je 2 × (Conv 3×3, BN, ReLU) und MaxPool 2×2, dann GAP, Dropout 0,3, Linear → 4. 500 Epochen, sonst wie ResNet.</p>
+  <p>Warum schlechter: Kreuzungen und Überlagerungen verwischen die Reihenfolge; das Zeitbild gibt sie nur grob zurück.</p>
+
+  <h2>5 · InceptionTime</h2>
+  <p>Nach <b>Ismail Fawaz et al. 2020</b>. 6 Inception-Module, nach je 3 eine Residual-Verbindung. Ein Modul: 1×1-Bottleneck auf 32 Kanäle, dann parallel
+    drei Faltungen mit Kernen <b>39, 19, 9</b> (je 32 Filter) und ein Zweig MaxPool 3 + 1×1-Faltung; alles aneinandergehängt (4 × 32 = 128 Kanäle), BN, ReLU.
+    Am Ende GAP und Linear. Eingabe wie ResNet (Länge 128). Die langen Kerne sehen große Teile der Bahn auf einmal; bei 515 Bahnen bringt das aber nichts:
+    Val {ba("inception")} gegen {ba("laenge_128")} für ResNet mit Länge 128.</p>
+
+  <h2>6 · Video-Modelle R3D-18 und MC3-18</h2>
+  <ol class="steps">
+    <li><b>Clip bauen:</b> 16 Punkte gleichmäßig entlang der Bahn; an jedem ein 224 × 224-Ausschnitt in voller Auflösung um die Biene. Die 16 Bilder sind also
+      <i>nicht</i> aufeinanderfolgende Frames, sondern über die ganze Bahn verteilt.</li>
+    <li><b>Auf 112 px bringen:</b> entweder die mittleren 112 px ausschneiden (<code>c112</code>, Biene groß) oder 224 → 112 verkleinern (<code>c224</code>, mehr Umgebung).</li>
+    <li><b>Netz:</b> torchvision R3D-18 bzw. MC3-18 (Tran et al. 2018), vortrainiert auf Kinetics-400; letzte Schicht durch Linear → 4 ersetzt. R3D: alle Faltungen 3D
+      (Raum + Zeit); MC3: 3D nur in den ersten Schichten, danach 2D.</li>
+    <li><b>Feintuning:</b> AdamW, Lernrate 10⁻⁴, Weight Decay 0,01, OneCycle-Plan (10 % Aufwärmen), 15 Epochen, Batch 8, bf16, horizontales Spiegeln mit p = 0,5, 3 Seeds.
+      Normalisierung mit Kinetics-Mittelwerten.</li>
+  </ol>
+  <p>Ergebnis: R3D c224 {ba("r3d_c224")}, R3D c112 {ba("r3d_c112")}, MC3 c224 {ba("mc3_c224")}, MC3 c112 {ba("mc3_c112")}. Mehr Umgebung (c224) hilft. Das beste Video-Modell
+    liegt gleichauf mit ResNet Kombi, braucht aber GPU, Videodekodierung und viel mehr Rechenzeit. Eine Fusion aus Bahn und Video war schlechter als die Bahn allein.</p>
+
+  <h2>7 · DINOv2 Linear Probe (Video-Zweig, 10.11.)</h2>
+  <p>Nach <b>Oquab et al. 2023</b>: eingefrorener ViT-S/14, 8 Ausschnitte (224 px) entlang der Bahn, RGB und Differenzbild (Frame − Frame ±2); Merkmale der letzten 4 Schichten,
+    Klassentoken + gemittelte Patch-Tokens, Frames aneinandergehängt (49 152 Zahlen); darauf eine lineare Softmax-Schicht mit Full-Batch-SGD (12 500 Iterationen,
+    Lernrate 0,3, per 5-facher CV auf Train gewählt). Setup-Vergleich (Orientierung ja/nein): F1 Video {su.video_4?.f1_o?.toFixed(2).replace(".", ",") ?? "–"} gegen
+    Bahn {su.bahn_4?.f1_o?.toFixed(2).replace(".", ",") ?? "–"}.</p>
+  <div class="fig">
+    <svg viewBox="0 0 860 230">
+      <text x="20" y="20" class="b">1 · 8 Punkte auf der Bahn</text>
+      <path d="M30 170 C 10 100, 70 50, 100 100 S 150 190, 170 120" fill="none" stroke="#e0662a" stroke-width="3" />
+      {[[30, 170], [22, 128], [45, 78], [85, 82], [108, 120], [128, 162], [158, 158], [170, 120]].map(([x, y]) => <circle cx={x} cy={y} r="5" fill="#3d93c9" />)}
+      <text x="190" y="120" class="m" style="font-size:22px">→</text>
+      <text x="225" y="20" class="b">2 · Ausschnitte</text>
+      {[0, 1, 2, 3].map((i) => <rect x={225 + (i % 2) * 52} y={36 + Math.floor(i / 2) * 52} width="44" height="44" fill="#e8dcc4" stroke="#a8adb5" />)}
+      <text x="275" y="150" class="c m">RGB-Bild</text>
+      {[0, 1].map((i) => <rect x={225 + i * 52} y="160" width="44" height="44" fill="#d5dde3" stroke="#a8adb5" />)}
+      <text x="275" y="222" class="c m">+ Differenzbild</text>
+      <text x="340" y="120" class="m" style="font-size:22px">→</text>
+      <rect x="375" y="60" width="150" height="110" rx="8" fill="#e6eef3" stroke="#6b8fa3" stroke-dasharray="5 4" />
+      <text x="450" y="98" class="c b">DINOv2</text><text x="450" y="116" class="c m">vortrainiert</text>
+      <text x="450" y="140" class="c b" style="fill:#2a6f9a">❄ eingefroren</text>
+      <text x="450" y="190" class="c m">lernt nichts dazu</text>
+      <text x="540" y="120" class="m" style="font-size:22px">→</text>
+      <rect x="570" y="40" width="26" height="150" fill="#f1efe9" stroke="#e5e7eb" />
+      <text x="583" y="210" class="c m">49 152 Zahlen</text>
+      <text x="610" y="120" class="m" style="font-size:22px">→</text>
+      <rect x="640" y="80" width="90" height="70" rx="8" fill="#fdf6e8" stroke="#d99a1e" />
+      <text x="685" y="110" class="c b">Linear</text><text x="685" y="128" class="c m">lernt allein</text>
+      <text x="745" y="120" class="m" style="font-size:22px">→</text>
+      {["O", "S", "A", "Art"].map((c, i) => <text x="790" y={84 + i * 22} class="b">{c}</text>)}
+    </svg>
+    <div class="cap">Nur die letzte, lineare Schicht wird trainiert. Das Modell sieht die Biene, aber die Bahnform nur indirekt.</div>
+  </div>
+
+  <h2>8 · Körperausrichtung als Zusatzkanäle</h2>
+  <p>Pro Bahnpunkt: Körperachse aus den zweiten Momenten des Flecks (96-px-Ausschnitt, Hintergrund = Median), Kopf = dunklere Hälfte (im Pilot mit 150 Klicks: Achse
+    auf 20° genau bei ~80 % der langsamen Bienen, Kopf 95 % richtig). Zusatzkanäle: cos/sin des Winkels Kopf ↔ Richtung zum Flugloch, cos des Seitwärtswinkels (Kopf ↔ Flugrichtung),
+    gültig ja/nein. Vorab auf Train geprüft: „Kopf zeigt zum Stock“ ist bei Orientierung (27 %) kaum häufiger als bei Sammelabflug (24 %); Zufall wäre 25 %. Mit den Kanälen
+    sank die BA deutlich ({ba("ensemble_kombi_pose")}). Die Messung ist bei 30 px und Bewegungsunschärfe zu verrauscht.</p>
+
+  <h2>9 · Fusion aus Bahn und Video</h2>
+  <p>Nach <b>Wang, Tran, Feiszli 2020</b> (CVPR): Zwei Zweige, die Bahn (ResNet) und das Bild (eingefrorene DINOv2-Merkmale), werden zusammengelegt. Idee: Was die Bahn nicht zeigt,
+    könnte das Bild ergänzen.</p>
+  <div class="fig">
+    <svg viewBox="0 0 860 280">
+      <text x="20" y="22" class="b">Bahn-Zweig</text>
+      <rect x="20" y="34" width="90" height="56" fill="#f1efe9" stroke="#e5e7eb" /><text x="65" y="66" class="c m">7 × 128</text>
+      <text x="122" y="68" class="m" style="font-size:20px">→</text>
+      <rect x="150" y="34" width="110" height="56" rx="8" fill="#fdf6e8" stroke="#d99a1e" /><text x="205" y="66" class="c b">ResNet</text>
+      <text x="272" y="68" class="m" style="font-size:20px">→</text>
+      <rect x="300" y="34" width="60" height="56" fill="#f7e7c3" stroke="#d99a1e" /><text x="330" y="66" class="c b">64</text>
+
+      <text x="20" y="152" class="b">Bild-Zweig</text>
+      <rect x="20" y="164" width="90" height="56" fill="#f1efe9" stroke="#e5e7eb" /><text x="65" y="196" class="c m">DINOv2-Zahlen</text>
+      <text x="122" y="198" class="m" style="font-size:20px">→</text>
+      <rect x="150" y="164" width="110" height="56" rx="8" fill="#e6eef3" stroke="#6b8fa3" /><text x="205" y="196" class="c b">Linear</text>
+      <text x="272" y="198" class="m" style="font-size:20px">→</text>
+      <rect x="300" y="164" width="60" height="56" fill="#d5dde3" stroke="#6b8fa3" /><text x="330" y="196" class="c b">64</text>
+
+      <path d="M360 62 C 400 62, 400 127, 430 127" fill="none" stroke="#a8adb5" stroke-width="2" />
+      <path d="M360 192 C 400 192, 400 127, 430 127" fill="none" stroke="#a8adb5" stroke-width="2" />
+      <rect x="430" y="92" width="70" height="70" fill="#f1efe9" stroke="#a8adb5" /><text x="465" y="124" class="c b">128</text><text x="465" y="142" class="c m">aneinander</text>
+      <text x="512" y="132" class="m" style="font-size:20px">→</text>
+      <rect x="540" y="92" width="130" height="70" rx="8" fill="#fdf6e8" stroke="#d99a1e" /><text x="605" y="122" class="c b">2 Schichten</text><text x="605" y="140" class="c m">+ ReLU</text>
+      <text x="682" y="132" class="m" style="font-size:20px">→</text>
+      <rect x="710" y="92" width="130" height="70" rx="8" fill="#fdf6e8" stroke="#d99a1e" /><text x="775" y="122" class="c b">Kopf: Fusion</text><text x="775" y="140" class="c m">→ 4 Klassen</text>
+
+      <rect x="420" y="34" width="150" height="40" rx="8" fill="none" stroke="#a8adb5" stroke-dasharray="5 4" /><text x="495" y="58" class="c m">Kopf: nur Bahn</text>
+      <rect x="420" y="184" width="150" height="40" rx="8" fill="none" stroke="#a8adb5" stroke-dasharray="5 4" /><text x="495" y="208" class="c m">Kopf: nur Bild</text>
+      <line x1="360" y1="48" x2="420" y2="54" stroke="#a8adb5" stroke-width="1.5" stroke-dasharray="4 3" />
+      <line x1="360" y1="206" x2="420" y2="204" stroke="#a8adb5" stroke-width="1.5" stroke-dasharray="4 3" />
+      <text x="20" y="250" class="m">Gestrichelt = nur bei Gradient-Blending: jeder Zweig hat einen eigenen Kopf, jeder Verlust ein eigenes Gewicht.</text>
+      <text x="20" y="270" class="m">Ergebnis: schlechter als Bahn allein und Video allein. 515 Bahnen reichen nicht, um beide zu verbinden.</text>
+    </svg>
+    <div class="cap">Late Fusion: Beide Zweige liefern je 64 Zahlen, die aneinandergehängt und gemeinsam klassifiziert werden.</div>
+  </div>
+  <ol>
+    <li><b>Zweige:</b> Das ResNet macht aus der Bahn einen Vektor mit 64 Zahlen. Eine lineare Schicht macht aus den DINOv2-Merkmalen ebenfalls 64 Zahlen.</li>
+    <li><b>Zusammenlegen:</b> Beide Vektoren werden aneinandergehängt (128 Zahlen), dann zwei vollverbundene Schichten mit ReLU und ein linearer Klassifikator (Late Fusion).</li>
+    <li><b>Variante Concat:</b> Nur der zusammengelegte Kopf wird trainiert.</li>
+    <li><b>Variante Gradient-Blending:</b> Jeder Zweig bekommt zusätzlich einen eigenen Kopf, und die drei Verluste werden gewichtet addiert. Die Gewichte wählt das Verfahren offline:
+      Zweige, die schnell überanpassen, bekommen weniger Gewicht (w ∝ G / O², G = Gewinn auf zurückgehaltenen Daten, O = Überanpassung).</li>
+    <li><b>Eigene Entscheidungen, nicht aus dem Paper:</b> Der Bildzweig bleibt eingefroren (Wang trainieren alles); Optimizer und Zeitplan wie beim ResNet; das Zurückhalten für G und O geschieht
+      nach ganzen Sequenzen, weil Bahnen einer Sequenz nicht unabhängig sind.</li>
+  </ol>
+  <p><b>Ergebnis (Val, 4 Klassen, 5 Seeds):</b> Fusion BA {su.fusion_4?.ba4?.toFixed(3).replace(".", ",") ?? "–"} gegen Bahn allein {su.bahn_4?.ba4?.toFixed(3).replace(".", ",") ?? "–"} und Video allein
+    {su.video_4?.ba4?.toFixed(3).replace(".", ",") ?? "–"}. Die Fusion ist also schlechter als beide Einzelzweige. Der Unterschied zur Bahn bei „Orientierung ja/nein“ ist signifikant negativ
+    (95 %-Intervall der Differenz in BA liegt unter 0).</p>
+  <div class="merke"><b>Warum?</b> Wang et al. zeigen: Eine Fusion muss gegen die beste Einzelmodalität antreten und verliert oft, weil der stärkere Zweig überanpasst und der schwächere zu wenig lernt.
+    Hier sind nur 515 Trainingsbahnen für 64 + 64 Zahlen und mehrere Schichten da. Wangs Befunde stammen aus End-to-End-Training auf Kinetics (240 000 Videos); der Fall mit eingefrorenem Bildzweig ist damit nur teilweise abgedeckt.</div>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum ist Clustering schlechter als ein überwachtes Modell, obwohl K = 50 viele feine Gruppen erlaubt?</summary><div>k-Means gruppiert nach Abstand
+      im Merkmalsraum, ohne die Labels zu kennen. Orientierungsflüge liegen dort mitten zwischen Sammelabflügen und Artefakten. Bei großem K werden Cluster klein und die
+      Mehrheitsklasse zufällig. Ein überwachtes Netz optimiert die Grenze direkt auf die Klassen.</div></details>
+    <details><summary>Warum ist das Video-Modell nicht besser, obwohl es mehr sieht?</summary><div>Es sieht nur 16 Ausschnitte; die Bahnform (Bögen relativ zum
+      Flugloch) muss es aus Bildpositionen erschließen, die es durch das Ausschneiden gar nicht direkt kennt. Und es hat Millionen Parameter für nur 515 Beispiele.</div></details>
+    <details><summary>Was ist der Unterschied zwischen R3D und MC3?</summary><div>R3D nutzt in allen Schichten 3D-Faltungen (Raum und Zeit). MC3 („mixed convolutions“)
+      nutzt 3D nur in den unteren Schichten und 2D oben; weniger Zeitmodellierung, hier deutlich schlechter.</div></details>
+    <details><summary>Was zeigt die Regel als Untergrenze?</summary><div>Wie weit man mit Start/Ende-Zone und zwei Schwellen kommt (BA ≈ 0,63–0,65). Alles darüber
+      ist der Gewinn durch Lernen aus dem Bahnverlauf.</div></details>
+  </div>
+</Kapitel>

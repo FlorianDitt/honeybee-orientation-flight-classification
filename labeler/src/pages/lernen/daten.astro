@@ -1,0 +1,80 @@
+---
+import Kapitel from "../../components/Kapitel.astro";
+---
+
+<Kapitel slug="daten" satz="96 Videosequenzen von 30 s aus zwei Stöcken, nach Zeitblöcken getrennt in Train (lernen), Val (auswählen) und zwei Testsets (einmal prüfen), mit Puffersequenzen dazwischen.">
+
+  <h2>Das Rohmaterial</h2>
+  <table class="p">
+    <tr><th>Größe</th><th>Wert</th><th>Bedeutung</th></tr>
+    <tr><td>Datensatz</td><td class="n">mrkschtr/thehiveisreal</td><td>Hugging Face, zugangsbeschränkt</td></tr>
+    <tr><td>Auflösung</td><td class="n">1080 × 1920 px</td><td>Hochformat (Breite × Höhe), Kamera schaut senkrecht auf Flugbrett und Boden davor</td></tr>
+    <tr><td>Bildrate</td><td class="n">59,94 fps</td><td>ein Frame ≈ 16,7 ms; Belichtung ≈ 1/4 Frame → schnelle Bienen sind verwischt</td></tr>
+    <tr><td>Sequenz</td><td class="n">30,03 s = 1800 Frames</td><td>kleinste Einheit des Splits</td></tr>
+    <tr><td>Größe einer Biene</td><td class="n">≈ 30 px lang</td><td>in voller Auflösung; im Tracker (halbe Auflösung) ≈ 15 px</td></tr>
+    <tr><td>Stock A</td><td class="n">rec2123</td><td>Train, Val, Test A</td></tr>
+    <tr><td>Stock B</td><td class="n">rec2125</td><td>nur Test B: anderes Holz (rot, Gitter), bedeckt, Kamera näher</td></tr>
+  </table>
+
+  <h2>Die Aufteilung</h2>
+  <div class="fig">
+    <svg viewBox="0 0 860 120">
+      {[["Train", 15, 69, "#3d93c9"], ["P", 70, 70, "#c4c7cd"], ["Val", 71, 84, "#d99a1e"], ["P", 85, 85, "#c4c7cd"], ["Test A", 86, 89, "#16181d"]].map(([n, a, b, col]) => {
+        const x0 = 20 + ((a as number) - 15) * 8.6, w = ((b as number) - (a as number) + 1) * 8.6;
+        return <g><rect x={x0} y="20" width={w - 1} height="34" fill={col as string} rx="3" />
+          {(n as string).length > 1 && <text x={x0 + w / 2} y="42" class="c b" style="fill:#fff">{n}</text>}
+          <text x={x0 + w / 2} y="70" class="c m">{a === b ? `seq${a}` : `seq${String(a).padStart(3, "0")}–${b}`}</text></g>;
+      })}
+      <text x="20" y="12" class="m">Stock A (rec2123), zeitlich geordnet →</text>
+      <rect x="690" y="20" width="150" height="34" fill="#16181d" rx="3" opacity=".75" /><text x="765" y="42" class="c b" style="fill:#fff">Test B</text>
+      <text x="765" y="70" class="c m">rec2125 seq000–020</text>
+      <text x="20" y="100" class="m">P = Puffer (seq070, seq085): verworfen, damit keine Bahn über eine Split-Grenze reicht.</text>
+    </svg>
+  </div>
+  <table class="p">
+    <tr><th>Split</th><th>Sequenzen</th><th>Dauer</th><th>gelabelte Bahnen</th><th>Rolle</th></tr>
+    <tr><td><b>Train</b></td><td class="n">rec2123 seq015–069 (55)</td><td class="n">27,5 min</td><td class="n">515</td><td>Modelle lernen nur hieraus</td></tr>
+    <tr><td><b>Val</b></td><td class="n">rec2123 seq071–084 (14)</td><td class="n">7,0 min</td><td class="n">204</td><td>Varianten vergleichen und auswählen</td></tr>
+    <tr><td><b>Test A</b> (gleicher Stock)</td><td class="n">rec2123 seq086–089 (4)</td><td class="n">2,0 min</td><td class="n">299</td><td>Wie gut ist die Methode?</td></tr>
+    <tr><td><b>Test B</b> (anderer Stock)</td><td class="n">rec2125 seq000–020 (21)</td><td class="n">10,5 min</td><td class="n">410</td><td>Überträgt sie sich auf einen neuen Stock?</td></tr>
+  </table>
+  <p class="src">Code: <code>src/beeflight/splits.py</code> (einzige Quelle für den Split; prüft, dass alle 96 Sequenzen disjunkt verteilt sind).</p>
+
+  <h2>Warum genau so?</h2>
+  <ol class="steps">
+    <li><b>Zeitblöcke statt Zufall.</b> Bei 60 fps sind Nachbar-Frames fast identisch, und eine Bahn erstreckt sich über viele
+      Frames. Zufällig gemischte Frames oder Bahnen aus derselben Minute in Train und Test würden das Ergebnis schönen
+      (<i>Leakage</i>). Ganze Sequenzblöcke verhindern das.</li>
+    <li><b>Puffer.</b> Eine Bahn am Ende von seq069 könnte in seq070 weiterlaufen. Die Puffersequenz wird nie benutzt, also
+      kann keine Biene in zwei Splits vorkommen.</li>
+    <li><b>Val getrennt von Test.</b> Wer auf einem Datensatz viele Varianten vergleicht und die beste nimmt, passt sich an
+      dessen Zufall an. Val trägt diese Auswahl; Test wird erst nach dem Einfrieren und <b>genau einmal</b> geöffnet.</li>
+    <li><b>Zwei Testsets.</b> Test A misst die Methode unter gleichen Bedingungen, Test B unter einem
+      <i>Domain Shift</i> (anderer Stock, Untergrund, Licht, Kameraabstand). Die Differenz A − B ist der Transfer-Verlust.</li>
+  </ol>
+
+  <div class="achtung"><b>Freeze-Regel:</b> Das Modell, alle Schwellen und der Eingang von Stock B werden festgelegt, bevor
+    ein Test-Label gelesen wird. Der Eingang von Stock B wurde aus einem einzigen Bild bestimmt (rec2125_seq000, Frame 0),
+    nicht aus Ergebnissen. Die Regeln stehen in <code>outputs/final/regeln.md</code>.</div>
+
+  <h2>Koordinaten</h2>
+  <p>Detektion und Tracking laufen auf <b>halber Auflösung</b> (540 × 960, <code>SCALE = 0.5</code>, Mittelwert-Verkleinerung
+    <code>INTER_AREA</code>) und nur in der <b>Flugzone</b>: vom oberen Rand des Flugbretts abwärts. Stock A: Brett von Zeile 820
+    bis 1000 (volle Auflösung), also Zone ab Zeile 410 (halb), Brettunterkante bei y = 90 in Zonenkoordinaten. Stock B: Brett 770–1040.</p>
+  <p class="src">Code: <code>BOARD</code> in <code>src/beeflight/tracks.py</code>, <code>flight_zone()</code> in <code>src/beeflight/evaluate.py</code>.</p>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum wurde nicht zufällig in Train und Test aufgeteilt?</summary><div>Benachbarte Frames und Bahnen
+      derselben Minute sind stark korreliert. Bei zufälliger Aufteilung sähe das Modell im Test fast dieselben Bienen wie im
+      Training, die Leistung wäre überschätzt. Zeitblöcke plus Puffer verhindern dieses Leakage.</div></details>
+    <details><summary>Wozu braucht man Val, wenn es doch einen Test gibt?</summary><div>Auf Val werden ~70 Varianten verglichen
+      und die beste gewählt. Diese Auswahl macht das Val-Ergebnis optimistisch (Selektionsbias). Der Test ist davon unberührt,
+      weil er nur einmal mit dem eingefrorenen Modell ausgewertet wird.</div></details>
+    <details><summary>Was misst Test B, was Test A nicht misst?</summary><div>Den Transfer auf einen anderen Stock (Domain
+      Shift): anderes Brett, anderer Boden, andere Kamera-Position. Test A zeigt die Leistung unter Trainingsbedingungen.</div></details>
+    <details><summary>Warum ist Test A statistisch schwächer als Test B, obwohl er 299 Bahnen hat?</summary><div>Er besteht nur
+      aus 4 Sequenzen. Bahnen derselben Sequenz sind abhängig; ein Cluster-Bootstrap über 4 Sequenzen erlaubt nur 35 verschiedene
+      Stichproben. Darum gibt es für Test A Wilson-Intervalle und „eine Sequenz weglassen“ statt Bootstrap (Kapitel 12).</div></details>
+  </div>
+</Kapitel>

@@ -1,0 +1,8 @@
+{"id": "rec2123_seq057:1505", "split": "train", "alt": "sammelabflug", "neu": "orientierung", "quelle": "recheck.jsonl", "am": "2026-11-16T14:35:17.351Z"}
+{"id": "rec2123_seq041:191", "split": "train", "alt": "orientierung", "neu": "artefakt", "quelle": "recheck.jsonl", "am": "2026-11-16T14:35:17.351Z"}
+{"id": "rec2123_seq035:1702", "split": "train", "alt": "artefakt", "neu": "anflug", "quelle": "recheck.jsonl", "am": "2026-11-16T14:35:17.351Z"}
+{"id": "rec2123_seq042:934", "split": "train", "alt": "orientierung", "neu": "artefakt", "quelle": "recheck.jsonl", "am": "2026-11-16T14:35:17.351Z"}
+{"id": "rec2123_seq025:263", "split": "train", "alt": "orientierung", "neu": "artefakt", "quelle": "recheck.jsonl", "am": "2026-11-16T14:35:17.351Z"}
+{"id": "rec2123_seq081:325", "split": "val", "alt": "artefakt", "neu": "orientierung", "quelle": "recheck_val.jsonl", "am": "2026-11-16T14:35:17.351Z"}
+{"id": "rec2123_seq084:1488", "split": "val", "alt": "sammelabflug", "neu": "orientierung", "quelle": "recheck_val.jsonl", "am": "2026-11-16T14:35:17.351Z"}
+{"id": "rec2123_seq072:1286", "split": "val", "alt": "anflug", "neu": "artefakt", "quelle": "recheck_val.jsonl", "am": "2026-11-16T14:35:17.351Z"}

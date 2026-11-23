@@ -1,0 +1,153 @@
+---
+// Bee check: for every artefakt track of train/val, is there a honey bee on it? Labels for a pre-classifier.
+import Layout from "../layouts/Layout.astro";
+import { readBee, readBeeQueue } from "../lib/biene";
+
+const queue = readBeeQueue();
+const labels = Object.fromEntries(readBee());
+const payload = JSON.stringify({ queue, labels });
+---
+
+<Layout title="Biene oder nicht">
+  <script type="application/json" id="payload" set:html={payload} />
+  <main>
+    <a href="/" class="back">← Übersicht</a>
+    <header>
+      <div class="kicker">beeflight · Vorfilter</div>
+      <h1>Ist da eine Honigbiene?</h1>
+      <p>8 Ausschnitte entlang einer Artefakt-Bahn, von links (Anfang) nach rechts (Ende). Taste <kbd>1</kbd>–<kbd>4</kbd>
+        drücken, dann kommt die nächste Bahn.</p>
+    </header>
+
+    {!queue && <p class="warn">Noch keine Stichprobe: <code>python -m beeflight.biene sample</code></p>}
+
+    <div hidden={!queue}>
+      <div class="pos"><b id="pos">–</b> · <span id="progress"></span></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="strip"><img id="strip" alt="Ausschnitte der Bahn" /></div>
+      <p id="state" class="state"></p>
+      <div class="answers">
+        <button data-a="honigbiene"><kbd>1</kbd> Honigbiene</button>
+        <button data-a="anderes_insekt"><kbd>2</kbd> Anderes Insekt</button>
+        <button data-a="kein_tier"><kbd>3</kbd> Kein Tier</button>
+        <button data-a="unklar"><kbd>4</kbd> Unklar</button>
+      </div>
+      <div class="row">
+        <button id="prev">← zurück</button>
+        <button id="next">weiter →</button>
+        <button id="open">nächste offene <kbd>N</kbd></button>
+        <button id="zoom"><kbd>Z</kbd> größer</button>
+        <button id="clear">löschen <kbd>⌫</kbd></button>
+      </div>
+      <dl>
+        <dt>1 Honigbiene</dt><dd>In mindestens einem Ausschnitt ist klar eine Honigbiene zu sehen.</dd>
+        <dt>2 Anderes Insekt</dt><dd>Wespe, Hornisse, Fliege, Hummel, Wildbiene …</dd>
+        <dt>3 Kein Tier</dt><dd>Gras, Blatt, Schatten, Lichtwechsel, nur Hintergrund.</dd>
+        <dt>4 Unklar</dt><dd>Zu verwischt oder zu klein, um es zu sagen.</dd>
+      </dl>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  type Item = { id: string; name: string; split: string; seq: string; frames: number };
+  type Rec = { id: string; answer: string };
+  const NAMES: Record<string, string> = {
+    honigbiene: "Honigbiene", anderes_insekt: "Anderes Insekt", kein_tier: "Kein Tier", unklar: "Unklar",
+  };
+  const KEYS = ["honigbiene", "anderes_insekt", "kein_tier", "unklar"];
+  const { queue, labels } = JSON.parse(document.getElementById("payload")!.textContent!) as {
+    queue: { crop: number; k: number; items: Item[] } | null; labels: Record<string, Rec>;
+  };
+
+  if (queue) {
+    const $ = (id: string) => document.getElementById(id)!;
+    const items = queue.items;
+    const img = $("strip") as HTMLImageElement;
+    let idx = Math.max(0, items.findIndex((i) => !labels[i.id]));
+    let zoom = false;
+
+    function render() {
+      const it = items[idx];
+      const done = items.filter((i) => labels[i.id]).length;
+      img.src = `/biene/${it.name}.png`;
+      const nx = items[idx + 1];
+      if (nx) new Image().src = `/biene/${nx.name}.png`;
+      $("pos").textContent = `${idx + 1} / ${items.length}`;
+      $("progress").textContent = `${done} beschriftet`;
+      ($("bar") as HTMLElement).style.width = `${(100 * done) / items.length}%`;
+      const rec = labels[it.id];
+      $("state").textContent = rec ? `gespeichert: ${NAMES[rec.answer]}` : "offen";
+      document.querySelectorAll<HTMLButtonElement>("[data-a]").forEach((b) => b.classList.toggle("on", rec?.answer === b.dataset.a));
+      img.classList.toggle("big", zoom);
+      $("zoom").classList.toggle("on", zoom);
+    }
+    function go(k: number) { idx = Math.min(Math.max(0, k), items.length - 1); render(); }
+    function nextOpen() {
+      let k = items.findIndex((i, j) => j > idx && !labels[i.id]);
+      if (k < 0) k = items.findIndex((i) => !labels[i.id]);
+      go(k >= 0 ? k : idx);
+    }
+    async function answer(a: string) {
+      const it = items[idx];
+      const res = await fetch("/api/biene", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: it.id, answer: a }) });
+      if (!res.ok) { $("state").textContent = `Fehler: ${(await res.json()).error}`; return; }
+      labels[it.id] = { id: it.id, answer: a };
+      render();
+      setTimeout(() => { if (items[idx].id === it.id) nextOpen(); }, 200);
+    }
+    async function clear() {
+      const it = items[idx];
+      await fetch("/api/biene", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: it.id }) });
+      delete labels[it.id];
+      render();
+    }
+
+    document.querySelectorAll<HTMLButtonElement>("[data-a]").forEach((b) => b.addEventListener("click", () => answer(b.dataset.a!)));
+    $("prev").addEventListener("click", () => go(idx - 1));
+    $("next").addEventListener("click", () => go(idx + 1));
+    $("open").addEventListener("click", nextOpen);
+    $("zoom").addEventListener("click", () => { zoom = !zoom; render(); });
+    $("clear").addEventListener("click", clear);
+    document.addEventListener("keydown", (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (["1", "2", "3", "4"].includes(k)) answer(KEYS[Number(k) - 1]);
+      else if (k === "n") nextOpen();
+      else if (k === "z") { zoom = !zoom; render(); }
+      else if (e.key === "ArrowLeft") go(idx - 1);
+      else if (e.key === "ArrowRight") go(idx + 1);
+      else if (e.key === "Backspace") clear();
+      else return;
+      e.preventDefault();
+    });
+    render();
+  }
+</script>
+
+<style>
+  main { max-width: 1600px; margin: 0 auto; padding: 24px 16px 48px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 12px; }
+  h1 { font-size: 28px; margin: 4px 0 8px; letter-spacing: -.02em; }
+  header p { color: var(--muted); max-width: 80ch; margin: 0 0 20px; }
+  .warn { background: #fff4e5; border: 1px solid #f0c27a; border-radius: 8px; padding: 10px 14px; }
+  [hidden] { display: none; }
+  .strip { overflow-x: auto; background: #000; border-radius: 8px; padding: 6px; }
+  .strip img { display: block; height: 176px; image-rendering: auto; }
+  .strip img.big { height: 300px; }
+  button { font: inherit; font-size: 15px; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 8px 12px; cursor: pointer; color: var(--ink); }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  button.on kbd { color: #ddd; background: transparent; border-color: #888; }
+  kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; background: var(--panel); }
+  .pos { font-size: 15px; }
+  .bar { height: 6px; background: var(--panel); border-radius: 3px; overflow: hidden; margin: 6px 0 12px; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 0; }
+  .state { min-height: 1.4em; font-weight: 600; }
+  .answers, .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .answers button { font-size: 17px; padding: 10px 16px; }
+  dl { font-size: 14px; color: var(--muted); max-width: 70ch; }
+  dt { font-weight: 600; color: var(--ink); margin-top: 8px; }
+  dd { margin: 2px 0 0; }
+</style>

@@ -29,8 +29,9 @@ LABELS = ROOT / "labels"
 OUT = ROOT / "outputs" / "models" / "resnet"
 N_CHANNELS = 6
 # entrance reference point (middle of the lower board edge) and board width at half resolution.
-# rec2125 is still missing: docs/roadmap.md sets it from a single frame at the freeze, not from results.
-ENTRANCE = {"2123": dict(x=270.0, width=540.0)}
+# rec2125: set at the freeze (21.11.2026) from a single frame (rec2125_seq000, frame 0), not from results
+# (docs/roadmap.md): as at rec2123 the board spans the whole frame width, so the same reference applies.
+ENTRANCE = {"2123": dict(x=270.0, width=540.0), "2125": dict(x=270.0, width=540.0)}
 
 
 def to_entrance(xy, rec):
@@ -68,6 +69,17 @@ def prepare(rows, length, mean, std):
     """-> (n, channels, length) array for torch."""
     data = np.stack([interpolate(series_of(r), length) for r in rows])
     return np.transpose((data - mean) / std, (0, 2, 1)).astype(np.float32)
+
+
+def device():
+    """The GPU if torch sees one (e.g. on the DGX Spark), else the CPU. On the GPU cuDNN runs deterministically,
+    so that a seed gives the same model there too."""
+    import torch
+
+    if torch.cuda.is_available():
+        torch.backends.cudnn.deterministic, torch.backends.cudnn.benchmark = True, False
+        return torch.device("cuda")
+    return torch.device("cpu")
 
 
 def build_net(n_classes=len(M.CLASSES), n_channels=N_CHANNELS):
@@ -111,18 +123,19 @@ def train(x, y, seed, epochs=1500, batch=16, log=None):
 
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
-    net = build_net()
+    dev = device()
+    net = build_net().to(dev)
     opt = torch.optim.Adam(net.parameters(), lr=0.001)
     sched = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, factor=0.5, patience=50)
     loss_fn = nn.CrossEntropyLoss()
-    x, y = torch.from_numpy(x), torch.as_tensor(y, dtype=torch.long)
+    x, y = torch.from_numpy(x).to(dev), torch.as_tensor(y, dtype=torch.long, device=dev)
     best, best_state = float("inf"), None
     start = time.time()
     for epoch in range(epochs):
         net.train()
         total = 0.0
         for idx in np.array_split(rng.permutation(len(x)), max(1, int(np.ceil(len(x) / batch)))):
-            idx = torch.as_tensor(idx)
+            idx = torch.as_tensor(idx, device=dev)
             opt.zero_grad()
             loss = loss_fn(net(x[idx]), y[idx])
             loss.backward()
@@ -136,15 +149,16 @@ def train(x, y, seed, epochs=1500, batch=16, log=None):
             log(f"  seed {seed} epoch {epoch + 1}/{epochs}: train loss {total:.4f}, best {best:.4f}, "
                 f"lr {opt.param_groups[0]['lr']:.2g}, {time.time() - start:.0f} s")
     net.load_state_dict(best_state)
-    return net
+    return net.cpu()
 
 
 def predict(net, x, batch=64):
     import torch
 
+    dev = next(net.parameters()).device
     net.eval()
     with torch.no_grad():
-        return np.concatenate([net(torch.from_numpy(x[i:i + batch])).softmax(dim=1).numpy()
+        return np.concatenate([net(torch.from_numpy(x[i:i + batch]).to(dev)).softmax(dim=1).cpu().numpy()
                                for i in range(0, len(x), batch)])
 
 

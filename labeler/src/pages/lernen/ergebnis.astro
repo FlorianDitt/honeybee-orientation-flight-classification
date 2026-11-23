@@ -1,0 +1,78 @@
+---
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import Kapitel from "../../components/Kapitel.astro";
+import { ROOT } from "../../lib/store";
+
+const read = (...f: string[]) => { const p = resolve(ROOT, "outputs", ...f); return existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : null; };
+const test = read("final", "test_ergebnis.json");
+const vf = read("final", "vorfilter", "auswahl.json");
+const de = (x: number | null | undefined, d = 2) => (x == null || Number.isNaN(x) ? "–" : x.toFixed(d).replace(".", ","));
+const ci = (a: number[] | null | undefined) => (a ? "[" + de(a[0]) + " – " + de(a[1]) + "]" : "");
+const CLS = ["orientierung", "sammelabflug", "anflug", "artefakt"];
+const SHORT: Record<string, string> = { orientierung: "Orient.", sammelabflug: "Sammel.", anflug: "Anflug", artefakt: "Artef." };
+const TN: Record<string, string> = { test_same_hive: "Test A · gleicher Stock", test_other_hive: "Test B · anderer Stock" };
+---
+
+<Kapitel slug="ergebnis" satz="Auf Val erreicht Ensemble Kombi BA 0,74 und F1 der Orientierung 0,68; die ehrliche Leistung zeigt der einmalige Test auf dem gleichen und auf einem fremden Stock.">
+
+  <h2>Val (Auswahl)</h2>
+  <table class="p">
+    <tr><th>Modell</th><th>BA</th><th>F1 O</th></tr>
+    <tr><td>Regel (Schwellen auf Train)</td><td class="n">0,646</td><td class="n">–</td></tr>
+    <tr><td>ResNet Basis</td><td class="n">0,689</td><td class="n">0,591</td></tr>
+    <tr><td><b>Ensemble Kombi</b></td><td class="n"><b>0,737</b></td><td class="n"><b>0,681</b></td></tr>
+    {vf && <tr><td>gewählte Vorfilter-Variante: {vf.auswahl}</td><td class="n">{de(vf.variants[vf.auswahl].ba, 3)}</td><td class="n">–</td></tr>}
+  </table>
+
+  <h2>Test (einmal ausgewertet)</h2>
+  {test ? (
+    <>
+      <p>Eingefroren: <b>{test.model}</b>. Labels: Mehrheit aus Florian, Labeler2 und Labeler3, gebildet mit <code>beeflight-vote --test</code>.</p>
+      {Object.entries(test.splits).map(([k, t]: [string, any]) => (
+        <section>
+          <h3>{TN[k] ?? k} · {t.n} Bahnen, {t.n_o} Orientierungsflüge, {t.seqs} Sequenzen</h3>
+          <table class="p">
+            <tr><th>Maß</th><th>Wert</th><th>95-%-Intervall</th><th>Regel zum Vergleich</th></tr>
+            <tr><td>Balanced Accuracy</td><td class="n"><b>{de(t.ba, 3)}</b></td><td class="n">{ci(t.ba_ci) || t.ci_note}</td><td class="n">{de(t.rule_ba, 3)}</td></tr>
+            <tr><td>Recall Orientierung</td><td class="n">{de(t.recall_o)}</td><td class="n">{ci(t.recall_o_ci) || ""}</td><td></td></tr>
+            <tr><td>Precision Orientierung</td><td class="n">{de(t.precision_o)}</td><td class="n">{ci(t.precision_o_ci) || ""}</td><td></td></tr>
+            <tr><td>F1 Orientierung</td><td class="n">{de(t.f1_o)}</td><td></td><td></td></tr>
+            <tr><td>Anteil Orientierung, wahr → vorhergesagt</td><td class="n">{de(t.share_true)} → {de(t.share_pred)}</td><td></td><td></td></tr>
+            <tr><td>BA nur einstimmige Bahnen</td><td class="n">{de(t.unanimous_ba, 3)}</td><td class="n">{t.unanimous_n}</td><td></td></tr>
+          </table>
+          <table class="p">
+            <tr><th>wahr ↓ / vorhergesagt →</th>{CLS.map((c) => <th>{SHORT[c]}</th>)}</tr>
+            {t.confusion.map((row: number[], i: number) => (
+              <tr>
+                <th>{SHORT[CLS[i]]}</th>
+                {row.map((v: number, j: number) => <td class={i === j ? "n diag" : "n"}>{v}</td>)}
+              </tr>
+            ))}
+          </table>
+        </section>
+      ))}
+      {test.notes && <ul>{test.notes.map((n: string) => <li>{n}</li>)}</ul>}
+    </>
+  ) : <p class="achtung">Der Test ist noch nicht ausgewertet. Diese Stelle füllt sich danach von selbst aus <code>outputs/final/test_ergebnis.json</code>.</p>}
+
+  <h2>Grenzen, die man nennen muss</h2>
+  <ol class="steps">
+    <li><b>Nur die Bahn.</b> Der Klassifikator sieht kein Bild; Artefakte mit bienenähnlicher Bahn verwechselt er mit Orientierung.</li>
+    <li><b>Auswahl auf Val</b> unter ~70 Varianten: Val-Werte sind optimistisch; nur der Test zählt.</li>
+    <li><b>Kleine Daten:</b> 515 Train-Bahnen, 42 Orientierungsflüge in Val; Intervalle sind entsprechend breit.</li>
+    <li><b>Labels:</b> Die Grenze Orientierung / Sammelabflug ist auch für Menschen unscharf (Recheck, Kapitel 2).</li>
+    <li><b>Tracker:</b> Bruchstücke und Bienenwechsel entstehen vor dem Klassifikator und werden als Artefakt gelabelt.</li>
+    <li><b>Test A</b> hat nur 4 Sequenzen: Intervalle nach Wilson, abhängig von wenigen Minuten Video.</li>
+  </ol>
+
+  <h2>Prüfungsfragen</h2>
+  <div class="quiz">
+    <details><summary>Warum kann Test besser oder schlechter als Val ausfallen?</summary><div>Schlechter: Selektionsbias auf Val und andere Bedingungen (Tageszeit, Stock).
+      Besser: Zufall, z. B. ein Testabschnitt mit vielen eindeutigen Flügen. Mit Intervallen sieht man, ob der Unterschied über den Zufall hinausgeht.</div></details>
+    <details><summary>Was würde man als Nächstes verbessern?</summary><div>Mehr gelabelte Bahnen (vor allem Orientierung), Bild und Bahn besser verbinden (der Vorfilter ist ein erster
+      Schritt), Labelregeln für Grenzfälle schärfen, Tracker gegen Bienenwechsel robuster machen.</div></details>
+    <details><summary>Wie liest man den Unterschied zwischen Test A und Test B?</summary><div>Als Kosten des Transfers auf einen neuen Stock (Domain Shift). Die Eingabe
+      ist relativ zum Flugloch und in Brettbreiten normiert, um diesen Verlust klein zu halten.</div></details>
+  </div>
+</Kapitel>

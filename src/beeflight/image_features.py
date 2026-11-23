@@ -26,6 +26,7 @@ from collections import defaultdict
 import numpy as np
 
 from . import metrics as M
+from . import resnet as R
 from .resnet import LABELS, read_train
 from .splits import ROOT
 
@@ -83,19 +84,21 @@ def rows_of(split):
     return json.loads((LABELS / f"queue_{split}.json").read_text())["items"]
 
 
-def load_backbone():
+def load_backbone(name="dinov2_vits14", trust_repo="check"):
+    """A DINOv2 model from torch.hub, e.g. dinov2_vitb14 or dinov2_vitl14_reg; on the GPU if there is one."""
     import torch
 
-    return torch.hub.load("facebookresearch/dinov2", "dinov2_vits14", trust_repo="check").eval()
+    return torch.hub.load("facebookresearch/dinov2", name, trust_repo=trust_repo).eval().to(R.device())
 
 
 def embed(net, batch):
     """(b, 3, H, W) -> (b, layers, tokens, dim): the last 4 layers, token 0 = class, token 1 = averaged patches."""
     import torch
 
+    dev = next(net.parameters()).device
     with torch.inference_mode():
-        layers = net.get_intermediate_layers(torch.from_numpy(batch), n=4, return_class_token=True)
-    return np.stack([torch.stack([cls, patches.mean(dim=1)], dim=1).numpy() for patches, cls in layers], axis=1)
+        layers = net.get_intermediate_layers(torch.from_numpy(batch).to(dev), n=4, return_class_token=True)
+    return np.stack([torch.stack([cls, patches.mean(dim=1)], dim=1).cpu().numpy() for patches, cls in layers], axis=1)
 
 
 def extract(split, net=None, batch=32):
@@ -157,18 +160,19 @@ def train_linear(x, y, lrs=LEARNING_RATES, iterations=ITERATIONS, seed=0, n_clas
     A classifier that diverges ends up with non-finite weights and is never chosen."""
     import torch
 
-    x = torch.as_tensor(x, dtype=torch.float32)
-    one_hot = torch.eye(n_classes)[torch.as_tensor(y, dtype=torch.long)]
+    dev = R.device()
+    x = torch.as_tensor(x, dtype=torch.float32, device=dev)
+    one_hot = torch.eye(n_classes, device=dev)[torch.as_tensor(y, dtype=torch.long, device=dev)]
     gen = torch.Generator().manual_seed(seed)
-    rates = torch.tensor(lrs, dtype=torch.float32)
-    w = 0.01 * torch.randn(len(lrs), x.shape[1], n_classes, generator=gen)
-    b = torch.zeros(len(lrs), n_classes)
+    rates = torch.tensor(lrs, dtype=torch.float32, device=dev)
+    w = (0.01 * torch.randn(len(lrs), x.shape[1], n_classes, generator=gen)).to(dev)
+    b = torch.zeros(len(lrs), n_classes, device=dev)
     for _ in range(iterations):
         logits = torch.einsum("nd,ldk->lnk", x, w) + b[:, None]
         error = logits.softmax(dim=2) - one_hot
         w -= rates[:, None, None] * torch.einsum("nd,lnk->ldk", x, error) / len(x)
         b -= rates[:, None] * error.mean(dim=1)
-    return w.numpy(), b.numpy()
+    return w.cpu().numpy(), b.cpu().numpy()
 
 
 def probabilities(x, w, b):

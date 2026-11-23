@@ -96,3 +96,8 @@ section.title p { color: var(--muted); font-size: 22px; }
   font-size: 16px;
   color: var(--muted);
 }
+
+/* footnotes with sources, above the footer */
+.fn { position: absolute; left: 80px; right: 80px; bottom: 50px; font-size: 11px; line-height: 1.35; color: var(--muted); border-top: 1px solid var(--line); padding-top: 5px; }
+.fn i { font-style: italic; }
+sup { font-size: 0.6em; color: var(--accent); font-weight: 700; }

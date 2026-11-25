@@ -28,3 +28,17 @@ labeler/dist-web/
 
 # model weights (yolo11n.pt is downloaded by ultralytics on first use)
 *.pt
+
+# frames and clips of the gated dataset (thehiveisreal, CC BY-NC 4.0): not redistributed, regenerate locally with
+# presentation/make_figures.py and beeflight-figures after downloading the data
+*.mp4
+presentation/assets/hero.png
+presentation/assets/leer.png
+presentation/assets/labeler.png
+presentation/assets/flights_seq050.jpg
+labeler/public/praesentation/assets/hero.png
+labeler/public/praesentation/assets/leer.png
+labeler/public/praesentation/assets/labeler.png
+labeler/public/praesentation/assets/flights_seq050.jpg
+archive/assets/hive_*.jpg
+archive/assets/speed_*.jpg

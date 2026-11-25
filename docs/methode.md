@@ -271,9 +271,9 @@ Information, die in der Bahn fehlt? Testsets wurden nicht geöffnet. Alles ist b
 | Befund | Zahl |
 |---|---|
 | Bahnen, die alle 20 Vorhersagen (4 Modelle × 5 Seeds) falsch haben („Dauerfehler“) | 15 von 104 |
-| Übereinstimmung mit Labeler3 auf identischen v3-Bahnen | 101/168 = 0,60, **κ = 0,47** (Bootstrap 0,37–0,56) |
+| Übereinstimmung mit Labeler 3 auf identischen v3-Bahnen | 101/168 = 0,60, **κ = 0,47** (Bootstrap 0,37–0,56) |
 | spezifische Übereinstimmung pro Klasse | anflug 0,83, sammelabflug 0,66, orientierung 0,54, artefakt 0,29 |
-| Dauerfehler mit Labeler3-Label, bei denen sie wie das Modell entscheidet | 7 von 9 (erwartet 3,0; p ≈ 0,003) |
+| Dauerfehler mit Label von Labeler 3, bei denen Labeler 3 wie das Modell entscheidet | 7 von 9 (erwartet 3,0; p ≈ 0,003) |
 | sehr nahe Bahnpaare (21 Handmerkmale, engstes 0,5-%-Quantil) mit verschiedenem Label | 111 von 438 = **25 %**, vor allem ori–sam und art–ori |
 | eigene Wiederholungslabels über Tracker-Versionen gleich | 8 von 14 (κ 0,36); 4 der 6 Wechsel gehen von orientierung nach artefakt |
 | Artefakte in Train mit Notiz zur Art | 0 von 75 |
@@ -284,7 +284,7 @@ Information, die in der Bahn fehlt? Testsets wurden nicht geöffnet. Alles ist b
   Klasse aussieht: **kreisende Abflüge** (sammelabflug oder orientierung?), **gerade Rand-zu-Rand-Vorbeiflüge** (in
   Train und Val 8 als sammelabflug, 9 als artefakt gelabelt) und **Brett-zu-Brett-Bahnen** (orientierung, anflug oder
   artefakt; 23 Orientierungen in Train teilen die Signatur der Brett-zu-Brett-Artefakte).
-- Labeler3 vergibt im Zweifel `orientierung` (49 % ihrer Labels), ich `artefakt` oder `sammelabflug`. Ein Großteil
+- Labeler 3 vergibt im Zweifel `orientierung` (49 % der eigenen Labels), ich `artefakt` oder `sammelabflug`. Ein Großteil
   der Abweichung ist also **systematisch**, eine Definitionsfrage. Ob sie nach Video oder nach der eingezeichneten
   Bahn entschieden hat, ist nicht bekannt.
 - **Bienenwechsel sind teils nur im Video sichtbar.** Die beiden notierten Wechsel haben einen Sprung in der Bahn

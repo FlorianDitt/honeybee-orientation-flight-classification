@@ -28,7 +28,7 @@ const TN: Record<string, string> = { test_same_hive: "Test A · gleicher Stock",
   <h2>Test (einmal ausgewertet)</h2>
   {test ? (
     <>
-      <p>Eingefroren: <b>{test.model}</b>. Labels: Mehrheit aus Florian, Labeler2 und Labeler3, gebildet mit <code>beeflight-vote --test</code>.</p>
+      <p>Eingefroren: <b>{test.model}</b>. Labels: Mehrheit aus Florian, Labeler 2 und Labeler 3, gebildet mit <code>beeflight-vote --test</code>.</p>
       {Object.entries(test.splits).map(([k, t]: [string, any]) => (
         <section>
           <h3>{TN[k] ?? k} · {t.n} Bahnen, {t.n_o} Orientierungsflüge, {t.seqs} Sequenzen</h3>

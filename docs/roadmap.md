@@ -165,7 +165,7 @@ Fragmente als eigene Kategorie mitzählen.
 - [x] `beeflight-sort track|compare`: SORT und SORT für Bienen, Ablation und Train-Bestätigung (Tabellen oben)
 - [x] Entscheiden, ob die Labels umziehen: **ja, auf Chiron + Huang (`flights_chiron_linked`)**, 02.11.2026.
       v3-Stand in `labels/archive/background-v3/`; 140 von 205 eigenen Labels übertragen (Rest: Bahn stark
-      verändert, neu labeln), 237 von 321 Stimmen von Labeler3 über `labels/id_map_<split>.json`. Online-Seite
+      verändert, neu labeln), 237 von 321 Stimmen von Labeler 3 über `labels/id_map_<split>.json`. Online-Seite
       bleibt bis zum Ende der laufenden Runde auf v3.
 - [ ] Optional nach Chiron: Mahalanobis- statt euklidischer Abstand als Kosten
 

@@ -3,8 +3,6 @@
 **Klassifikation von Flugbahnen junger Bienen vor dem Flugloch**
 Studienarbeit WDS224 *Machine Learning System Design and Operations* (DHBW Ravensburg, Prof. Mark Schutera) · Florian Dittmann
 
-<img src="presentation/assets/flights_seq050.jpg" width="360" align="right" alt="Getrackte Flugbahnen vor Stock A: kurvige Bahnen orange, gerade blau">
-
 Bevor junge Honigbienen Nektar und Pollen sammeln, lernen sie in **Orientierungsflügen** die Lage ihres Stocks:
 Sie fliegen Schleifen und Bögen vor dem Flugloch, statt direkt abzufliegen. Dieses Projekt erzeugt aus
 ungelabelten Flugloch-Videos automatisch Flugbahnen und trainiert auf Handlabels einen Trajektorien-Klassifikator, der **Orientierungsflüge**, **direkte Sammelabflüge** und
@@ -14,12 +12,16 @@ nicht-invasiver Indikator für den Nachschub an neuen Sammlerinnen und damit fü
 Getestet wird zweistufig: auf einem späteren Zeitblock desselben Stocks (**Test A**) und auf einem zweiten
 Stock mit anderem Holz, Licht und Kamera-Abstand (**Test B**).
 
-**Status:** Machbarkeitsstudie abgeschlossen ([docs/vorstudie.md](docs/vorstudie.md)). Auf 7 × 30 s von Stock A
-finden sich 509 Flugbahnen, davon 21 kurvige Abflüge vom Flugbrett als Orientierungsflug-Kandidaten.
-Zwei Runden Fehleranalyse am Tracker (v2, v3) heben den Anteil vollständiger Bahnen von 32 % auf 67 %
-([Nachtrag](docs/vorstudie.md#nachtrag-tracker-v2-und-v3)); die übrigen Abrisse über dem Gras sind die offene Baustelle.
+**Status:** abgeschlossen und präsentiert (November 2026). Eingefroren ist ein Ensemble aus 5 ResNets auf der
+Flugbahn mit einem YOLO26s-Vorfilter gegen Artefakte. Einmalige Testauswertung (Balanced Accuracy):
 
-<br clear="right">
+| Testset | Modell | Regel-Baseline |
+|---|---|---|
+| Test A (gleicher Stock, später) | 0,657 | 0,642 |
+| Test B (anderer Stock) | 0,758 | 0,677 |
+
+F1 für `orientierung` liegt auf beiden Testsets bei etwa 0,58. Alles danach (z. B. BoT-SORT) ist nur auf val
+ausgewertet.
 
 ## Dokumentation
 
@@ -100,3 +102,19 @@ archive/         Prototypen verworfener Themen (Bewegungsunschärfe, Leichenträ
 
 Zwischen den Blöcken liegt je eine verworfene Puffersequenz (070, 085), damit keine Flugbahn eine Split-Grenze
 überquert. Details und Begründung in [docs/methode.md](docs/methode.md#split-und-evaluationsprotokoll).
+
+## Danke
+
+Großer Dank an [@dariandieck](https://github.com/dariandieck) für die Bienen-Labels, auf denen das YOLO für den
+Vorfilter trainiert ist. Die Labels selbst sind nicht Teil dieses Repos. Danke auch an die beiden Freiwilligen
+(Labeler 2 und 3), die die Testsets mitgelabelt haben.
+
+## Lizenz
+
+- **Code:** MIT, siehe [LICENSE](LICENSE).
+- **Daten, Labels, Abbildungen und Clips:** abgeleitet aus [mrkschtr/thehiveisreal](https://huggingface.co/datasets/mrkschtr/thehiveisreal)
+  und daher wie der Datensatz unter [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
+  Quelle: Schutera, Mark, *thehiveisreal* (2026).
+- **Videos, Clips und Einzelbilder** aus dem Datensatz sind nicht enthalten, weil der Datensatz gated ist. Zugang
+  wie unter [Setup](#setup) beschrieben; danach erzeugen `uv run beeflight-figures` und `presentation/make_figures.py`
+  die Bilder und Clips der Präsentation lokal.

@@ -216,8 +216,6 @@ Modelle und Begründung in [methode.md](methode.md#5-modelle).
 
 ## Phase 6: Präsentation (Woche 4)
 
-Erkenntnisse aus den Vorträgen von Mo und Darian, Fragen und Antworten: [vortrag.md](vortrag.md).
-
 - [ ] Folie 3 mit echten Zahlen füllen: Test A, Test B, Domain Shift, Baseline-Vergleich
 - [ ] Neue Abbildungen: Konfusionsmatrix, Indikator über die Zeit
 - [ ] Kurzer Clip: ein Orientierungsflug und ein Sammelabflug nebeneinander, langsam (als Einstieg oder für Fragen)

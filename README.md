@@ -24,6 +24,9 @@ Flugbahn mit einem YOLO26s-Vorfilter gegen Artefakte (trainiert auf Darians Labe
 F1 für `orientierung` liegt auf beiden Testsets bei etwa 0,58. Alles danach (z. B. BoT-SORT) ist nur auf val
 ausgewertet.
 
+**Tech-Stack:** Python 3 mit uv, OpenCV/PyAV (Tracking), PyTorch (ResNet-Ensemble), Ultralytics YOLO (Vorfilter),
+scikit-learn, pytest; Labeler und Ergebnis-Website mit Astro, GitHub Actions für Pages.
+
 ## Dokumentation
 
 Ergebnis-Website (Zahlen, Grafiken, Lernpfad, Bahnen-Viewer ohne Video): https://florianditt.github.io/honeybee-orientation-flight-classification/

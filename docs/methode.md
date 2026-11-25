@@ -22,9 +22,9 @@ Stand der Vorstudie: klassisches Hintergrundmodell, später durch einen gelernte
 Die Gras-Maske ist der wichtigste Trick: Eine vorbeifliegende Biene ist an einer Stelle nur wenige Frames
 Vordergrund, wehendes Gras und das dicht besetzte Flugbrett fast immer.
 
-**Nächster Schritt:** Detektor (z. B. YOLO, kleine Variante) auf Bienen in der Flugzone trainieren. Labels dafür
-liefern die Vorstudien-Bahnen selbst (Bounding Boxes um sichere Detektionen auf vollständigen Bahnen), ergänzt
-um von Hand korrigierte Frames.
+**Später geprüft:** Ein YOLO-Detektor mit ByteTrack + HyDaT blieb weit unter dem Hintergrundmodell und wurde als
+Tracker nicht weiterverfolgt ([roadmap.md](roadmap.md#zwei-paper-plan-bytetrack--hydat), Gate 1). YOLO kommt im
+finalen System nur als Vorfilter gegen Artefakte vor.
 
 ## 2. Tracking (`beeflight.tracks.track`)
 
@@ -160,8 +160,8 @@ liegen beide gleichauf (0,705 gegen 0,717). Der Vorsprung kommt aus nur 21 Fragm
 Einstellungen auf Val zusätzlich begünstigt. Auf dem Hold-out der Gewichtsschätzung (64 Bahnen, ein Seed, Genauigkeit) lag die
 Rangfolge umgekehrt (Bahn 0,58, Bild 0,70, Fusion 0,73), die Reihenfolge der Kandidaten ist also nicht stabil belegt.
 
-> **Platzhalter: Läufe auf der GPU (DGX Spark), ab 07.11.2026.** Die Ergebnisse werden hier nachgetragen, sobald sie
-> vorliegen (Tabelle wie oben, mit Datum, Git-Hash und Seeds). Bis dahin gilt die Tabelle vom 06.11.2026.
+> Die späteren Läufe auf der GPU (ab 07.11.2026) und das eingefrorene Modell (Ensemble aus 5 ResNets mit
+> YOLO26s-Vorfilter) stehen nicht hier, sondern in der [README](../README.md) und auf der Ergebnis-Website.
 
 ## 6. Metriken
 

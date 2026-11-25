@@ -64,6 +64,17 @@ uv run beeflight-sample --split train --n 300            # Label-Warteschlange -
 uv run pytest                                            # Tests
 ```
 
+**Modell trainieren und auswerten** (braucht `uv sync --extra ml`):
+
+```bash
+uv run beeflight-baselines --split val                   # Regel-Baseline und Zufall
+uv run beeflight-resnet --seeds 5 --predict val          # ResNet auf der Bahn, 5 Seeds
+uv run beeflight-evaluate --split val --predictions outputs/models/resnet/val --baseline rule
+```
+
+Der YOLO26s-Vorfilter des eingefrorenen Modells ist nicht enthalten (siehe [Danke](#danke)); die 5 ResNets
+lassen sich ohne ihn trainieren und auswerten. Weitere Kommandos (Tracker-Vergleiche, DINOv2, Fusion) stehen im Docstring des jeweiligen Moduls.
+
 **Handlabels** in der Web-App: `cd labeler && npm install && npm run dev`, dann http://127.0.0.1:4321.
 Die Online-Version zum Labeln für Freiwillige ist nicht mehr erreichbar; `uv run beeflight-vote` bildet aus den
 gesammelten Exporten Mehrheitslabels (Details in [labeler/README.md](labeler/README.md)).
@@ -76,19 +87,26 @@ Eine Sequenz braucht etwa eine Minute (8 Kerne) und rund 1 GB RAM.
 src/beeflight/
   splits.py      Train/Val/Test-Split (einzige Quelle der Wahrheit), Download
   tracks.py      Vordergrund, Gras-Maske, Tracking, Bahnmerkmale, Start-/Zielzonen
+  chiron.py      Tracker nach Chiron et al. 2013 (+ Huang-Verkettung), Grundlage der Labels
+  sort.py        SORT auf den Blobs des Hintergrundmodells (Vergleich)
+  detector.py    YOLO + ByteTrack/HyDaT (Vergleich, verworfen)
+  sledevic.py    YOLOv8 auf dem öffentlichen Flugbrett-Datensatz von Sledevič (Vergleich)
   figures.py     Abbildungen für die Folien
   sample.py      stratifizierte Label-Warteschlangen
   clips.py       zugeschnittene Clips und Pakete für die Online-Version
   vote.py        Mehrheitsentscheid über alle Labelnden, Krippendorffs α
+  own.py         eigene Labels aus der Online-Version übernehmen
   metrics.py     Metriken, Cluster-Bootstrap, Wilson-Intervalle
   evaluate.py    Auswertung von Vorhersagedateien, Test nur mit --test
   baselines.py   Regel, immer eine Klasse, Zufall
   resnet.py      Kandidat 1: ResNet auf der Bahn (gewählt)
   image_features.py  Kandidat 2: DINOv2 auf Ausschnitten
   fusion.py      Kandidaten 3 und 4: Fusion und G-Blend
+  biene.py       Labels für den Vorfilter „Honigbiene auf der Bahn?“
+  pose.py        Pilot: Körperachse im Einzelbild
 labeler/         Astro-Web-App zum Handlabeln (lokal)
 site/            Ergebnis-Website (Astro, statisch, GitHub Pages)
-labels/          Warteschlangen, Handlabels, votes/ (Exporte der Helfenden), final_*.jsonl
+labels/          Handlabels, Ergebnis in final_*.jsonl (siehe labels/README.md)
 tests/           Split-Invarianten, Bahnmerkmale, Tracker, Stichprobe, Mehrheitsentscheid
 docs/            Dokumentation der Idee und Methode
 presentation/    Marp-Folien (slides.md, theme/hive.css, assets/)

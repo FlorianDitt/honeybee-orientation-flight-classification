@@ -62,6 +62,9 @@ erkennbar ist.
 
 ## Labelregeln für Grenzfälle – ENTWURF, Entscheidung durch Florian
 
+> **Arbeitsstand vom 07.11.2026, danach nicht mehr aktualisiert.** Die offenen Fragen unten sind als damaliger
+> Stand stehen geblieben.
+>
 > **Nichts in diesem Abschnitt ist beschlossen.** Es sind Vorschläge vom 07.11.2026, abgeleitet aus
 > [biologie.md](biologie.md#abgrenzung-zu-den-anderen-klassen), den Klassen oben und der Fehleranalyse
 > ([methode.md](methode.md#7-fehleranalyse-und-labelqualität)). Bis zur Entscheidung gelten die Klassen und die
@@ -231,7 +234,7 @@ wird; spätere Änderungen nur mit Datum und Begründung.
 Genauigkeit: Bei n = 50 ist κ auf etwa ±0,15 bis ±0,18 genau, bei den 35 Val-Zufallsbahnen auf etwa ±0,2. Der Test
 in Punkt 2 erkennt nur einen großen Unterschied (Power etwa 0,83 bei Änderungsrate 0,5 gegen 0,15, etwa 0,38 bei 0,3).
 
-### Vorschlag: zwei Durchgänge und Pflichtnotiz (noch nicht beschlossen)
+### Vorschlag: zwei Durchgänge und Pflichtnotiz (Arbeitsstand 07.11.2026)
 
 Aus der Fehleranalyse. Damit sich „Label inkonsistent“ von „Information nur im Video“ trennen lässt:
 

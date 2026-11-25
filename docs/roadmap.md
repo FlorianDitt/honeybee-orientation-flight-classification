@@ -1,5 +1,8 @@
 # Roadmap zum Endprodukt
 
+> **Arbeitsplan aus der Projektzeit, das Projekt ist abgeschlossen.** Häkchen sind nachgetragen, wo das Ergebnis im
+> Repo liegt; ~~durchgestrichen~~ heißt nicht umgesetzt. Ergebnisse: [README](../README.md) und die Ergebnis-Website.
+
 Stand 08.11.2026. Präsentation am **26.11.2026** (bestätigt am 08.11.).
 
 ## Endprodukt
@@ -54,7 +57,7 @@ Recheck Val-Korrekturen ergibt, oder das Train-Recheck nur noch berichten und ni
 - [x] **Label-App** (`labeler/`, Astro): Bahn als vergrößerter Clip mit synchron eingezeichneter Bahn,
       Tasten 1–4, Flags, schreibt `labels/<split>.jsonl` inklusive Geometrie
 - [x] Stichprobe ziehen nach [labeling.md](labeling.md): stratifiziert, gemischt, ohne Selbst-Label
-- [ ] **Erste 100 Bahnen labeln** (≈ 1 h): zeigt früh, ob die Klassen trennbar sind und wie oft
+- [x] **Erste 100 Bahnen labeln** (≈ 1 h): zeigt früh, ob die Klassen trennbar sind und wie oft
       `artefakt` vorkommt
 
 **Ergebnis:** alle Bahnen als JSON, 100 Labels, erste Klassenverteilung.
@@ -109,13 +112,13 @@ dem Brett, mitten im Bild. ByteTrack ist für Fußgänger gebaut (scharf, groß,
 
 - [x] `beeflight-detector bootstrap`: Kacheln der Flugzone (640 px, volle Auflösung) mit 60-px-Boxen um die
       Punkte der v3-Bahnen, jede zweite Trainingssequenz, alle 2 s ein Frame
-- [ ] Bootstrap-Labels stichprobenartig prüfen: entfällt nach Gate 1 (Detektor nicht weiterverfolgt)
+- ~~Bootstrap-Labels stichprobenartig prüfen~~: entfällt nach Gate 1 (Detektor nicht weiterverfolgt)
 - [x] `beeflight-detector train`: YOLO11n auf der CPU, 30 Epochen (YOLO-Val: P 0,79, R 0,61, mAP50 ≈ 0,7)
 - [x] `beeflight-detector track --mode bytetrack|hybrid --match iou|center`: schreibt
       `outputs/flights_{bytetrack,hybrid}[_center]/` im selben Format wie v3; die Handlabels auf v3 bleiben unberührt
 - [x] `beeflight-detector compare --split val`: Ablation gemessen (Tabelle oben)
 - [ ] Zahlen in die Vorstudie und auf Folie 2
-- [ ] ~~Bewegungskanal (Differenzbild) als Zusatzinput~~ entfällt nach Gate 1
+- ~~Bewegungskanal (Differenzbild) als Zusatzinput~~ entfällt nach Gate 1
 
 > **Gate 1 (Ende Woche 2), entschieden:** ByteTrack + HyDaT erreicht auf Validierung 36 % vollständige Bahnen,
 > v3 80 %. **Das Hintergrundmodell (v3) bleibt.** Die Präsentation erzählt den Detektor als ehrlichen
@@ -172,10 +175,10 @@ Fragmente als eigene Kategorie mitzählen.
 ## Phase 3: Labels (Woche 2)
 
 - [x] **Online-Labeler** für Freunde (GitHub Pages, Übungsrunde, Pakete, Export) und `beeflight-vote`
-- [ ] **300 Trainingsbahnen** und **80 Validierungsbahnen** gelabelt (≈ 3–4 h, auf mehrere Tage verteilt)
+- [x] **300 Trainingsbahnen** und **80 Validierungsbahnen** gelabelt (am Ende 600 und 204) (≈ 3–4 h, auf mehrere Tage verteilt)
 - [ ] 8 Pakete an Helfende verteilen (je zwei pro Paket), Exporte nach `labels/votes/`, `beeflight-vote`
-- [ ] Mindestens **40 Orientierungsflüge** im Training, sonst gezielt kurvige Abflüge nachziehen
-- [ ] Übereinstimmung berichten: Krippendorffs α über alle Labelnden (nur Testsets), dazu mein Intra-Rater-κ aus
+- [x] Mindestens **40 Orientierungsflüge** im Training, sonst gezielt kurvige Abflüge nachziehen
+- [x] Übereinstimmung berichten: Krippendorffs α über alle Labelnden (nur Testsets), dazu mein Intra-Rater-κ aus
       dem Recheck für Train und Val
 
 ## Phase 4: Modelle (Woche 3)
@@ -194,7 +197,7 @@ Modelle und Begründung in [methode.md](methode.md#5-modelle).
 - [ ] Ergebnisse der Spark-Läufe in [methode.md](methode.md#5-modelle) eintragen
 - [ ] Experimente als JSON in `outputs/runs/` (Konfiguration, Seed, Git-Hash, Metriken), damit jede Zahl auf den
       Folien reproduzierbar ist
-- [ ] Zweitlabeln: je 50 Bahnen Val (ab 10.11.) und Train (ab 12.11.), κ nach der vorab festgelegten Regel
+- [x] Zweitlabeln: je 50 Bahnen Val (ab 10.11.) und Train (ab 12.11.), κ nach der vorab festgelegten Regel
       ([labeling.md](labeling.md#zweitlabeln-recheck))
 
 > **Gate 2 (Ende Woche 3):** Schlägt das Modell die Baseline auf Validierung nicht klar, wird trotzdem eingefroren. Dann
@@ -202,11 +205,11 @@ Modelle und Begründung in [methode.md](methode.md#5-modelle).
 
 ## Phase 5: Einfrieren und Test (Anfang Woche 4)
 
-- [ ] **Freeze** (geplant ~14.11.): bestes Modell, alle Schwellen und Zonen festschreiben, Commit taggen (`v1.0-freeze`)
-- [ ] Testsets herunterladen (`beeflight-splits --download test_same_hive`, `… test_other_hive`)
+- [x] **Freeze** (geplant ~14.11., erfolgt am 21.11.): bestes Modell, alle Schwellen und Zonen festschreiben, ~~Commit taggen (`v1.0-freeze`)~~
+- [x] Testsets herunterladen (`beeflight-splits --download test_same_hive`, `… test_other_hive`)
 - [ ] Zonen für Stock B aus einem einzelnen Frame setzen, nicht anhand von Ergebnissen
-- [ ] Testbahnen erzeugen und **erst jetzt** labeln (Test A: 4 Sequenzen, Test B: 21 Sequenzen)
-- [ ] **Genau eine Auswertung** pro Testset mit `beeflight-evaluate --test`: Balanced Accuracy, Recall und Precision
+- [x] Testbahnen erzeugen und **erst jetzt** labeln (Test A: 4 Sequenzen, Test B: 21 Sequenzen)
+- [x] **Genau eine Auswertung** pro Testset mit `beeflight-evaluate --test`: Balanced Accuracy, Recall und Precision
       Orientierung, Konfusionsmatrix, Intervalle nach [methode.md](methode.md#6-metriken)
       (Test B Cluster-Bootstrap, Test A Wilson und Weglassen je einer Sequenz)
 - [ ] **Indikator**: vorhergesagter gegen wahren Anteil auf der gelabelten Stichprobe, Verlauf über die 37 min aus den
@@ -216,10 +219,10 @@ Modelle und Begründung in [methode.md](methode.md#5-modelle).
 
 ## Phase 6: Präsentation (Woche 4)
 
-- [ ] Folie 3 mit echten Zahlen füllen: Test A, Test B, Domain Shift, Baseline-Vergleich
+- [x] Folie 3 mit echten Zahlen füllen: Test A, Test B, Domain Shift, Baseline-Vergleich
 - [ ] Neue Abbildungen: Konfusionsmatrix, Indikator über die Zeit
-- [ ] Kurzer Clip: ein Orientierungsflug und ein Sammelabflug nebeneinander, langsam (als Einstieg oder für Fragen)
-- [ ] `beeflight-run` als Ein-Befehl-Demo
+- [x] Kurzer Clip: ein Orientierungsflug und ein Sammelabflug nebeneinander, langsam (als Einstieg oder für Fragen)
+- ~~`beeflight-run` als Ein-Befehl-Demo~~
 - [ ] PDF exportieren, auf einem fremden Rechner testen
 - [ ] Zweimal laut proben mit Uhr (15 min), Fragen vorbereiten:
   - Woher weißt du, dass es junge Bienen sind? *(gar nicht direkt; Verhalten, nicht Alter)*

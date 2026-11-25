@@ -1,0 +1,1355 @@
+{
+ "Mehrheit (primär)": {
+  "n": 410,
+  "sequences": 21,
+  "interval": "cluster_bootstrap",
+  "class_counts": {
+   "orientierung": 53,
+   "sammelabflug": 47,
+   "anflug": 127,
+   "artefakt": 183
+  },
+  "absent_classes": [],
+  "chance_level": 0.25,
+  "models": {
+   "ensemble_kombi+B_yolo": {
+    "seeds": [
+     "ensemble"
+    ],
+    "metrics": {
+     "balanced_accuracy": {
+      "mean": 0.7578345163797882,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.703017153347689,
+       "high": 0.8119239439243119,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "accuracy": {
+      "mean": 0.7853658536585366,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7316455696202532,
+       "high": 0.8368876793666501,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "macro_f1": {
+      "mean": 0.7615386188839797,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6966627939046474,
+       "high": 0.8193825230401613,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "share_error": {
+      "mean": -0.036232469789435395,
+      "sd": 0.0,
+      "ci": {
+       "low": -0.07912564750661331,
+       "high": 0.010315867618465839,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_orientierung": {
+      "mean": 0.5283018867924528,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.3912778366914104,
+       "high": 0.6750168918918918,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_orientierung": {
+      "mean": 0.6511627906976745,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.47619047619047616,
+       "high": 0.8085359675785205,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_sammelabflug": {
+      "mean": 0.8723404255319149,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7916666666666666,
+       "high": 0.9473684210526315,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_sammelabflug": {
+      "mean": 0.82,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6976568005637773,
+       "high": 0.9375,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_anflug": {
+      "mean": 0.8110236220472441,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7687074829931972,
+       "high": 0.8582693569553806,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_anflug": {
+      "mean": 0.824,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7712418300653595,
+       "high": 0.8782669646485168,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_artefakt": {
+      "mean": 0.819672131147541,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7303301854277245,
+       "high": 0.889447897381645,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_artefakt": {
+      "mean": 0.78125,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7005972013192865,
+       "high": 0.8447568975496816,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     }
+    },
+    "classes": [
+     {
+      "class": "orientierung",
+      "n": 53,
+      "predicted": 43.0,
+      "correct": 28.0,
+      "too_few": false
+     },
+     {
+      "class": "sammelabflug",
+      "n": 47,
+      "predicted": 50.0,
+      "correct": 41.0,
+      "too_few": false
+     },
+     {
+      "class": "anflug",
+      "n": 127,
+      "predicted": 125.0,
+      "correct": 103.0,
+      "too_few": false
+     },
+     {
+      "class": "artefakt",
+      "n": 183,
+      "predicted": 192.0,
+      "correct": 150.0,
+      "too_few": false
+     }
+    ],
+    "confusion": [
+     [
+      28.0,
+      4.0,
+      6.0,
+      15.0
+     ],
+     [
+      0.0,
+      41.0,
+      0.0,
+      6.0
+     ],
+     [
+      3.0,
+      0.0,
+      103.0,
+      21.0
+     ],
+     [
+      12.0,
+      5.0,
+      16.0,
+      150.0
+     ]
+    ],
+    "share": {
+     "true": 0.23348017621145375,
+     "predicted": 0.19724770642201836
+    },
+    "subgroups": {
+     "vollständig": {
+      "n": 246,
+      "balanced_accuracy": 0.7381624935972763
+     },
+     "Fragment": {
+      "n": 164,
+      "balanced_accuracy": 0.7559523809523809
+     }
+    },
+    "auroc_orientierung": 0.8456741187040854
+   },
+   "rule": {
+    "seeds": [
+     0
+    ],
+    "metrics": {
+     "balanced_accuracy": {
+      "mean": 0.6771313996425599,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6068215989621388,
+       "high": 0.7585389113251451,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "accuracy": {
+      "mean": 0.6951219512195121,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.638579079887959,
+       "high": 0.7554945054945055,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "macro_f1": {
+      "mean": 0.661083977132865,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.5880973308791492,
+       "high": 0.7374610047184411,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "share_error": {
+      "mean": -0.05490874764002518,
+      "sd": 0.0,
+      "ci": {
+       "low": -0.11466543632668744,
+       "high": 0.0054150911284021885,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_orientierung": {
+      "mean": 0.4528301886792453,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.28983761131482455,
+       "high": 0.6666666666666666,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_orientierung": {
+      "mean": 0.5333333333333333,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.43243243243243246,
+       "high": 0.62,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_sammelabflug": {
+      "mean": 0.7659574468085106,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6511627906976745,
+       "high": 0.875,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_sammelabflug": {
+      "mean": 0.6206896551724138,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.47761194029850745,
+       "high": 0.7857435597189694,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_anflug": {
+      "mean": 0.8503937007874016,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7894647332617257,
+       "high": 0.9173572674198196,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_anflug": {
+      "mean": 0.7248322147651006,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6521679077588278,
+       "high": 0.7969952054048163,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_artefakt": {
+      "mean": 0.639344262295082,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.5548278455624268,
+       "high": 0.7091193181818181,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_artefakt": {
+      "mean": 0.740506329113924,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6272101033295063,
+       "high": 0.843760146103896,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     }
+    },
+    "classes": [
+     {
+      "class": "orientierung",
+      "n": 53,
+      "predicted": 45.0,
+      "correct": 24.0,
+      "too_few": false
+     },
+     {
+      "class": "sammelabflug",
+      "n": 47,
+      "predicted": 58.0,
+      "correct": 36.0,
+      "too_few": false
+     },
+     {
+      "class": "anflug",
+      "n": 127,
+      "predicted": 149.0,
+      "correct": 108.0,
+      "too_few": false
+     },
+     {
+      "class": "artefakt",
+      "n": 183,
+      "predicted": 158.0,
+      "correct": 117.0,
+      "too_few": false
+     }
+    ],
+    "confusion": [
+     [
+      24.0,
+      7.0,
+      9.0,
+      13.0
+     ],
+     [
+      0.0,
+      36.0,
+      0.0,
+      11.0
+     ],
+     [
+      2.0,
+      0.0,
+      108.0,
+      17.0
+     ],
+     [
+      19.0,
+      15.0,
+      32.0,
+      117.0
+     ]
+    ],
+    "share": {
+     "true": 0.23348017621145375,
+     "predicted": 0.17857142857142858
+    },
+    "subgroups": {
+     "vollständig": {
+      "n": 246,
+      "balanced_accuracy": 0.7081318358492271
+     },
+     "Fragment": {
+      "n": 164,
+      "balanced_accuracy": 0.45357142857142857
+     }
+    }
+   }
+  },
+  "baseline": "rule",
+  "comparison": {
+   "ensemble_kombi+B_yolo": {
+    "balanced_accuracy": {
+     "difference": 0.0807031167372283,
+     "ci": {
+      "low": 0.002499559854191628,
+      "high": 0.15647613868817145,
+      "undefined_share": 0.0,
+      "missing_class_share": 0.0
+     }
+    },
+    "recall_orientierung": {
+     "difference": 0.07547169811320753,
+     "ci": {
+      "low": -0.11904761904761907,
+      "high": 0.24137931034482757,
+      "undefined_share": 0.0,
+      "missing_class_share": 0.0
+     }
+    },
+    "precision_orientierung": {
+     "difference": 0.11782945736434114,
+     "ci": {
+      "low": -0.013690476190476142,
+      "high": 0.26554255319148923,
+      "undefined_share": 0.0,
+      "missing_class_share": 0.0
+     }
+    },
+    "share_error": {
+     "difference": 0.018676277850589784,
+     "ci": {
+      "low": -0.033184154239499004,
+      "high": 0.06645172508390197,
+      "undefined_share": 0.0,
+      "missing_class_share": 0.0
+     }
+    }
+   }
+  }
+ },
+ "Autor": {
+  "n": 410,
+  "sequences": 21,
+  "interval": "cluster_bootstrap",
+  "class_counts": {
+   "orientierung": 47,
+   "sammelabflug": 49,
+   "anflug": 124,
+   "artefakt": 190
+  },
+  "absent_classes": [],
+  "chance_level": 0.25,
+  "models": {
+   "ensemble_kombi+B_yolo": {
+    "seeds": [
+     "ensemble"
+    ],
+    "metrics": {
+     "balanced_accuracy": {
+      "mean": 0.7535250488954025,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6930560038943822,
+       "high": 0.8114553293317903,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "accuracy": {
+      "mean": 0.7853658536585366,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7274774184555339,
+       "high": 0.8390824692548831,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "macro_f1": {
+      "mean": 0.7553920266182929,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6830062950252851,
+       "high": 0.8185426749576132,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "share_error": {
+      "mean": -0.016388657214345265,
+      "sd": 0.0,
+      "ci": {
+       "low": -0.05774010268852423,
+       "high": 0.031099518799467846,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_orientierung": {
+      "mean": 0.5319148936170213,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.3520936429387133,
+       "high": 0.7058823529411765,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_orientierung": {
+      "mean": 0.5813953488372093,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.37998275862068964,
+       "high": 0.7714610389610388,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_sammelabflug": {
+      "mean": 0.8571428571428571,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7833333333333333,
+       "high": 0.9459459459459459,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_sammelabflug": {
+      "mean": 0.84,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7115277777777778,
+       "high": 0.9592040816326529,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_anflug": {
+      "mean": 0.8145161290322581,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7761194029850746,
+       "high": 0.8529538539553752,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_anflug": {
+      "mean": 0.808,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7560927597464951,
+       "high": 0.8608756038647343,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_artefakt": {
+      "mean": 0.8105263157894737,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7128111587982833,
+       "high": 0.8883126477541371,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_artefakt": {
+      "mean": 0.8020833333333334,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7344350282485875,
+       "high": 0.8565372670807453,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     }
+    },
+    "classes": [
+     {
+      "class": "orientierung",
+      "n": 47,
+      "predicted": 43.0,
+      "correct": 25.0,
+      "too_few": false
+     },
+     {
+      "class": "sammelabflug",
+      "n": 49,
+      "predicted": 50.0,
+      "correct": 42.0,
+      "too_few": false
+     },
+     {
+      "class": "anflug",
+      "n": 124,
+      "predicted": 125.0,
+      "correct": 101.0,
+      "too_few": false
+     },
+     {
+      "class": "artefakt",
+      "n": 190,
+      "predicted": 192.0,
+      "correct": 154.0,
+      "too_few": false
+     }
+    ],
+    "confusion": [
+     [
+      25.0,
+      3.0,
+      7.0,
+      12.0
+     ],
+     [
+      1.0,
+      42.0,
+      0.0,
+      6.0
+     ],
+     [
+      3.0,
+      0.0,
+      101.0,
+      20.0
+     ],
+     [
+      14.0,
+      5.0,
+      17.0,
+      154.0
+     ]
+    ],
+    "share": {
+     "true": 0.21363636363636362,
+     "predicted": 0.19724770642201836
+    },
+    "subgroups": {
+     "vollständig": {
+      "n": 246,
+      "balanced_accuracy": 0.733929267471898
+     },
+     "Fragment": {
+      "n": 164,
+      "balanced_accuracy": 0.7563134978229319
+     }
+    },
+    "auroc_orientierung": 0.8460817068167165
+   },
+   "rule": {
+    "seeds": [
+     0
+    ],
+    "metrics": {
+     "balanced_accuracy": {
+      "mean": 0.6492235435878646,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.5834743664916416,
+       "high": 0.7299273672140957,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "accuracy": {
+      "mean": 0.6804878048780488,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6239460784313725,
+       "high": 0.740214853350811,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "macro_f1": {
+      "mean": 0.6315337568455168,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.5597155331782959,
+       "high": 0.7055969166952634,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "share_error": {
+      "mean": -0.03506493506493505,
+      "sd": 0.0,
+      "ci": {
+       "low": -0.09723731638997063,
+       "high": 0.03061528592056487,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_orientierung": {
+      "mean": 0.40425531914893614,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.2553087192323738,
+       "high": 0.6216216216216216,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_orientierung": {
+      "mean": 0.4222222222222222,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.30952380952380953,
+       "high": 0.5333333333333333,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_sammelabflug": {
+      "mean": 0.7142857142857143,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6,
+       "high": 0.8333333333333334,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_sammelabflug": {
+      "mean": 0.603448275862069,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.4583156779661017,
+       "high": 0.7755190007037297,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_anflug": {
+      "mean": 0.8467741935483871,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7913653425086018,
+       "high": 0.9056684405741009,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_anflug": {
+      "mean": 0.7046979865771812,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6319176454138702,
+       "high": 0.7803030303030303,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "recall_artefakt": {
+      "mean": 0.631578947368421,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.5419767811704834,
+       "high": 0.7074109014675052,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     },
+     "precision_artefakt": {
+      "mean": 0.759493670886076,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6594564894564895,
+       "high": 0.850653835115161,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.0
+      }
+     }
+    },
+    "classes": [
+     {
+      "class": "orientierung",
+      "n": 47,
+      "predicted": 45.0,
+      "correct": 19.0,
+      "too_few": false
+     },
+     {
+      "class": "sammelabflug",
+      "n": 49,
+      "predicted": 58.0,
+      "correct": 35.0,
+      "too_few": false
+     },
+     {
+      "class": "anflug",
+      "n": 124,
+      "predicted": 149.0,
+      "correct": 105.0,
+      "too_few": false
+     },
+     {
+      "class": "artefakt",
+      "n": 190,
+      "predicted": 158.0,
+      "correct": 120.0,
+      "too_few": false
+     }
+    ],
+    "confusion": [
+     [
+      19.0,
+      7.0,
+      11.0,
+      10.0
+     ],
+     [
+      1.0,
+      35.0,
+      0.0,
+      13.0
+     ],
+     [
+      3.0,
+      1.0,
+      105.0,
+      15.0
+     ],
+     [
+      22.0,
+      15.0,
+      33.0,
+      120.0
+     ]
+    ],
+    "share": {
+     "true": 0.21363636363636362,
+     "predicted": 0.17857142857142858
+    },
+    "subgroups": {
+     "vollständig": {
+      "n": 246,
+      "balanced_accuracy": 0.6737198552714084
+     },
+     "Fragment": {
+      "n": 164,
+      "balanced_accuracy": 0.4540431266846361
+     }
+    }
+   }
+  },
+  "baseline": "rule",
+  "comparison": {
+   "ensemble_kombi+B_yolo": {
+    "balanced_accuracy": {
+     "difference": 0.1043015053075379,
+     "ci": {
+      "low": 0.023801775735541562,
+      "high": 0.18414049777693386,
+      "undefined_share": 0.0,
+      "missing_class_share": 0.0
+     }
+    },
+    "recall_orientierung": {
+     "difference": 0.12765957446808512,
+     "ci": {
+      "low": -0.07894736842105265,
+      "high": 0.30357142857142855,
+      "undefined_share": 0.0,
+      "missing_class_share": 0.0
+     }
+    },
+    "precision_orientierung": {
+     "difference": 0.15917312661498711,
+     "ci": {
+      "low": 0.020472739436129556,
+      "high": 0.3132920369104579,
+      "undefined_share": 0.0,
+      "missing_class_share": 0.0
+     }
+    },
+    "share_error": {
+     "difference": 0.018676277850589784,
+     "ci": {
+      "low": -0.033184154239499004,
+      "high": 0.06645172508390197,
+      "undefined_share": 0.0,
+      "missing_class_share": 0.0
+     }
+    }
+   }
+  }
+ },
+ "einstimmig": {
+  "n": 69,
+  "sequences": 20,
+  "interval": "cluster_bootstrap",
+  "class_counts": {
+   "orientierung": 8,
+   "sammelabflug": 13,
+   "anflug": 28,
+   "artefakt": 20
+  },
+  "absent_classes": [],
+  "chance_level": 0.25,
+  "models": {
+   "ensemble_kombi+B_yolo": {
+    "seeds": [
+     "ensemble"
+    ],
+    "metrics": {
+     "balanced_accuracy": {
+      "mean": 0.9093406593406593,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7421811995967742,
+       "high": 0.9875038580246914,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "accuracy": {
+      "mean": 0.9420289855072463,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.8860669077757685,
+       "high": 0.9857193158953722,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "macro_f1": {
+      "mean": 0.9279152823920266,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.728787621546535,
+       "high": 0.9862792071860002,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "share_error": {
+      "mean": -0.03283052351375332,
+      "sd": 0.0,
+      "ci": {
+       "low": -0.09693149313501143,
+       "high": 0.011321973575154786,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "recall_orientierung": {
+      "mean": 0.75,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.0,
+       "high": 1.0,
+       "undefined_share": 0.003,
+       "missing_class_share": 0.003
+      }
+     },
+     "precision_orientierung": {
+      "mean": 1.0,
+      "sd": 0.0,
+      "ci": {
+       "low": 1.0,
+       "high": 1.0,
+       "undefined_share": 0.0405,
+       "missing_class_share": 0.003
+      }
+     },
+     "recall_sammelabflug": {
+      "mean": 0.9230769230769231,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.8,
+       "high": 1.0,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "precision_sammelabflug": {
+      "mean": 1.0,
+      "sd": 0.0,
+      "ci": {
+       "low": 1.0,
+       "high": 1.0,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "recall_anflug": {
+      "mean": 0.9642857142857143,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.8695652173913043,
+       "high": 1.0,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "precision_anflug": {
+      "mean": 0.9642857142857143,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.8928571428571429,
+       "high": 1.0,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "recall_artefakt": {
+      "mean": 1.0,
+      "sd": 0.0,
+      "ci": {
+       "low": 1.0,
+       "high": 1.0,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "precision_artefakt": {
+      "mean": 0.8695652173913043,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7142857142857143,
+       "high": 1.0,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     }
+    },
+    "classes": [
+     {
+      "class": "orientierung",
+      "n": 8,
+      "predicted": 6.0,
+      "correct": 6.0,
+      "too_few": false
+     },
+     {
+      "class": "sammelabflug",
+      "n": 13,
+      "predicted": 12.0,
+      "correct": 12.0,
+      "too_few": false
+     },
+     {
+      "class": "anflug",
+      "n": 28,
+      "predicted": 28.0,
+      "correct": 27.0,
+      "too_few": false
+     },
+     {
+      "class": "artefakt",
+      "n": 20,
+      "predicted": 23.0,
+      "correct": 20.0,
+      "too_few": false
+     }
+    ],
+    "confusion": [
+     [
+      6.0,
+      0.0,
+      1.0,
+      1.0
+     ],
+     [
+      0.0,
+      12.0,
+      0.0,
+      1.0
+     ],
+     [
+      0.0,
+      0.0,
+      27.0,
+      1.0
+     ],
+     [
+      0.0,
+      0.0,
+      0.0,
+      20.0
+     ]
+    ],
+    "share": {
+     "true": 0.16326530612244897,
+     "predicted": 0.13043478260869565
+    },
+    "subgroups": {
+     "vollständig": {
+      "n": 41,
+      "balanced_accuracy": 0.8625
+     },
+     "Fragment": {
+      "n": 28,
+      "balanced_accuracy": 0.875
+     }
+    },
+    "auroc_orientierung": 0.9774590163934426
+   },
+   "rule": {
+    "seeds": [
+     0
+    ],
+    "metrics": {
+     "balanced_accuracy": {
+      "mean": 0.7883241758241759,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7002493401206636,
+       "high": 0.95,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "accuracy": {
+      "mean": 0.8405797101449275,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.734375,
+       "high": 0.9400074626865671,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "macro_f1": {
+      "mean": 0.8023889077602446,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6955075573345338,
+       "high": 0.9341073113785664,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "share_error": {
+      "mean": -0.044217687074829926,
+      "sd": 0.0,
+      "ci": {
+       "low": -0.14738550922761448,
+       "high": 0.052802568366592625,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "recall_orientierung": {
+      "mean": 0.5,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.2222222222222222,
+       "high": 1.0,
+       "undefined_share": 0.003,
+       "missing_class_share": 0.003
+      }
+     },
+     "precision_orientierung": {
+      "mean": 0.8,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.3333333333333333,
+       "high": 1.0,
+       "undefined_share": 0.0015,
+       "missing_class_share": 0.003
+      }
+     },
+     "recall_sammelabflug": {
+      "mean": 0.8461538461538461,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6666666666666666,
+       "high": 1.0,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "precision_sammelabflug": {
+      "mean": 0.9166666666666666,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.7894736842105263,
+       "high": 1.0,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "recall_anflug": {
+      "mean": 0.8571428571428571,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.6818181818181818,
+       "high": 0.967741935483871,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "precision_anflug": {
+      "mean": 0.96,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.8636363636363636,
+       "high": 1.0,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "recall_artefakt": {
+      "mean": 0.95,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.8181818181818182,
+       "high": 1.0,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     },
+     "precision_artefakt": {
+      "mean": 0.7037037037037037,
+      "sd": 0.0,
+      "ci": {
+       "low": 0.5,
+       "high": 0.8889639639639635,
+       "undefined_share": 0.0,
+       "missing_class_share": 0.003
+      }
+     }
+    },
+    "classes": [
+     {
+      "class": "orientierung",
+      "n": 8,
+      "predicted": 5.0,
+      "correct": 4.0,
+      "too_few": false
+     },
+     {
+      "class": "sammelabflug",
+      "n": 13,
+      "predicted": 12.0,
+      "correct": 11.0,
+      "too_few": false
+     },
+     {
+      "class": "anflug",
+      "n": 28,
+      "predicted": 25.0,
+      "correct": 24.0,
+      "too_few": false
+     },
+     {
+      "class": "artefakt",
+      "n": 20,
+      "predicted": 27.0,
+      "correct": 19.0,
+      "too_few": false
+     }
+    ],
+    "confusion": [
+     [
+      4.0,
+      1.0,
+      1.0,
+      2.0
+     ],
+     [
+      0.0,
+      11.0,
+      0.0,
+      2.0
+     ],
+     [
+      0.0,
+      0.0,
+      24.0,
+      4.0
+     ],
+     [
+      1.0,
+      0.0,
+      0.0,
+      19.0
+     ]
+    ],
+    "share": {
+     "true": 0.16326530612244897,
+     "predicted": 0.11904761904761904
+    },
+    "subgroups": {
+     "vollständig": {
+      "n": 41,
+      "balanced_accuracy": 0.9208333333333334
+     },
+     "Fragment": {
+      "n": 28,
+      "balanced_accuracy": 0.46875
+     }
+    }
+   }
+  },
+  "baseline": "rule",
+  "comparison": {
+   "ensemble_kombi+B_yolo": {
+    "balanced_accuracy": {
+     "difference": 0.12101648351648342,
+     "ci": {
+      "low": -0.20162538699690402,
+      "high": 0.25784168587433454,
+      "undefined_share": 0.0,
+      "missing_class_share": 0.003
+     }
+    },
+    "recall_orientierung": {
+     "difference": 0.25,
+     "ci": {
+      "low": -1.0,
+      "high": 0.7777777777777778,
+      "undefined_share": 0.003,
+      "missing_class_share": 0.003
+     }
+    },
+    "precision_orientierung": {
+     "difference": 0.19999999999999996,
+     "ci": {
+      "low": 0.0,
+      "high": 0.6666666666666667,
+      "undefined_share": 0.0415,
+      "missing_class_share": 0.003
+     }
+    },
+    "share_error": {
+     "difference": 0.011387163561076608,
+     "ci": {
+      "low": -0.12071503977534906,
+      "high": 0.14563289141414135,
+      "undefined_share": 0.0,
+      "missing_class_share": 0.003
+     }
+    }
+   }
+  }
+ }
+}

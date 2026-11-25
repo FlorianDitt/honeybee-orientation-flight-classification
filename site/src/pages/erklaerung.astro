@@ -1,0 +1,372 @@
+---
+// Learning page: the whole method in nine steps, one picture and one or two sentences each.
+// Numbers come from the data snapshots in src/data (see scripts/snapshot.mjs):
+//   modelle2_vergleich.json   val comparison of all models
+//   vorfilter_auswahl.json    pre-filter variants on val
+//   test_ergebnis.json        the one test evaluation per test set
+//   biene_counts.json         what the artefact tracks show (hand answers)
+import Layout from "../layouts/Layout.astro";
+import { url } from "../lib/url";
+import m2Json from "../data/modelle2_vergleich.json";
+import vfJson from "../data/vorfilter_auswahl.json";
+import testJson from "../data/test_ergebnis.json";
+import bieneJson from "../data/artefakt_inhalt.json";
+
+const m2: any = m2Json;
+const vf: any = vfJson;
+const test: any = testJson;
+const bee: Record<string, number> = (bieneJson as any).total ?? {};
+const BEE_PARTS = ([["honigbiene", "Honigbiene", "#d99a1e"], ["anderes_insekt", "anderes Insekt", "#7a5bd6"],
+  ["kein_tier", "kein Tier", "#3f9d6b"], ["unklar", "unklar", "#9aa0a8"]] as [string, string, string][]).filter(([k]) => bee[k]);
+
+const de = (x: number, d = 2) => x.toFixed(d).replace(".", ",");
+const pc = (x: number) => `${Math.round(100 * x)} %`;
+
+// step 7: what we tried (val, balanced accuracy)
+const TRIED: [string, string, string][] = [
+  ["gradient_boosting", "Merkmale + Gradient Boosting", "base"],
+  ["cluster_bahn_k50", "Clustering (K = 50)", "no"],
+  ["ensemble_kombi_pose", "+ Körperausrichtung", "no"],
+  ["bild_absolut", "Bahn als Bild + CNN", "no"],
+  ["base", "ResNet (Fawaz 2019)", "base"],
+  ["inception", "InceptionTime", "no"],
+  ["r3d_c224", "Video-Clip (R3D-18)", "no"],
+  ["kombi", "ResNet Kombi", "yes"],
+  ["ensemble_kombi", "Ensemble Kombi", "best"],
+];
+const tried = m2 ? TRIED.filter(([k]) => m2.configs[k]).map(([k, n, g]) => ({ n, g, ba: m2.configs[k].ba as number, f1: m2.configs[k].f1_o as number }))
+  .sort((a, b) => a.ba - b.ba) : [];
+const BX0 = 210, BX1 = 640, BLO = 0.25, BHI = 0.8;
+const bx = (v: number) => BX0 + ((v - BLO) / (BHI - BLO)) * (BX1 - BX0);
+
+const CLS = ["orientierung", "sammelabflug", "anflug", "artefakt"];
+const CLS_NAME: Record<string, string> = { orientierung: "Orientierung", sammelabflug: "Sammelabflug", anflug: "Anflug", artefakt: "Artefakt" };
+const VF_NAME: Record<string, string> = { A_ohne_filter: "ohne Vorfilter", B_yolo: "YOLO-Filter", C_eigener_vorfilter: "eigener Vorfilter" };
+const TEST_NAME: Record<string, string> = { test_same_hive: "Gleicher Stock (Test A)", test_other_hive: "Anderer Stock (Test B)" };
+---
+
+<Layout title="So funktioniert's">
+  <main>
+    <a href={url("/")} class="back">← Start</a>
+    <header>
+      <div class="kicker">beeflight · Erklärung</div>
+      <h1>Vom Video zum Orientierungsflug</h1>
+      <p>Neun Schritte. Jeder hat ein Bild und höchstens zwei Sätze.</p>
+      <nav class="toc">
+        {["Frage", "Weg", "Eingabe", "Modell", "Fair prüfen", "Messen", "Ausprobiert", "Vorfilter", "Test"].map((t, i) =>
+          <a href={`#s${i + 1}`}><b>{i + 1}</b> {t}</a>)}
+      </nav>
+    </header>
+
+    <!-- 1 -->
+    <section id="s1">
+      <div class="num">1</div>
+      <div class="body">
+        <h2>Die Frage</h2>
+        <p class="lead">Welche Flüge vor dem Flugloch sind <b class="o">Orientierungsflüge</b>? Junge Bienen fliegen Bögen vor dem
+          Stock, um ihn sich zu merken.</p>
+        <div class="chart"><svg viewBox="0 0 680 190" class="pic" role="img" aria-label="Vier Flugklassen als Bahnen vor dem Flugbrett">
+          <rect x="0" y="0" width="680" height="26" rx="4" class="board" />
+          <text x="340" y="18" class="lbl c">Flugbrett mit Flugloch</text>
+          <g transform="translate(20,0)">
+            <path d="M75 30 C 20 70, 20 120, 75 110 S 140 60, 85 32" class="path" style="stroke:var(--c-orientierung)" marker-end="url(#ah-o)" />
+            <text x="80" y="180" class="lbl c">Orientierung</text><text x="80" y="160" class="sub c">Bögen, zurück zum Brett</text>
+          </g>
+          <g transform="translate(190,0)">
+            <path d="M70 30 C 72 80, 80 120, 120 170" class="path" style="stroke:var(--c-sammelabflug)" marker-end="url(#ah-s)" />
+            <text x="70" y="186" class="lbl c">Sammelabflug</text>
+          </g>
+          <g transform="translate(360,0)">
+            <path d="M20 170 C 50 120, 70 80, 80 32" class="path" style="stroke:var(--c-anflug)" marker-end="url(#ah-a)" />
+            <text x="70" y="186" class="lbl c">Anflug</text>
+          </g>
+          <g transform="translate(520,0)">
+            <path d="M10 90 L 40 100 L 30 80 L 70 95 L 55 70 L 120 85" class="path dash" style="stroke:var(--c-artefakt)" />
+            <text x="70" y="186" class="lbl c">Artefakt</text><text x="70" y="140" class="sub c">keine echte Bahn</text>
+          </g>
+          <defs>
+            {[["o", "--c-orientierung"], ["s", "--c-sammelabflug"], ["a", "--c-anflug"]].map(([k, c]) =>
+              <marker id={`ah-${k}`} viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10z" style={`fill:var(${c})`} /></marker>)}
+          </defs>
+        </svg></div>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section id="s2">
+      <div class="num">2</div>
+      <div class="body">
+        <h2>Der Weg</h2>
+        <p class="lead">Jede Stufe beantwortet eine kleine Frage. Erst am Ende fällt die Klasse.</p>
+        <div class="flow">
+          {[["Video", "60 Bilder pro Sekunde"], ["Detektor", "Wo ist eine Biene?"], ["Tracker", "Welche Punkte gehören zusammen?"],
+            ["Vorfilter", "Ist das eine Honigbiene?"], ["Klassifikator", "Welcher Flug ist das?"]].map(([t, q], i) => (
+            <div class={`step ${i === 4 ? "hl" : ""}`}><b>{t}</b><span>{q}</span></div>
+          ))}
+        </div>
+        <p class="hint">Detektor und Tracker: Chiron 2013 + Huang 2008. Vorfilter: Schritt 8. Klassifikator: Schritt 4.</p>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section id="s3">
+      <div class="num">3</div>
+      <div class="body">
+        <h2>Was das Modell sieht</h2>
+        <p class="lead">Kein Bild, nur die Bahn. Sie wird auf <b>128 Punkte</b> gestreckt, und jeder Punkt hat 7 Zahlen.</p>
+        <div class="chart"><svg viewBox="0 0 680 200" class="pic" role="img" aria-label="Eine Bahn wird zu sieben Zahlenreihen">
+          <path d="M40 30 C 0 90, 10 150, 70 140 S 140 70, 80 35" class="path" style="stroke:var(--c-orientierung)" />
+          {Array.from({ length: 14 }, (_, i) => {
+            const t = i / 13; const x = 40 + 60 * Math.sin(t * 5.5) * (1 - t * 0.3) - 10 * t; const y = 30 + 110 * Math.sin(t * 3.1);
+            return <circle cx={x + 20} cy={y} r="2.5" class="dot" />;
+          })}
+          <text x="200" y="100" class="arrow">→</text>
+          {["x  (links/rechts)", "y  (Abstand zum Brett)", "dx (Tempo seitlich)", "dy (Tempo hoch/runter)", "|v| (Geschwindigkeit)", "dθ (Kurve)", "Dauer"].map((n, i) => (
+            <g transform={`translate(240,${14 + i * 26})`}>
+              <text x="0" y="12" class="sub">{n}</text>
+              <polyline class="spark" points={Array.from({ length: 30 }, (_, j) => `${190 + j * 8},${10 - 7 * Math.sin(j * (0.3 + i * 0.13) + i)}`).join(" ")} />
+            </g>
+          ))}
+        </svg></div>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section id="s4">
+      <div class="num">4</div>
+      <div class="body">
+        <h2>Das Modell</h2>
+        <p class="lead">Ein <b>ResNet</b> (Fawaz 2019) lernt Muster in den Zahlenreihen. Wir trainieren es <b>5-mal</b> mit anderem
+          Zufallsstart und nehmen den Mittelwert: das <b>Ensemble</b>.</p>
+        <div class="chart"><svg viewBox="0 0 680 150" class="pic" role="img" aria-label="Fünf ResNets werden gemittelt">
+          <rect x="10" y="55" width="90" height="40" rx="6" class="box" /><text x="55" y="80" class="lbl c">Bahn</text>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <g>
+              <line x1="100" y1="75" x2="200" y2={15 + i * 30} class="wire" />
+              <rect x="200" y={2 + i * 30} width="120" height="26" rx="5" class="box" />
+              <text x="260" y={20 + i * 30} class="sub c">ResNet {i + 1}</text>
+              <line x1="320" y1={15 + i * 30} x2="420" y2="75" class="wire" />
+            </g>
+          ))}
+          <circle cx="440" cy="75" r="22" class="box hlb" /><text x="440" y="81" class="lbl c">Ø</text>
+          <line x1="462" y1="75" x2="530" y2="75" class="wire" />
+          <rect x="530" y="55" width="140" height="40" rx="6" class="box hlb" /><text x="600" y="80" class="lbl c">Klasse</text>
+        </svg></div>
+        <p class="hint">Warum 5? Ein einzelnes Netz schwankt je nach Zufallsstart. Der Mittelwert ist stabiler.</p>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section id="s5">
+      <div class="num">5</div>
+      <div class="body">
+        <h2>Fair prüfen</h2>
+        <p class="lead">Drei getrennte Töpfe. Der Test-Topf wird <b>genau einmal</b> geöffnet, nachdem alles eingefroren ist.</p>
+        <div class="pots">
+          <div class="pot tr" style="flex:515"><b>Train</b><span>515 Bahnen</span><em>lernen</em></div>
+          <div class="pot va" style="flex:204"><b>Val</b><span>204</span><em>auswählen</em></div>
+          <div class="pot te" style="flex:709"><b>Test</b><span>299 + 410</span><em>einmal prüfen</em></div>
+        </div>
+        <p class="hint">Getrennt nach Zeitblöcken, mit Pausen dazwischen. Test B ist ein <b>anderer Stock</b>: Klappt es auch dort?</p>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section id="s6">
+      <div class="num">6</div>
+      <div class="body">
+        <h2>Messen</h2>
+        <p class="lead"><b>Balanced Accuracy (BA)</b> = Trefferquote pro Klasse, dann der Mittelwert. So zählt jede Klasse gleich viel,
+          egal wie häufig sie ist.</p>
+        <div class="chart"><svg viewBox="0 0 680 140" class="pic" role="img" aria-label="Beispiel Balanced Accuracy">
+          {[["orientierung", 0.76], ["sammelabflug", 0.69], ["anflug", 0.84], ["artefakt", 0.65]].map(([c, v], i) => (
+            <g transform={`translate(${20 + i * 120},0)`}>
+              <rect x="20" y={110 - 90 * (v as number)} width="60" height={90 * (v as number)} rx="3" style={`fill:var(--c-${c})`} />
+              <text x="50" y={104 - 90 * (v as number)} class="sub c">{pc(v as number)}</text>
+              <text x="50" y="128" class="sub c">{CLS_NAME[c as string]}</text>
+            </g>
+          ))}
+          <text x="520" y="62" class="arrow">→</text>
+          <text x="600" y="58" class="big c">BA</text><text x="600" y="84" class="big c">0,74</text>
+          <line x1="20" y1={110 - 90 * 0.25} x2="500" y2={110 - 90 * 0.25} class="chance" />
+          <text x="500" y={106 - 90 * 0.25} class="sub">Raten: 0,25</text>
+        </svg></div>
+        <p class="hint"><b>F1 Orientierung</b> fasst zusammen: Wie viele Orientierungsflüge findet es (Recall), und wie oft stimmt ein
+          „Orientierung“ (Precision)? Zufällig raten ergibt etwa 0,23.</p>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section id="s7">
+      <div class="num">7</div>
+      <div class="body">
+        <h2>Was wir ausprobiert haben</h2>
+        <p class="lead">Viele Ideen, auf val verglichen. Gewonnen hat das <b>Ensemble Kombi</b>.</p>
+        {tried.length ? (
+          <div class="chart"><svg viewBox={`0 0 680 ${30 + tried.length * 28}`} class="pic" role="img" aria-label="Balanced Accuracy auf val je Modell">
+            {[0.3, 0.4, 0.5, 0.6, 0.7, 0.8].map((v) => (
+              <g><line x1={bx(v)} x2={bx(v)} y1="8" y2={22 + tried.length * 28} class="grid" />
+                <text x={bx(v)} y={34 + tried.length * 28} class="sub c">{de(v, 1)}</text></g>
+            ))}
+            {tried.map((t, i) => (
+              <g transform={`translate(0,${12 + i * 28})`}>
+                <text x={BX0 - 10} y="14" class={`sub r ${t.g === "best" ? "strong" : ""}`}>{t.n}</text>
+                <rect x={BX0} y="2" width={bx(t.ba) - BX0} height="18" rx="3" class={`bar g-${t.g}`} />
+                <text x={bx(t.ba) + 6} y="15" class="sub">{de(t.ba, 3)}</text>
+              </g>
+            ))}
+          </svg></div>
+        ) : <p class="warn">Keine Vergleichsdaten vorhanden.</p>}
+        <div class="legend"><span class="g-best">bestes</span><span class="g-yes">hilft</span><span class="g-base">Vergleich</span><span class="g-no">hilft nicht</span></div>
+        <p class="hint">„Kombi“ = Länge 128 + kleinere Lernrate + Dauer als Kanal. Die Körperausrichtung hat geschadet: Sie trennt die
+          Klassen nicht.</p>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section id="s8">
+      <div class="num">8</div>
+      <div class="body">
+        <h2>Vorfilter: Ist das eine Honigbiene?</h2>
+        <p class="lead">Viele Artefakte sind gar keine Honigbienen. Ein Filter davor schickt sie direkt zu „Artefakt“.</p>
+        <div class="cols">
+          <div>
+            <h3>Was auf den 255 Artefakt-Bahnen zu sehen ist</h3>
+            <div class="stack">
+              {BEE_PARTS.map(([k, n, c]) => <div style={`flex:${bee[k]};background:${c}`} title={`${n}: ${bee[k]}`}><span>{bee[k]}</span></div>)}
+            </div>
+            <div class="stack-legend" style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:13px">
+              {BEE_PARTS.map(([k, n, c]) => (
+                <span style="display:inline-flex;align-items:center;gap:5px">
+                  <span style={`display:inline-block;width:10px;height:10px;border-radius:2px;background:${c}`}></span>
+                  <span>{n}</span><b>{bee[k]}</b>
+                </span>
+              ))}
+            </div>
+            <p class="hint">Viele andere Insekten! Echte Bienen auf falschen Bahnen (Vorbeiflug, Bienenwechsel) bleiben Artefakte, die das
+              Modell selbst erkennen muss.</p>
+          </div>
+          <div>
+            <h3>Drei Varianten auf val</h3>
+            {vf ? (
+              <table>
+                <tr><th></th><th>BA</th><th>Artefakt → Orient.</th></tr>
+                {Object.entries(vf.variants).map(([k, v]: [string, any]) => (
+                  <tr class={k === vf.auswahl ? "pick" : ""}><td>{VF_NAME[k] ?? k}{k === vf.auswahl ? " ✓" : ""}</td><td>{de(v.ba, 3)}</td><td>{v.artefakt_als_o}</td></tr>
+                ))}
+              </table>
+            ) : <p class="warn">Keine Daten vorhanden.</p>}
+            <p class="hint">Fertige Artenerkennung (BioCLIP) scheitert bei 30 px: Rund 80 % der echten Bienen hält es für Fliegen oder Blätter.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9 -->
+    <section id="s9">
+      <div class="num">9</div>
+      <div class="body">
+        <h2>Ergebnis auf Test</h2>
+        <p class="lead">Einmal geöffnet, nichts mehr verändert. Das ist die ehrliche Zahl.</p>
+        {test ? (
+          <div class="cols">
+            {Object.entries(test.splits).map(([k, t]: [string, any]) => (
+              <div class="result">
+                <h3>{TEST_NAME[k] ?? k}</h3>
+                <div class="kpis">
+                  <div><b>{de(t.ba, 2)}</b><span>BA</span><em>{t.ba_ci ? "[" + de(t.ba_ci[0], 2) + " – " + de(t.ba_ci[1], 2) + "]" : t.ci_note}</em></div>
+                  <div><b>{de(t.f1_o, 2)}</b><span>F1 Orientierung</span><em>Regel: BA {de(t.rule_ba, 2)}</em></div>
+                  <div><b>{t.n}</b><span>Bahnen</span><em>{t.n_o} Orientierung</em></div>
+                </div>
+                <table class="cm">
+                  <tr><th>wahr ↓ / erkannt →</th>{CLS.map((c) => <th><i style={`background:var(--c-${c})`}></i>{CLS_NAME[c].slice(0, 6)}.</th>)}</tr>
+                  {t.confusion.map((row: number[], i: number) => (
+                    <tr><th><i style={`background:var(--c-${CLS[i]})`}></i>{CLS_NAME[CLS[i]]}</th>
+                      {row.map((v, j) => <td class={i === j ? "diag" : ""} style={`--a:${Math.min(1, v / Math.max(1, row.reduce((a, b) => a + b, 0)))}`}>{v}</td>)}</tr>
+                  ))}
+                </table>
+              </div>
+            ))}
+          </div>
+        ) : <p class="warn">Keine Testdaten vorhanden.</p>}
+        <h3 class="limits">Grenzen</h3>
+        <ul class="limits">
+          <li>Das Modell sieht nur die Bahn: Ein Blatt, das schwingt, kann wie ein Orientierungsflug aussehen.</li>
+          <li>Ausgewählt unter rund 70 Varianten auf val: Darum zählt nur der Test.</li>
+          <li>Test B ist ein anderer Stock mit anderer Kamera-Position.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</Layout>
+
+<style>
+  main { max-width: 900px; margin: 0 auto; padding: 24px 16px 64px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 12px; }
+  h1 { font-size: 32px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  header > p { color: var(--muted); margin: 0 0 16px; }
+  .toc { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 28px; }
+  .toc a { text-decoration: none; font-size: 13px; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 10px; }
+  .toc a b { color: var(--accent); }
+  section { display: grid; grid-template-columns: 44px 1fr; gap: 16px; padding: 28px 0; border-top: 1px solid var(--line); scroll-margin-top: 12px; }
+  .num { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 18px;
+    display: grid; place-items: center; }
+  h2 { font-size: 22px; margin: 6px 0 6px; letter-spacing: -.01em; }
+  h3 { font-size: 14px; margin: 0 0 8px; }
+  .lead { font-size: 17px; margin: 0 0 14px; max-width: 62ch; }
+  .hint { color: var(--muted); font-size: 14px; margin: 10px 0 0; max-width: 70ch; }
+  .warn { background: #fff4e5; border: 1px solid #f0c27a; border-radius: 8px; padding: 10px 14px; }
+  .o { color: var(--c-orientierung); }
+  .pic { width: 100%; height: auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+  .board { fill: #c9a46a; }
+  .path { fill: none; stroke-width: 3.5; stroke-linecap: round; }
+  .dash { stroke-dasharray: 2 6; }
+  .dot { fill: var(--ink); }
+  .lbl { font: 600 14px Inter, system-ui, sans-serif; fill: var(--ink); }
+  .sub { font: 12px Inter, system-ui, sans-serif; fill: var(--muted); }
+  .sub.strong { fill: var(--ink); font-weight: 700; }
+  .c { text-anchor: middle; } .r { text-anchor: end; }
+  .big { font: 700 22px Inter, system-ui, sans-serif; fill: var(--ink); }
+  .arrow { font: 28px system-ui; fill: var(--muted); }
+  .spark { fill: none; stroke: var(--c-orientierung); stroke-width: 1.5; }
+  .box { fill: var(--panel); stroke: var(--line); }
+  .hlb { fill: #fbe9c6; stroke: var(--accent); }
+  .wire { stroke: #c4c7cd; stroke-width: 1.2; }
+  .chance { stroke: var(--ink); stroke-dasharray: 4 4; opacity: .5; }
+  .grid { stroke: var(--line); }
+  .flow { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+  .step { flex: 1 1 140px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; position: relative; }
+  .step b { display: block; font-size: 15px; } .step span { font-size: 13px; color: var(--muted); }
+  .step.hl { border-color: var(--accent); background: #fdf6e8; }
+  .step:not(:last-child)::after { content: "→"; position: absolute; right: -14px; top: 50%; transform: translateY(-50%); color: var(--muted); z-index: 1; }
+  .pots { display: flex; gap: 6px; }
+  .pot { border-radius: 10px; padding: 12px; color: #fff; min-width: 90px; display: flex; flex-direction: column; }
+  .pot b { font-size: 16px; } .pot span { font-size: 13px; opacity: .9; } .pot em { font-style: normal; font-weight: 600; margin-top: 6px; }
+  .tr { background: #3d93c9; } .va { background: #d99a1e; } .te { background: #16181d; }
+  .bar.g-best { fill: var(--accent); } .bar.g-yes { fill: #e8c578; } .bar.g-base { fill: #9aa3ae; } .bar.g-no { fill: #d9dce1; }
+  .legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .legend .g-best::before { background: var(--accent); } .legend .g-yes::before { background: #e8c578; }
+  .legend .g-base::before { background: #9aa3ae; } .legend .g-no::before { background: #d9dce1; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+  .stack { display: flex; height: 44px; border-radius: 8px; overflow: hidden; }
+  .stack div { display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 600; min-width: 0; }
+  .stack span { white-space: nowrap; overflow: hidden; text-overflow: clip; padding: 0 2px; font-size: 13px; }
+  .stack-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 13px; }
+  table { border-collapse: collapse; font-size: 14px; width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+  th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; font-size: 12px; color: var(--muted); }
+  tr.pick td { font-weight: 700; background: #fdf6e8; }
+  .kpis { display: flex; gap: 10px; margin-bottom: 10px; }
+  .kpis div { flex: 1; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .kpis b { display: block; font-size: 24px; } .kpis span { font-size: 12px; color: var(--muted); display: block; }
+  .kpis em { font-style: normal; font-size: 12px; color: var(--muted); }
+  .cm td { text-align: center; background: rgba(217, 154, 30, calc(var(--a) * .55)); }
+  .cm i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .limits { margin-top: 18px; } ul.limits { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+  @media (max-width: 700px) {
+    section { grid-template-columns: 1fr; } .cols { grid-template-columns: 1fr; }
+    .pots { flex-direction: column; } .step:not(:last-child)::after { content: none; }
+  }
+</style>

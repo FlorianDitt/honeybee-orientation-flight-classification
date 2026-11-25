@@ -1,0 +1,116 @@
+{
+ "model": "Ensemble Kombi + YOLO-Vorfilter (B_yolo)",
+ "splits": {
+  "test_same_hive": {
+   "n": 299,
+   "seqs": 4,
+   "n_o": 57,
+   "ba": 0.6573910640422194,
+   "ba_ci": null,
+   "ci_note": "LOSO 0,64\u20130,67",
+   "recall_o": 0.543859649122807,
+   "precision_o": 0.62,
+   "f1_o": 0.5794392523364486,
+   "recall_o_ci": [
+    0.41590460831272247,
+    0.6662760049518861
+   ],
+   "precision_o_ci": [
+    0.4815019502239357,
+    0.7413740415742278
+   ],
+   "share_true": 0.2626728110599078,
+   "share_pred": 0.2631578947368421,
+   "confusion": [
+    [
+     31,
+     5,
+     10,
+     11
+    ],
+    [
+     4,
+     55,
+     0,
+     29
+    ],
+    [
+     2,
+     1,
+     56,
+     13
+    ],
+    [
+     13,
+     8,
+     5,
+     56
+    ]
+   ],
+   "rule_ba": 0.6418003040676339,
+   "unanimous_ba": 0.8000333000333,
+   "unanimous_n": 84,
+   "auroc_o": 0.8816876903001305
+  },
+  "test_other_hive": {
+   "n": 410,
+   "seqs": 21,
+   "n_o": 53,
+   "ba": 0.7578345163797882,
+   "ba_ci": [
+    0.703017153347689,
+    0.8119239439243119
+   ],
+   "ci_note": "",
+   "recall_o": 0.5283018867924528,
+   "precision_o": 0.6511627906976745,
+   "f1_o": 0.5833333333333334,
+   "recall_o_ci": [
+    0.3912778366914104,
+    0.6750168918918918
+   ],
+   "precision_o_ci": [
+    0.47619047619047616,
+    0.8085359675785205
+   ],
+   "share_true": 0.23348017621145375,
+   "share_pred": 0.19724770642201836,
+   "confusion": [
+    [
+     28,
+     4,
+     6,
+     15
+    ],
+    [
+     0,
+     41,
+     0,
+     6
+    ],
+    [
+     3,
+     0,
+     103,
+     21
+    ],
+    [
+     12,
+     5,
+     16,
+     150
+    ]
+   ],
+   "rule_ba": 0.6771313996425599,
+   "unanimous_ba": 0.9093406593406593,
+   "unanimous_n": 69,
+   "auroc_o": 0.8456741187040854
+  }
+ },
+ "notes": [
+  "Test A hat nur 4 Sequenzen: statt Bootstrap gibt es die Spanne beim Weglassen je einer Sequenz (LOSO) und Wilson-Intervalle f\u00fcr Recall und Precision (eher zu eng).",
+  "Test B: 95-%-Cluster-Bootstrap \u00fcber 21 Sequenzen. Gegen die Regel: +0,081 BA, Intervall 0,00 bis 0,16.",
+  "Einstimmige Bahnen = Bahnen mit mindestens 2 Stimmen, die alle gleich sind. Dort ist das Modell deutlich besser: Viele Fehler liegen bei Bahnen, bei denen sich auch Menschen nicht einig sind.",
+  "Das final neu trainierte Ensemble erreicht auf Val ohne Filter 0,727 statt 0,737 (Training auf CPU statt GPU, anderer Zufall); mit YOLO-Filter 0,750."
+ ]
+}

@@ -1,0 +1,1 @@
+{"train":{"orientierung":165,"sammelabflug":129,"anflug":111,"artefakt":195},"val":{"orientierung":42,"sammelabflug":48,"anflug":45,"artefakt":69},"test_same_hive":{"orientierung":57,"sammelabflug":88,"anflug":72,"artefakt":82},"test_other_hive":{"orientierung":53,"sammelabflug":47,"anflug":127,"artefakt":183}}

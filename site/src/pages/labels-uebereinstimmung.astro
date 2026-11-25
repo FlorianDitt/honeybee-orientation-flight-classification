@@ -1,0 +1,142 @@
+---
+// Class counts per split and agreement between the labelers (aggregates only: no per-track rows, no notes).
+// Data: snapshots of labels/final_*.jsonl (counts) and of the labeler votes (see scripts/snapshot.mjs).
+import Layout from "../layouts/Layout.astro";
+import { url } from "../lib/url";
+import countsJson from "../data/class_counts.json";
+import agreementJson from "../data/label_agreement.json";
+
+const counts: Record<string, Record<string, number>> = countsJson as any;
+const ag: any = agreementJson;
+const CLASSES = ["orientierung", "sammelabflug", "anflug", "artefakt"];
+const CN: Record<string, string> = { orientierung: "Orientierung", sammelabflug: "Sammelabflug", anflug: "Anflug", artefakt: "Artefakt" };
+const SHORT: Record<string, string> = { orientierung: "Orient.", sammelabflug: "Sammel", anflug: "Anflug", artefakt: "Artef." };
+const SPLITS: [string, string][] = [["train", "Train"], ["val", "Val"], ["test_same_hive", "Test A (gleicher Stock)"], ["test_other_hive", "Test B (anderer Stock)"]];
+const total = (s: string) => CLASSES.reduce((a, c) => a + counts[s][c], 0);
+const pct = ([a, n]: [number, number]) => (n ? `${Math.round((100 * a) / n)} %` : "–");
+const people: string[] = ag.people;
+const friends = people.slice(1);
+const maxOff = Math.max(1, ...CLASSES.flatMap((a) => CLASSES.map((b) => ag.confusion[a][b] as number)));
+---
+
+<Layout title="Labels">
+  <main>
+    <a href={url("/")} class="back">← Start</a>
+    <header>
+      <div class="kicker">beeflight · Handlabels</div>
+      <h1>Labels: Klassen und Übereinstimmung</h1>
+      <p>Wie viele Bahnen es je Klasse und Split gibt, und wie gut mehrere Labelnde auf denselben Bahnen übereinstimmen. Nur Zählungen: keine einzelnen Bahnen, keine Notizen.</p>
+    </header>
+
+    <section>
+      <h2>Klassen je Split</h2>
+      <p class="sub">Endgültige Labels (Mehrheit, Recheck eingearbeitet), die Grundlage für Training, Auswahl und Test.</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Split</th><th>Bahnen</th>{CLASSES.map((c) => <th><i style={`background:var(--c-${c})`}></i>{CN[c]}</th>)}</tr></thead>
+          <tbody>
+            {SPLITS.map(([s, n]) => (
+              <tr><th>{n}</th><td>{total(s)}</td>{CLASSES.map((c) => <td>{counts[s][c]}<small>{pct([counts[s][c], total(s)])}</small></td>)}</tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div class="bars">
+        {SPLITS.map(([s, n]) => (
+          <div class="barrow">
+            <span class="bn">{n}</span>
+            <span class="bar">{CLASSES.map((c) => <i style={`width:${(100 * counts[s][c]) / total(s)}%;background:var(--c-${c})`} title={`${CN[c]}: ${counts[s][c]}`}></i>)}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section>
+      <h2>Übereinstimmung zwischen Labelnden</h2>
+      <p class="sub">Anteil gleicher Klasse auf Train- und Val-Bahnen, die beide gelabelt haben (Anzahl darunter). Bei mehreren Labels derselben Person gilt das neueste.
+        Eine Zelle ohne Wert heißt: Dieses Paar hat keine gemeinsamen Bahnen in Train/Val.</p>
+      <div class="summary">
+        <div>
+          <table class="matrix">
+            <thead><tr><th></th>{people.map((p) => <th>{p}</th>)}</tr></thead>
+            <tbody>
+              {people.map((a) => (
+                <tr>
+                  <th>{a}</th>
+                  {people.map((b) => a === b ? <td class="self">–</td> : (
+                    <td style={`--a:${ag.pairs[a][b][1] ? ag.pairs[a][b][0] / ag.pairs[a][b][1] : 0}`} class={ag.pairs[a][b][1] ? "heat" : ""}>
+                      {pct(ag.pairs[a][b])}<small>{ag.pairs[a][b][1]}</small>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <h3>Übungsrunde</h3>
+          <ul class="scores">
+            {ag.scores.map((s: any) => <li><b>{s.who}</b> {s.practice[1] ? `${s.practice[0]} / ${s.practice[1]} richtig` : "nicht gemacht"}</li>)}
+          </ul>
+        </div>
+        <div>
+          <h3>Verwechslungen</h3>
+          <p class="sub">Zeilen: Label von Florian · Spalten: Stimmen der anderen auf denselben Bahnen ({friends.join(", ")}).</p>
+          <table class="matrix">
+            <thead><tr><th></th>{CLASSES.map((c) => <th><i style={`background:var(--c-${c})`}></i>{SHORT[c]}</th>)}</tr></thead>
+            <tbody>
+              {CLASSES.map((a) => (
+                <tr>
+                  <th><i style={`background:var(--c-${a})`}></i>{SHORT[a]}</th>
+                  {CLASSES.map((b) => (
+                    <td class={`heat ${a === b ? "diag" : "off"}`} style={`--a:${ag.confusion[a][b] / maxOff}`}>{ag.confusion[a][b] || ""}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="sub">Die Grenze zwischen Orientierung und Sammelabflug ist auch für Menschen unscharf. Wie sich das auf die Testlabels auswirkt, zeigen die
+        <a href={url("/test-details")}>Test-Details</a>.</p>
+    </section>
+
+    <section>
+      <h2>Konsistenz beim zweiten Durchgang</h2>
+      <p class="sub">Je 50 Bahnen aus Train und Val wurden blind ein zweites Mal gelabelt. Anteil gleicher Klasse wie beim ersten Mal:</p>
+      <img src={url("/grafiken/label_konsistenz.png")} alt="Zweites Label gleich wie das erste: Train 86 %, Val 68 %" width="380" />
+    </section>
+  </main>
+</Layout>
+
+<style>
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 48px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 16px; }
+  h1 { font-size: 34px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  h2 { font-size: 22px; margin: 36px 0 6px; padding-top: 16px; border-top: 1px solid var(--line); }
+  h3 { font-size: 14px; margin: 18px 0 6px; }
+  header p, .sub { color: var(--muted); margin: 0 0 12px; max-width: 800px; font-size: 14px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; background: #fff; border: 1px solid var(--line); }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:first-child { text-align: left; }
+  thead th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--panel); }
+  tbody th { font-weight: 500; }
+  td small { display: block; color: var(--muted); font-size: 11px; }
+  i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+  .bars { margin-top: 14px; max-width: 760px; }
+  @media (max-width: 700px) { .barrow { grid-template-columns: 110px minmax(0, 1fr) !important; } }
+  .barrow { display: grid; grid-template-columns: 190px 1fr; gap: 10px; align-items: center; margin: 5px 0; font-size: 13px; }
+  .bar { display: flex; height: 16px; border-radius: 4px; overflow: hidden; background: var(--panel); }
+  .bar i { height: 100%; margin: 0; border-radius: 0; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 32px; margin: 12px 0; }
+  .matrix { border-collapse: separate; border-spacing: 2px; width: auto; border: 0; background: none; font-size: 13px; }
+  .matrix th { font-weight: 600; color: var(--muted); padding: 4px 8px; text-align: left; white-space: nowrap; border: 0; background: none; }
+  .matrix td { min-width: 64px; text-align: center; padding: 8px 6px; border: 0; border-radius: 4px; background: var(--panel); font-variant-numeric: tabular-nums; }
+  .matrix td.heat { background: color-mix(in srgb, var(--accent) calc(var(--a) * 70%), var(--panel)); }
+  .matrix td.off { background: color-mix(in srgb, #c2410c calc(var(--a) * 60%), var(--panel)); }
+  .matrix td.diag { background: color-mix(in srgb, #3f9d6b calc(var(--a) * 55%), var(--panel)); }
+  .matrix td.self { color: var(--muted); }
+  .scores { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+  .scores li { padding: 2px 0; }
+  img { max-width: 100%; height: auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+</style>

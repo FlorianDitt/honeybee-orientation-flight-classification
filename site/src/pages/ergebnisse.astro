@@ -1,0 +1,170 @@
+---
+// Overview of model and tracker results: key numbers and one short chart each; the full pages hold the details.
+import Layout from "../layouts/Layout.astro";
+import { url } from "../lib/url";
+import { NAMES } from "../lib/names";
+import modelleJson from "../data/modelle2_vergleich.json";
+import trackerJson from "../data/tracker_vergleich.json";
+import bewertungJson from "../data/tracker_bewertung.json";
+
+const de = (x: number, d = 2) => x.toFixed(d).replace(".", ",");
+const pct = (x: number) => (100 * x).toFixed(1).replace(".", ",") + " %";
+
+// model: round 2 on val (4 classes)
+const m: any = modelleJson;
+const M2N: Record<string, string> = { base: "ResNet Basis", kombi: "ResNet Länge 128 + lr + Dauer", laenge_128: "ResNet Länge 128",
+  inception: "InceptionTime", inception_kombi: "InceptionTime + lr + Dauer", r3d_c224: "Video: R3D-18, 224 px",
+  r3d_c112: "Video: R3D-18, 112 px", mc3_c224: "Video: MC3-18, 224 px", mc3_c112: "Video: MC3-18, 112 px",
+  laenge_128_lr: "ResNet Länge 128 + lr", laenge_128_dauer: "ResNet Länge 128 + Dauer" };
+const mname = (k: string) => k.startsWith("ensemble_") ? `Ensemble: ${M2N[k.slice(9)] ?? k.slice(9)}` : (M2N[k] ?? k);
+const KIND: Record<string, string> = { bahn: "Bahn-Netz", ensemble: "Ensemble", video: "Video-Netz", cluster: "Clustering", ohne_netz: "ohne Netz" };
+const models = (Object.entries(m.configs) as [string, any][]).filter(([k]) => !k.startsWith("cluster_"))
+  .sort((a, b) => b[1].ba - a[1].ba);
+const final = m.configs.ensemble_kombi;
+const base = m.configs.base;
+const bestVideo = models.find(([, c]) => c.kind === "video");
+const topModels = models.slice(0, 8);
+if (!topModels.some(([k]) => k === "base")) topModels.push(["base", base]);
+
+// tracker: share of complete tracks on the val videos
+const t: any = trackerJson;
+const tname = (k: string) => NAMES[k] ?? k.replace(/^flights_/, "");
+const trackers = (Object.entries(t.trackers) as [string, any][]).filter(([, v]) => v.tracks > 0).sort((a, b) => b[1].share - a[1].share);
+const ref = t.trackers[t.ref];
+const best = trackers[0];
+const topTrackers = trackers.slice(0, 8);
+if (!topTrackers.some(([k]) => k === t.ref)) topTrackers.push([t.ref, ref]);
+const blind: any = (bewertungJson as any[]).find((r) => r.key === t.ref);
+
+// shared dot chart geometry
+// position on a 0..100 % track
+const scale = (lo: number, hi: number) => (v: number) => (100 * (Math.max(lo, Math.min(hi, v)) - lo)) / (hi - lo);
+const mp = scale(0.5, 0.85), tp = scale(0.5, 0.9);
+
+const GRAFIKEN: [string, string][] = [
+  ["ergebnis", "Balanced Accuracy auf Test A und B: Regel, Modell, Modell auf einstimmigen Bahnen"],
+  ["modelle", "Balanced Accuracy von Modell und Regel auf Val, Test A und Test B"],
+  ["einstimmig", "Alle Bahnen gegenüber Bahnen, bei denen alle Labelnden einig sind"],
+  ["klassenzahl", "F1 Orientierung auf Val bei 2, 3 und 4 Klassen"],
+  ["klassen", "Die vier Klassen als Flugbahnen"],
+  ["flight_counts", "Flugbahnen pro 30 s in sieben Sequenzen"],
+  ["tracker_versions", "Anteil korrekter Bahnen je Tracker-Version"],
+  ["tracker_vergleich", "Blind bewertete Tracker mit 95-%-Intervall"],
+  ["label_konsistenz", "Konsistenz beim zweiten Label"],
+];
+---
+
+<Layout title="Ergebnisse">
+  <main>
+    <header>
+      <div class="kicker">Ergebnisse auf Val</div>
+      <h1>Ergebnisse</h1>
+      <p>Alle Modelle und Tracker wurden auf den Validierungsdaten verglichen. Hier stehen nur die wichtigsten Zahlen;
+        alles Weitere auf den Detailseiten. Das Ergebnis auf dem Test steht in den <a href={url("/test-details")}>Test-Details</a>.</p>
+    </header>
+
+    <section>
+      <h2>Modell</h2>
+      <div class="facts">
+        <div><b>{de(final.ba)}</b><span>Balanced Accuracy des finalen Modells</span><em>Ensemble aus 5 ResNets</em></div>
+        <div><b>+{de(final.ba - base.ba)}</b><span>besser als ein einzelnes ResNet</span><em>Basis: {de(base.ba)}</em></div>
+        <div><b>{de(bestVideo![1].ba)}</b><span>bestes Video-Netz</span><em>nicht besser als die Flugbahn allein</em></div>
+      </div>
+      <p class="sub">Die 8 besten Modelle. Punkt: Mittel über die Seeds, Strich: 95-%-Intervall.</p>
+      <div class="rows" role="list" aria-label="Balanced Accuracy der besten Modelle">
+        <div class="axis" aria-hidden="true"><span></span><span class="ticks">{[0.5, 0.6, 0.7, 0.8].map((v) => <i style={`left:${mp(v)}%`}>{de(v, 1)}</i>)}</span><span></span></div>
+        {topModels.map(([k, c]) => (
+          <div role="listitem" class={`row k-${c.kind} ${k === "ensemble_kombi" ? "hl" : ""}`}>
+            <span class="name">{mname(k)}</span>
+            <span class="track">{[0.5, 0.6, 0.7, 0.8].map((v) => <i class="gl" style={`left:${mp(v)}%`}></i>)}
+              <i class="ci" style={`left:${mp(c.ba_ci[0])}%;width:${mp(c.ba_ci[1]) - mp(c.ba_ci[0])}%`}></i><i class="pt" style={`left:${mp(c.ba)}%`}></i></span>
+            <span class="v">{de(c.ba, 3)}</span>
+          </div>
+        ))}
+      </div>
+      <div class="legend">{["ensemble", "bahn", "video"].map((k) => <span class={`k-${k}`}><i></i>{KIND[k]}</span>)}</div>
+      <a class="more" href={url("/modell-zahlen")}>Alle Modell-Zahlen: Setups, Hyperparameter, Clustering →</a>
+    </section>
+
+    <section>
+      <h2>Tracker</h2>
+      <div class="facts">
+        <div><b>{pct(ref.share)}</b><span>vollständige Bahnen mit dem finalen Tracker</span><em>{tname(t.ref)}</em></div>
+        <div><b>{pct(best[1].share)}</b><span>bester Tracker</span><em>{tname(best[0])}</em></div>
+        {blind && <div><b>{blind.korrekt}/{blind.n}</b><span>Bahnen bei blinder Handprüfung korrekt</span><em>finaler Tracker</em></div>}
+      </div>
+      <p class="sub">Die 8 Tracker mit dem höchsten Anteil vollständiger Bahnen (Flugbrett oder Bildrand an beiden Enden).</p>
+      <div class="rows" role="list" aria-label="Anteil vollständiger Bahnen der besten Tracker">
+        <div class="axis" aria-hidden="true"><span></span><span class="ticks">{[0.5, 0.6, 0.7, 0.8, 0.9].map((v) => <i style={`left:${tp(v)}%`}>{v * 100} %</i>)}</span><span></span></div>
+        {topTrackers.map(([k, v]) => (
+          <div role="listitem" class={`row ${k === t.ref ? "k-final hl" : "k-other"}`}>
+            <span class="name">{tname(k)}</span>
+            <span class="track">{[0.5, 0.6, 0.7, 0.8, 0.9].map((g) => <i class="gl" style={`left:${tp(g)}%`}></i>)}
+              <i class="bar" style={`left:0;width:${tp(v.share)}%`}></i><i class="pt" style={`left:${tp(v.share)}%`}></i></span>
+            <span class="v">{pct(v.share)}</span>
+          </div>
+        ))}
+      </div>
+      <div class="links">
+        <a class="more" href={url("/tracker-zahlen")}>Alle {trackers.length} Tracker im Vergleich →</a>
+        <a class="more" href={url("/tracker-bewertung")}>Blinde Handbewertung →</a>
+      </div>
+    </section>
+
+    <section>
+      <details>
+        <summary>Grafiken aus der Präsentation</summary>
+        <div class="gallery">
+          {GRAFIKEN.map(([f, c]) => <figure><img src={url(`/grafiken/${f}.png`)} alt={c} loading="lazy" /><figcaption>{c}</figcaption></figure>)}
+        </div>
+      </details>
+    </section>
+  </main>
+</Layout>
+
+<style>
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 48px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
+  h1 { font-size: 34px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  h2 { font-size: 24px; margin: 40px 0 12px; padding-top: 20px; border-top: 1px solid var(--line); }
+  header p, .sub { color: var(--muted); margin: 0 0 12px; max-width: 820px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .facts div { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .facts b { display: block; font-size: 30px; line-height: 1.15; }
+  .facts span { display: block; font-size: 13.5px; margin-top: 2px; }
+  .facts em { font-style: normal; font-size: 12.5px; color: var(--muted); }
+  .rows { margin: 8px 0 4px; }
+  .row, .axis { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 2fr) 64px; gap: 12px; align-items: center; }
+  .row { padding: 5px 0; }
+  .name { text-align: right; font-size: 14px; overflow-wrap: anywhere; }
+  .hl .name { font-weight: 700; }
+  .track { position: relative; height: 18px; }
+  .ticks { position: relative; height: 16px; font-size: 12px; color: var(--muted); }
+  .ticks i { position: absolute; transform: translateX(-50%); font-style: normal; white-space: nowrap; }
+  .track i { position: absolute; top: 50%; transform: translateY(-50%); }
+  .gl { width: 1px; height: 100%; background: var(--line); }
+  .ci { height: 5px; border-radius: 3px; background: var(--c); opacity: .4; }
+  .bar { height: 3px; background: var(--c); opacity: .35; }
+  .pt { width: 13px; height: 13px; border-radius: 50%; background: var(--c); margin-left: -6.5px; }
+  .v { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  @media (max-width: 700px) {
+    .row, .axis { grid-template-columns: minmax(0, 1fr) 56px; column-gap: 10px; row-gap: 2px; }
+    .axis > span:first-child, .axis > span:last-child { display: none; }
+    .axis .ticks { grid-column: 1; }
+    .name { grid-column: 1 / -1; text-align: left; }
+    .row { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  }
+  .k-ensemble { --c: #6a4fb3; } .k-bahn { --c: #2f6fb0; } .k-video { --c: #e0662a; } .k-ohne_netz { --c: #8a8f98; }
+  .k-final { --c: #2f6fb0; } .k-other { --c: #8a8f98; }
+  .legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin: 6px 0 10px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); margin-right: 5px; }
+  .links { display: flex; gap: 18px; flex-wrap: wrap; }
+  .more { display: inline-block; margin-top: 6px; font-weight: 600; text-decoration: none; color: var(--accent); }
+  .more:hover { text-decoration: underline; }
+  details { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-top: 40px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 14px; }
+  figure { margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+  figure img { width: 100%; height: auto; display: block; }
+  figcaption { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+</style>

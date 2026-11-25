@@ -37,7 +37,8 @@ uv run beeflight-sample --split test_other_hive --n 100 --flights outputs/flight
 uv run beeflight-clips        # Clips + public-web/data/site.json (Testsets, mit --split train --split val die alten Pakete)
 cd labeler
 npm run dev:web               # Test: http://127.0.0.1:4322/BeeHive/
-npm run deploy:web            # baut und pusht nach gh-pages -> https://florianditt.github.io/BeeHive/
+# deploy:web nicht mehr nutzen: die Clips stammen aus dem gated Datensatz und dürfen nicht öffentlich
+# gehostet werden. Die öffentliche Ergebnis-Seite liegt in site/ (ohne Clips).
 ```
 
 **Ablauf für die Helfenden:** Name eingeben → Tutorial (8 Beispielbahnen aus `labels/tutorial.json`, je Klasse

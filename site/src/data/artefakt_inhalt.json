@@ -1,0 +1,1 @@
+{"train":{"anderes_insekt":52,"honigbiene":60,"unklar":38,"kein_tier":36},"val":{"unklar":16,"honigbiene":35,"anderes_insekt":17,"kein_tier":1},"total":{"anderes_insekt":69,"honigbiene":95,"unklar":54,"kein_tier":37}}

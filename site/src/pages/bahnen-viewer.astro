@@ -1,0 +1,157 @@
+---
+// Track viewer without video: hand-labelled flight tracks drawn as lines on a blank background.
+// Data: src/data/tracks.json (id, split, class, coordinates in full-resolution frame pixels, rounded to 0.1).
+import Layout from "../layouts/Layout.astro";
+import { url } from "../lib/url";
+
+const CLASSES = ["orientierung", "sammelabflug", "anflug", "artefakt"];
+const CN: Record<string, string> = { orientierung: "Orientierung", sammelabflug: "Sammelabflug", anflug: "Anflug", artefakt: "Artefakt" };
+---
+
+<Layout title="Bahnen">
+  <main>
+    <a href={url("/")} class="back">← Start</a>
+    <header>
+      <div class="kicker">beeflight · Handlabels</div>
+      <h1>Bahnen-Viewer</h1>
+      <p>Die von Hand gelabelten Flugbahnen als Linien auf leerem Grund, ohne Video und ohne Bild. Koordinaten in Bildpixeln der vollen Auflösung
+        (1080 × 1920), das Flugbrett liegt oben. Test A und Test B stammen von verschiedenen Stöcken mit anderer Kameraposition; die Koordinaten sind
+        darum nur innerhalb eines Splits direkt vergleichbar. Bahnen sind für die Anzeige auf höchstens 48 Punkte ausgedünnt.</p>
+    </header>
+
+    <div class="controls">
+      <label>Split
+        <select id="f-split">
+          <option value="">alle</option>
+          <option value="train">Train</option>
+          <option value="val">Val</option>
+          <option value="test_same_hive">Test A (gleicher Stock)</option>
+          <option value="test_other_hive">Test B (anderer Stock)</option>
+        </select>
+      </label>
+      <label>Klasse
+        <select id="f-class">
+          <option value="">alle</option>
+          {CLASSES.map((c) => <option value={c}>{CN[c]}</option>)}
+        </select>
+      </label>
+      <label>Ansicht
+        <select id="f-mode">
+          <option value="overlay">Überlagert</option>
+          <option value="single">Eine Bahn</option>
+        </select>
+      </label>
+      <label id="n-wrap">Anzahl <input id="f-n" type="number" min="1" max="300" value="40" /></label>
+      <span id="single-nav" hidden>
+        <button id="prev" type="button">←</button>
+        <span id="pos"></span>
+        <button id="next" type="button">→</button>
+      </span>
+      <span id="count" class="count"></span>
+    </div>
+
+    <div class="legend">
+      {CLASSES.map((c) => <span><i style={`background:var(--c-${c})`}></i>{CN[c]}</span>)}
+      <span id="markers" hidden><b class="start"></b> Start · <b class="end"></b> Ende</span>
+    </div>
+
+    <svg id="view" role="img" aria-label="Flugbahnen als Linien" preserveAspectRatio="xMidYMid meet"></svg>
+    <p id="info" class="sub"></p>
+  </main>
+</Layout>
+
+<script>
+  import data from "../data/tracks.json";
+
+  type Track = { id: string; s: string; c: string; p: number[] };
+  const tracks = data as Track[];
+  const COL: Record<string, string> = { orientierung: "#e0662a", sammelabflug: "#3d93c9", anflug: "#3f9d6b", artefakt: "#8a8f98" };
+  const CN: Record<string, string> = { orientierung: "Orientierung", sammelabflug: "Sammelabflug", anflug: "Anflug", artefakt: "Artefakt" };
+  const SN: Record<string, string> = { train: "Train", val: "Val", test_same_hive: "Test A", test_other_hive: "Test B" };
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const svg = document.getElementById("view") as unknown as SVGSVGElement;
+  const fSplit = $<HTMLSelectElement>("f-split"), fClass = $<HTMLSelectElement>("f-class"), fMode = $<HTMLSelectElement>("f-mode"), fN = $<HTMLInputElement>("f-n");
+  let idx = 0;
+
+  const pts = (t: Track) => { const o: [number, number][] = []; for (let i = 0; i < t.p.length; i += 2) o.push([t.p[i], t.p[i + 1]]); return o; };
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (name: string, attrs: Record<string, string | number>) => {
+    const e = document.createElementNS(NS, name);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+    return e;
+  };
+
+  function bounds(list: Track[]) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const t of list) for (const [x, y] of pts(t)) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    if (!isFinite(x0)) { x0 = 0; y0 = 0; x1 = 1080; y1 = 1920; }
+    return { x0, y0, x1, y1 };
+  }
+
+  function render() {
+    const list = tracks.filter((t) => (!fSplit.value || t.s === fSplit.value) && (!fClass.value || t.c === fClass.value));
+    const single = fMode.value === "single";
+    $("n-wrap").hidden = single;
+    $("single-nav").hidden = !single;
+    $("markers").hidden = !single;
+    $("count").textContent = `${list.length} Bahnen passen zum Filter`;
+    svg.replaceChildren();
+    const shown = single ? (list.length ? [list[((idx % list.length) + list.length) % list.length]] : []) : list.slice(0, Math.max(1, Math.min(300, Number(fN.value) || 40)));
+    if (single && list.length) { idx = ((idx % list.length) + list.length) % list.length; $("pos").textContent = `${idx + 1} / ${list.length}`; }
+    // frame of the view: the filtered set (overlay) or the one track with a margin (single), at least 300 px wide
+    const b = bounds(single ? shown : list);
+    const m = single ? 60 : 40;
+    let w = Math.max(300, b.x1 - b.x0 + 2 * m), h = Math.max(300, b.y1 - b.y0 + 2 * m);
+    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+    svg.setAttribute("viewBox", `${cx - w / 2} ${cy - h / 2} ${w} ${h}`);
+    svg.style.aspectRatio = `${w} / ${h}`;
+    const sw = Math.max(w, h) / (single ? 260 : 420);
+    for (const t of shown) {
+      const p = pts(t);
+      svg.appendChild(el("polyline", {
+        points: p.map(([x, y]) => `${x},${y}`).join(" "), fill: "none", stroke: COL[t.c], "stroke-width": sw * (single ? 1.6 : 1),
+        "stroke-linecap": "round", "stroke-linejoin": "round", opacity: single ? 1 : 0.55,
+      }));
+      if (single && p.length) {
+        svg.appendChild(el("circle", { cx: p[0][0], cy: p[0][1], r: sw * 4, fill: COL[t.c] }));
+        const [ex, ey] = p[p.length - 1];
+        svg.appendChild(el("rect", { x: ex - sw * 3.5, y: ey - sw * 3.5, width: sw * 7, height: sw * 7, fill: "#fff", stroke: COL[t.c], "stroke-width": sw * 1.6 }));
+      }
+    }
+    $("info").textContent = single && shown[0]
+      ? `${shown[0].id} · ${SN[shown[0].s]} · ${CN[shown[0].c]} · ${shown[0].p.length / 2} Punkte`
+      : shown.length < list.length ? `Gezeigt: die ersten ${shown.length} von ${list.length} Bahnen.` : "";
+  }
+
+  for (const c of [fSplit, fClass, fMode]) c.addEventListener("input", () => { idx = 0; render(); });
+  fN.addEventListener("input", render);
+  $("prev").addEventListener("click", () => { idx -= 1; render(); });
+  $("next").addEventListener("click", () => { idx += 1; render(); });
+  addEventListener("keydown", (e) => {
+    if (fMode.value !== "single" || (e.target as HTMLElement).tagName === "SELECT" || (e.target as HTMLElement).tagName === "INPUT") return;
+    if (e.key === "ArrowLeft") { idx -= 1; render(); }
+    if (e.key === "ArrowRight") { idx += 1; render(); }
+  });
+  render();
+</script>
+
+<style>
+  main { max-width: 1000px; margin: 0 auto; padding: 28px 16px 48px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 16px; }
+  h1 { font-size: 34px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  header p, .sub { color: var(--muted); margin: 0 0 14px; max-width: 820px; font-size: 14px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 8px 0 12px; font-size: 13px; color: var(--muted); }
+  .controls label { display: flex; flex-direction: column; gap: 3px; }
+  select, input[type="number"], button { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+  input[type="number"] { width: 80px; }
+  button { cursor: pointer; }
+  [hidden] { display: none !important; }
+  #single-nav { display: flex; gap: 8px; align-items: center; }
+  .count { margin-left: auto; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; margin-bottom: 10px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; }
+  .legend b { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border: 2px solid var(--ink); }
+  .legend b.start { border-radius: 50%; background: var(--ink); }
+  svg { display: block; width: 100%; max-height: 78vh; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+</style>

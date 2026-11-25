@@ -1,0 +1,74 @@
+---
+// Result of the blind hand check of the trackers: counts per verdict, no tracks and no video.
+// Data: snapshot of labels/tracker_eval.jsonl (counts only), see scripts/snapshot.mjs.
+import Layout from "../layouts/Layout.astro";
+import { url } from "../lib/url";
+import bewertungJson from "../data/tracker_bewertung.json";
+
+const VERDICTS = [
+  { key: "korrekt", name: "Korrekt und ganz", hint: "eine Biene, von Brett/Rand bis Brett/Rand" },
+  { key: "bruchstueck", name: "Korrekt, aber Bruchstück", hint: "eine Biene, aber Anfang oder Ende fehlt" },
+  { key: "wechsel", name: "Bienenwechsel", hint: "springt irgendwo auf eine andere Biene (geht vor Bruchstück)" },
+  { key: "keine_biene", name: "Keine Biene", hint: "Schatten, Gras, Fleck" },
+] as const;
+const table: any[] = bewertungJson as any[];
+const pct = (a: number, n: number) => (n ? `${Math.round((100 * a) / n)} %` : "–");
+// Wilson 95 % interval of a share
+const wilson = (a: number, n: number) => {
+  if (!n) return "–";
+  const z = 1.96, p = a / n, d = 1 + z * z / n, c = (p + z * z / (2 * n)) / d, h = (z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / d;
+  return `${Math.round(100 * (c - h))}–${Math.round(100 * (c + h))} %`;
+};
+---
+
+<Layout title="Tracker-Bewertung">
+  <main>
+    <a href={url("/")} class="back">← Start</a>
+    <header>
+      <div class="kicker">beeflight · Tracker</div>
+      <h1>Tracker blind bewertet</h1>
+      <p>30 bis 60 zufällige Bahnen pro Tracker aus den Validierungssequenzen wurden gemischt und ohne Namen von Hand beurteilt:
+        bleibt der Punkt die ganze Zeit auf <b>derselben Biene</b>, und beginnt und endet die Bahn am Brett oder Bildrand?
+        Hier stehen nur die Ergebnisse. Die Bahnen selbst und das Video bleiben beim Datensatz.</p>
+    </header>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Tracker</th><th>n</th>{VERDICTS.map((v) => <th title={v.hint}>{v.name}</th>)}<th>95 % „korrekt und ganz“</th></tr>
+        </thead>
+        <tbody>
+          {table.map((r) => (
+            <tr class={r.key === "flights_chiron_linked" ? "final" : ""}>
+              <th>{r.name}</th><td>{r.n}</td>
+              {VERDICTS.map((v) => <td>{pct(r[v.key], r.n)}<small>{r[v.key]}</small></td>)}
+              <td>{wilson(r.korrekt, r.n)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <ul class="sub">
+      {VERDICTS.map((v) => <li><b>{v.name}:</b> {v.hint}</li>)}
+    </ul>
+    <p class="sub">Intervall: Wilson, 95 %. Bei so wenigen Bahnen pro Tracker sind die Intervalle breit; Zeilen mit n unter 20 zeigen nur eine Tendenz.
+      Fett markiert: der finale Tracker (Chiron + Huang 2008).</p>
+  </main>
+</Layout>
+
+<style>
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 48px; }
+  .back { text-decoration: none; color: var(--muted); font-size: 14px; }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 16px; }
+  h1 { font-size: 34px; margin: 4px 0 6px; letter-spacing: -.02em; }
+  header p, .sub { color: var(--muted); margin: 0 0 12px; max-width: 900px; font-size: 14px; }
+  .scroll { overflow-x: auto; margin-top: 16px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; background: #fff; border: 1px solid var(--line); }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:first-child { text-align: left; }
+  thead th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--panel); }
+  tbody th { font-weight: 500; }
+  td small { display: block; color: var(--muted); font-size: 11px; }
+  tr.final th, tr.final td { font-weight: 700; background: #fdf6e8; }
+  ul.sub { padding-left: 18px; margin-top: 14px; }
+</style>

@@ -1,0 +1,106 @@
+---
+// Short landing page: one sentence, the main result, a picture made of real tracks (coordinates only), two ways in.
+import Layout from "../layouts/Layout.astro";
+import { url } from "../lib/url";
+import testJson from "../data/test_ergebnis.json";
+import tracksJson from "../data/tracks.json";
+
+const test: any = testJson;
+const de = (x: number, d = 2) => x.toFixed(d).replace(".", ",");
+const TEST: [string, string][] = [["test_same_hive", "gleicher Stock, später"], ["test_other_hive", "anderer Stock"]];
+
+// a few train tracks per class, drawn as lines (no video, no image)
+const COL: Record<string, string> = { orientierung: "var(--c-orientierung)", sammelabflug: "var(--c-sammelabflug)",
+  anflug: "var(--c-anflug)", artefakt: "var(--c-artefakt)" };
+const PICK: Record<string, number> = { orientierung: 7, sammelabflug: 4, anflug: 3 };
+const all: any[] = (tracksJson as any[]).filter((t) => t.s === "train" && t.p.length >= 24);
+const picked = Object.entries(PICK).flatMap(([c, n]) => {
+  const of = all.filter((t) => t.c === c);
+  return Array.from({ length: n }, (_, i) => of[Math.floor((i * of.length) / n)]).filter(Boolean);
+});
+const xs = picked.flatMap((t) => t.p.filter((_: number, i: number) => i % 2 === 0));
+const ys = picked.flatMap((t) => t.p.filter((_: number, i: number) => i % 2 === 1));
+const pad = 30, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+const vw = Math.max(...xs) - x0 + pad, vh = Math.max(...ys) - y0 + pad;
+const line = (p: number[]) => p.reduce((s, v, i) => s + (i % 2 ? `,${v} ` : `${v}`), "");
+
+const MORE: [string, string, string][] = [
+  ["/test-details", "Test-Details", "Test A und B gegen drei Referenzen"],
+  ["/labels-uebereinstimmung", "Labels", "Klassen je Split und wie einig sich die Labelnden sind"],
+  ["/tracker-bewertung", "Tracker-Bewertung", "Blinde Handbewertung der Tracker"],
+  ["/bahnen-viewer", "Bahnen-Viewer", "Alle gelabelten Flugbahnen zum Durchklicken"],
+];
+---
+
+<Layout title="Start">
+  <main>
+    <section class="hero">
+      <div class="text">
+        <div class="kicker">Studienarbeit · DHBW Ravensburg · 2026</div>
+        <h1>Orientierungsflüge von Honigbienen erkennen</h1>
+        <p class="lead">Junge Bienen fliegen Schleifen vor dem Stock, bevor sie sammeln. Ein Modell erkennt diese
+          Orientierungsflüge automatisch an ihrer Flugbahn.</p>
+        <div class="kpis">
+          {TEST.map(([k, n]) => {
+            const t = test.splits[k];
+            return (
+              <div class="kpi">
+                <b>{de(t.ba)}</b>
+                <span>Balanced Accuracy<br />{n}</span>
+                <em>Regel: {de(t.rule_ba)} · Zufall: 0,25</em>
+              </div>
+            );
+          })}
+        </div>
+        <div class="cta">
+          <a class="btn primary" href={url("/erklaerung")}>So funktioniert's →</a>
+          <a class="btn" href={url("/ergebnisse")}>Ergebnisse</a>
+        </div>
+      </div>
+      <figure class="art">
+        <svg viewBox={`${x0} ${y0} ${vw} ${vh}`} role="img" aria-label="Echte Flugbahnen: orange Orientierungsflüge, blau Sammelabflüge, grün Anflüge">
+          {picked.map((t) => <polyline points={line(t.p)} stroke={COL[t.c]} class={t.c === "orientierung" ? "o" : ""} />)}
+        </svg>
+        <figcaption>
+          <span><i style="background:var(--c-orientierung)"></i>Orientierung</span>
+          <span><i style="background:var(--c-sammelabflug)"></i>Sammelabflug</span>
+          <span><i style="background:var(--c-anflug)"></i>Anflug</span>
+        </figcaption>
+      </figure>
+    </section>
+
+    <section class="more">
+      {MORE.map(([p, t, d]) => <a href={url(p)}><b>{t}</b><span>{d}</span></a>)}
+    </section>
+  </main>
+</Layout>
+
+<style>
+  main { max-width: 1100px; margin: 0 auto; padding: 40px 16px 48px; }
+  .hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 40px; align-items: center; }
+  @media (max-width: 820px) { .hero { grid-template-columns: 1fr; } }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: clamp(28px, 7vw, 40px); line-height: 1.1; margin: 8px 0 12px; letter-spacing: -.02em; }
+  .lead { font-size: 18px; color: var(--muted); margin: 0 0 22px; max-width: 520px; }
+  .kpis { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 22px; }
+  .kpi { flex: 1; min-width: 140px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .kpi b { display: block; font-size: 34px; line-height: 1.1; }
+  .kpi span { display: block; font-size: 13px; margin: 2px 0 4px; }
+  .kpi em { font-style: normal; font-size: 12px; color: var(--muted); }
+  .cta { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { text-decoration: none; padding: 10px 18px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-weight: 600; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .art { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  .art svg { width: 100%; height: auto; max-height: 520px; display: block; }
+  .art polyline { fill: none; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+  .art polyline.o { stroke-width: 9; opacity: .9; }
+  figcaption { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 8px; }
+  figcaption i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+  .more { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-top: 48px;
+    padding-top: 24px; border-top: 1px solid var(--line); }
+  .more a { text-decoration: none; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .more a:hover { border-color: var(--accent); }
+  .more b { display: block; margin-bottom: 2px; }
+  .more span { font-size: 13px; color: var(--muted); }
+</style>

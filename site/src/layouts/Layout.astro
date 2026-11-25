@@ -1,0 +1,90 @@
+---
+import { url } from "../lib/url";
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+const NAV: [string, string][] = [
+  ["/", "Start"], ["/erklaerung", "So funktioniert's"], ["/ergebnisse", "Ergebnisse"],
+  ["/test-details", "Test-Details"], ["/labels-uebereinstimmung", "Labels"], ["/tracker-bewertung", "Tracker-Bewertung"],
+  ["/bahnen-viewer", "Bahnen"],
+];
+---
+
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · Orientierungsflüge</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6' fill='%23d99a1e'/></svg>" />
+  </head>
+  <body>
+    <nav class="topnav" aria-label="Hauptnavigation">
+      <a class="brand" href={url("/")}>Orientierungsflüge</a>
+      {NAV.slice(1).map(([p, t]) => <a href={url(p)}>{t}</a>)}
+    </nav>
+    <slot />
+    <footer class="sitefoot">
+      <p>Orientierungsflüge von Honigbienen: Ergebnisse der Klassifikation von Flugbahnen. Nur Zahlen, Bahnkoordinaten und Grafiken, keine Videos oder Bilder.</p>
+      <p>Texte, Grafiken und Daten dieser Seite: CC BY-NC 4.0, Namensnennung „Schutera, Mark, thehiveisreal (2026)“. Code: MIT.</p>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --ink: #16181d;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #fbfaf7;
+    --panel: #f1efe9;
+    --accent: #d99a1e;
+    --c-orientierung: #e0662a;
+    --c-sammelabflug: #3d93c9;
+    --c-anflug: #3f9d6b;
+    --c-artefakt: #8a8f98;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 Inter, system-ui, sans-serif;
+  }
+  a { color: inherit; }
+  kbd {
+    font: 600 11px/1 ui-monospace, "JetBrains Mono", monospace;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 2px 5px;
+    background: #fff;
+    color: var(--ink);
+  }
+  .topnav { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: #fff; font-size: 13.5px; }
+  .topnav a { text-decoration: none; color: var(--muted); padding: 3px 0; }
+  .topnav a:hover { color: var(--ink); }
+  .topnav .brand { font-weight: 700; color: var(--accent); margin-right: 8px; }
+  .sitefoot { border-top: 1px solid var(--line); padding: 18px 16px 32px; color: var(--muted); font-size: 12.5px; max-width: 1180px; margin: 0 auto; }
+  .sitefoot p { margin: 4px 0; }
+  img { max-width: 100%; height: auto; }
+  /* wide charts keep a readable size and scroll sideways on small screens */
+  .chart { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .chart > svg { display: block; }
+  /* grid and flex children may shrink below their content, so a wide chart or table scrolls instead of widening the page */
+  main section > *, main .body, main .two > *, main .cols > *, main .summary > * { min-width: 0; }
+  @media (max-width: 900px) {
+    main table { display: block; overflow-x: auto; max-width: 100%; }
+  }
+  @media (max-width: 700px) {
+    body { font-size: 15.5px; }
+    .topnav { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; gap: 16px; padding: 12px 16px; -webkit-overflow-scrolling: touch; }
+    .chart > svg { min-width: 640px; }
+    .chart > svg[viewBox^="0 0 680"] { min-width: 520px; }
+    main table { display: block; overflow-x: auto; max-width: 100%; }
+    main h1 { font-size: 28px !important; }
+    main h2 { font-size: 20px !important; }
+  }
+</style>

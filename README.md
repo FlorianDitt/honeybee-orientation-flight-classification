@@ -13,7 +13,8 @@ Getestet wird zweistufig: auf einem späteren Zeitblock desselben Stocks (**Test
 Stock mit anderem Holz, Licht und Kamera-Abstand (**Test B**).
 
 **Status:** abgeschlossen und präsentiert (November 2026). Eingefroren ist ein Ensemble aus 5 ResNets auf der
-Flugbahn mit einem YOLO26s-Vorfilter gegen Artefakte. Einmalige Testauswertung (Balanced Accuracy):
+Flugbahn mit einem YOLO26s-Vorfilter gegen Artefakte (trainiert auf Darians Labels, Gewichte nicht enthalten, siehe
+[Danke](#danke)). Einmalige Testauswertung (Balanced Accuracy):
 
 | Testset | Modell | Regel-Baseline |
 |---|---|---|
@@ -24,6 +25,8 @@ F1 für `orientierung` liegt auf beiden Testsets bei etwa 0,58. Alles danach (z.
 ausgewertet.
 
 ## Dokumentation
+
+Ergebnis-Website (Zahlen, Grafiken, Lernpfad, Bahnen-Viewer ohne Video): https://florianditt.github.io/honeybee-orientation-flight-classification/
 
 | Dokument | Inhalt |
 |---|---|
@@ -59,9 +62,8 @@ uv run pytest                                            # Tests
 ```
 
 **Handlabels** in der Web-App: `cd labeler && npm install && npm run dev`, dann http://127.0.0.1:4321.
-Freunde labeln online unter https://florianditt.github.io/BeeHive/ (Clips mit `uv run beeflight-clips`,
-Deploy mit `npm run deploy:web`), `uv run beeflight-vote` bildet daraus Mehrheitslabels
-(Details in [labeler/README.md](labeler/README.md)).
+Die Online-Version zum Labeln für Freiwillige ist nicht mehr erreichbar; `uv run beeflight-vote` bildet aus den
+gesammelten Exporten Mehrheitslabels (Details in [labeler/README.md](labeler/README.md)).
 
 Eine Sequenz braucht etwa eine Minute (8 Kerne) und rund 1 GB RAM.
 
@@ -81,7 +83,8 @@ src/beeflight/
   resnet.py      Kandidat 1: ResNet auf der Bahn (gewählt)
   image_features.py  Kandidat 2: DINOv2 auf Ausschnitten
   fusion.py      Kandidaten 3 und 4: Fusion und G-Blend
-labeler/         Astro-Web-App zum Handlabeln (lokal und als GitHub-Pages-Seite)
+labeler/         Astro-Web-App zum Handlabeln (lokal)
+site/            Ergebnis-Website (Astro, statisch, GitHub Pages)
 labels/          Warteschlangen, Handlabels, votes/ (Exporte der Helfenden), final_*.jsonl
 tests/           Split-Invarianten, Bahnmerkmale, Tracker, Stichprobe, Mehrheitsentscheid
 docs/            Dokumentation der Idee und Methode
@@ -106,7 +109,8 @@ Zwischen den Blöcken liegt je eine verworfene Puffersequenz (070, 085), damit k
 ## Danke
 
 Großer Dank an [@dariandieck](https://github.com/dariandieck) für die Bienen-Labels, auf denen das YOLO für den
-Vorfilter trainiert ist. Die Labels selbst sind nicht Teil dieses Repos. Danke auch an die beiden Freiwilligen
+Vorfilter trainiert ist (YOLO26s, feinjustiert auf Darians handgelabelten Bienen-Frames). Weder die Labels noch die
+Gewichte dieses YOLO sind Teil dieses Repos. Danke auch an die beiden Freiwilligen
 (Labeler 2 und 3), die die Testsets mitgelabelt haben.
 
 ## Lizenz

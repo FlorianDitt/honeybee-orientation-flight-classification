@@ -7,7 +7,7 @@ import { trackerFolders, trackerRuns } from "./trackers";
 
 // order matters: a new tracker goes to the end, so the samples of the others (and their verdicts) stay the same
 export const EVAL_TRACKERS = ["flights_chiron_sort", "flights_chiron", "flights", "flights_chiron_linked", "flights_darian_hybrid",
-  "flights_sledevic26_hybrid"];
+  "flights_sledevic26_hybrid", "flights_darian_botsort_bee"];
 export const PER_TRACKER = 30;
 // 17.11.: the trackers on slide 2 (SORT, Chiron, Chiron + Huang) and the Sledevič YOLO26s hybrid get 60 tracks each,
 // the Darian hybrid 30 (only for background). The first 30 per tracker are the same as before (the shuffle per tracker

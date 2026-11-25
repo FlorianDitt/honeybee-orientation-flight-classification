@@ -234,8 +234,10 @@ deshalb nicht sauber vergleichbar; der Vergleich für den Domain Shift ist A geg
 **Fragmente (H3):** vollständig gegen Fragment nach den Zonen (`lost` an Start oder Ende), nicht nach den Flags der
 Labelnden; beschreibend.
 
-**Tracking-Qualität:** Anteil vollständiger Bahnen (Start und Ende in `board` oder `edge`), getrennt von den
-Klassifikationsmetriken.
+**Tracking-Qualität:** blinde Handprüfung einer festen Zufallsstichprobe von Val-Bahnen je Tracker
+(`labels/tracker_eval.jsonl`): korrekt und ganz, Bruchstück, Bienenwechsel, keine Biene. Der Anteil vollständiger
+Bahnen (Start und Ende in `board` oder `edge`) ist keine Qualitätsmetrik: Auch ein Bienenwechsel zählt dort als
+vollständig. Er bleibt nur als Beschreibung.
 
 **Grenzen:** Alle Kennzahlen gelten nur für Flüge, die der Tracker gefunden hat. Test B ist ein einzelner anderer
 Stock unter anderen Bedingungen, Stock, Wetter und Kamera lassen sich nicht trennen.

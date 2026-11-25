@@ -40,6 +40,11 @@ BLOB_SCORE = 0.2  # background blobs: between track_low_thresh and track_high_th
 # Ultralytics' bytetrack.yaml defaults (the paper uses tau = 0.6 for its pedestrian detector)
 BYTE = dict(tracker_type="bytetrack", track_high_thresh=0.25, track_low_thresh=0.1, new_track_thresh=0.25,
             track_buffer=30, match_thresh=0.8, fuse_score=True)
+# BoT-SORT (Aharon et al. 2022) as in Ultralytics' botsort.yaml, but without camera motion compensation (the
+# camera is fixed) and without ReID (bees look alike): what is left is ByteTrack with BoT-SORT's Kalman state
+# (box width and height instead of aspect ratio).
+BOT = dict(BYTE, tracker_type="botsort", gmc_method="none", proximity_thresh=0.5, appearance_thresh=0.8,
+           with_reid=False)
 DET = ROOT / "outputs" / "detector"
 WEIGHTS = DET / "bee" / "weights" / "best.pt"
 
@@ -168,20 +173,30 @@ def center_cost(tracks, dets):
     return np.minimum(np.linalg.norm(a[:, None] - b[None], axis=2) / CENTER_SCALE, 1.0)
 
 
-def byte_track(per_frame, shape, match="iou"):
-    """Run Ultralytics' BYTETracker; returns tracks as (t, x, y) arrays in zone coordinates.
+def byte_track(per_frame, shape, match="iou", kind="bytetrack", vel=1.0):
+    """Run Ultralytics' BYTETracker (kind="botsort": BOTSORT); returns tracks as (t, x, y) arrays.
 
     match="center" swaps only the cost function (all three associations), the BYTE logic stays as it is.
     A new track has no velocity yet, so with IoU a fast bee has left its box before it is confirmed.
+    vel scales the Kalman velocity noise (default 1/160 of the box height per frame, made for pedestrians;
+    a bee turns within a few frames, as in sort.py's sort_bee).
     """
     from unittest.mock import patch
 
     from ultralytics.engine.results import Boxes
+    from ultralytics.trackers.bot_sort import BOTSORT
     from ultralytics.trackers.byte_tracker import BYTETracker, matching
 
-    tracker = BYTETracker(SimpleNamespace(**BYTE))
+    from ultralytics.trackers.bot_sort import BOTrack
+    from ultralytics.trackers.byte_tracker import STrack
+
+    tracker = BOTSORT(SimpleNamespace(**BOT)) if kind == "botsort" else BYTETracker(SimpleNamespace(**BYTE))
+    shared = (BOTrack if kind == "botsort" else STrack).shared_kalman  # used by multi_predict
+    std = tracker.kalman_filter._std_weight_velocity * vel
     pts = {}
-    with patch.object(matching, "iou_distance", center_cost) if match == "center" else nullcontext():
+    with (patch.object(matching, "iou_distance", center_cost) if match == "center" else nullcontext(),
+          patch.object(tracker.kalman_filter, "_std_weight_velocity", std),
+          patch.object(shared, "_std_weight_velocity", std)):
         for t, d in enumerate(per_frame):
             boxes = Boxes(np.c_[d, np.zeros(len(d))].reshape(-1, 6), shape)
             for x1, y1, x2, y2, tid, *_ in tracker.update(boxes):
